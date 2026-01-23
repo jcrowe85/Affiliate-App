@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { hashPassword } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 
+// Mark route as dynamic to prevent static analysis during build
+export const dynamic = 'force-dynamic';
+
 /**
  * Create initial admin user (run once to setup)
  * TODO: Remove or protect this route in production
