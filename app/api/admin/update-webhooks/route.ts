@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentAdmin } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 
+// Mark route as dynamic to prevent static analysis during build
+export const dynamic = 'force-dynamic';
+
 /**
  * Update webhook URLs for the current shop
  * POST /api/admin/update-webhooks
