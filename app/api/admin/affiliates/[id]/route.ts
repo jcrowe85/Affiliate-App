@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { getCurrentAdmin, hashPassword } from '@/lib/auth';
 
 // Mark route as dynamic to prevent static analysis during build
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /**
