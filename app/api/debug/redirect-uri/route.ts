@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Mark route as dynamic to prevent static analysis during build
+export const dynamic = 'force-dynamic';
+
 /**
  * Debug endpoint to show what redirect URI will be used
  */

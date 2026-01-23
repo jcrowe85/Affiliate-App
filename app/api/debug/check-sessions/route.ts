@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 
+// Mark route as dynamic to prevent static analysis during build
+export const dynamic = 'force-dynamic';
+
 /**
  * Debug endpoint to check what sessions are in the database
  */

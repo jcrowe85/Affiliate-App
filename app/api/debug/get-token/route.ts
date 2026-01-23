@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getCurrentAdmin } from '@/lib/auth';
 
+// Mark route as dynamic to prevent static analysis during build
+export const dynamic = 'force-dynamic';
+
 /**
  * Debug endpoint to get stored Shopify access token
  * Requires admin login

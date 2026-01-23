@@ -3,6 +3,9 @@ import { hashIP, hashUserAgent, generateClickId } from '@/lib/utils';
 import { recordClick } from '@/lib/attribution';
 import { prisma } from '@/lib/db';
 
+// Mark route as dynamic to prevent static analysis during build
+export const dynamic = 'force-dynamic';
+
 /**
  * Track affiliate click via POST with deduplication
  * 

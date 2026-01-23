@@ -4,6 +4,9 @@ import { recordClick } from '@/lib/attribution';
 import { prisma } from '@/lib/db';
 import { cookies } from 'next/headers';
 
+// Mark route as dynamic to prevent static analysis during build
+export const dynamic = 'force-dynamic';
+
 /**
  * Track affiliate click and set cookie/cart attributes
  */

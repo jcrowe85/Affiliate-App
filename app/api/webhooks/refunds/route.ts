@@ -3,6 +3,10 @@ import { verifyShopifyWebhook } from '@/lib/utils';
 import { prisma } from '@/lib/db';
 import { reverseCommission } from '@/lib/commission';
 
+// Mark route as dynamic to prevent static analysis during build
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 /**
  * Handle Shopify refund webhooks
  * Reverses commissions for refunded orders

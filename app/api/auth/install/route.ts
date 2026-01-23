@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 
+// Mark route as dynamic to prevent static analysis during build
+export const dynamic = 'force-dynamic';
+
 /**
  * Shopify app installation endpoint
  * Initiates OAuth flow by building the OAuth URL manually

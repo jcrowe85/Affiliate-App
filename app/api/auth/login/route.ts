@@ -3,6 +3,9 @@ import { verifyPassword, createAdminSession } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { cookies } from 'next/headers';
 
+// Mark route as dynamic to prevent static analysis during build
+export const dynamic = 'force-dynamic';
+
 /**
  * Admin login endpoint (standalone, not Shopify OAuth)
  */

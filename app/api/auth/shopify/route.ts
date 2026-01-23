@@ -3,6 +3,9 @@ import { shopify } from '@/lib/shopify';
 import { prisma } from '@/lib/db';
 import { createAppWebhooks } from '@/lib/webhooks';
 
+// Mark route as dynamic to prevent static analysis during build
+export const dynamic = 'force-dynamic';
+
 /**
  * Shopify OAuth callback handler
  * Receives the authorization code and exchanges it for access tokens

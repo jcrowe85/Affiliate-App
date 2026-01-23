@@ -3,6 +3,9 @@ import { prisma } from '@/lib/db';
 import { hashIP, hashUserAgent, generateClickId } from '@/lib/utils';
 import { recordClick } from '@/lib/attribution';
 
+// Mark route as dynamic to prevent static analysis during build
+export const dynamic = 'force-dynamic';
+
 /**
  * Automatic referral link handler (Refersion-style)
  * 

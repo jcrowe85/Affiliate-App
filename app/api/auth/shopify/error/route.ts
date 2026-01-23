@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Mark route as dynamic to prevent static analysis during build
+export const dynamic = 'force-dynamic';
+
 /**
  * OAuth error page - shows what went wrong
  */
