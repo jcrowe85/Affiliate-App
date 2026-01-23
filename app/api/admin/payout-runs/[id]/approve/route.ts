@@ -3,6 +3,9 @@ import { prisma } from '@/lib/db';
 import { getCurrentAdmin } from '@/lib/auth';
 import { firePostbacks } from '@/lib/postback';
 
+// Mark route as dynamic to prevent static analysis during build
+export const dynamic = 'force-dynamic';
+
 /**
  * Approve payout run and mark commissions as paid
  */
