@@ -1144,9 +1144,17 @@ export default function AffiliateManagement() {
                                     keys.splice(targetIndex, 0, draggedWebhookParam);
                                     
                                     // Create new ordered mapping
-                                    const reorderedMapping: Record<string, { type: 'fixed' | 'dynamic'; value: string } | string> = {};
+                                    const reorderedMapping: Record<string, { type: 'fixed' | 'dynamic'; value: string }> = {};
                                     keys.forEach(key => {
-                                      reorderedMapping[key] = newMapping[key];
+                                      const value = newMapping[key];
+                                      // Ensure the value is in the correct format
+                                      if (typeof value === 'string') {
+                                        // Legacy format: convert to new format
+                                        reorderedMapping[key] = { type: 'dynamic', value };
+                                      } else if (value && typeof value === 'object' && 'type' in value && 'value' in value) {
+                                        // New format: use as-is
+                                        reorderedMapping[key] = value as { type: 'fixed' | 'dynamic'; value: string };
+                                      }
                                     });
                                     
                                     setFormData({ 
