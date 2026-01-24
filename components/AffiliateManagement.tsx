@@ -364,6 +364,14 @@ export default function AffiliateManagement() {
         return converted;
       })(),
       redirect_base_url: affiliate.redirect_base_url || '',
+      redirect_parameters_enabled: {
+        transaction_id: true,
+        affiliate_id: true,
+        sub1: true,
+        sub2: true,
+        sub3: true,
+        sub4: true,
+      },
     });
     setShowForm(true);
   };
