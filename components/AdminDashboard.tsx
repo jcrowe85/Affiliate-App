@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import AffiliateManagement from '@/components/AffiliateManagement';
 import OffersManagement from '@/components/OffersManagement';
@@ -103,10 +103,6 @@ export default function AdminDashboard() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, [activeTab]);
-
   const fetchDashboardData = async () => {
     try {
       // Always fetch stats
@@ -142,7 +138,11 @@ export default function AdminDashboard() {
       console.error('Error fetching dashboard data:', err);
       setLoading(false);
     }
-  };
+  }, [activeTab, router]);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   const handleApprove = async (commissionId: string) => {
     setActionLoading(commissionId);

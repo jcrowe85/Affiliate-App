@@ -61,10 +61,6 @@ export default function Conversions() {
     fetchOffers();
   }, []);
 
-  useEffect(() => {
-    fetchConversions();
-  }, [filters]);
-
   const fetchAffiliates = async () => {
     try {
       const res = await fetch('/api/admin/affiliates');
@@ -89,7 +85,7 @@ export default function Conversions() {
     }
   };
 
-  const fetchConversions = async () => {
+  const fetchConversions = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -112,7 +108,11 @@ export default function Conversions() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
+
+  useEffect(() => {
+    fetchConversions();
+  }, [fetchConversions]);
 
   const formatCurrency = (amount: string, currency: string = 'USD') => {
     return new Intl.NumberFormat('en-US', {

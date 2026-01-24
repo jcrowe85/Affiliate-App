@@ -96,21 +96,21 @@ function WebhookLogs({ commissionId, refreshTrigger }: { commissionId: string; r
   const [logs, setLogs] = useState<WebhookLog[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchWebhookLogs = async () => {
-    try {
-      const res = await fetch(`/api/admin/webhook-logs/${commissionId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setLogs(data.logs || []);
-      }
-    } catch (err) {
-      console.error('Error fetching webhook logs:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    const fetchWebhookLogs = async () => {
+      try {
+        const res = await fetch(`/api/admin/webhook-logs/${commissionId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setLogs(data.logs || []);
+        }
+      } catch (err) {
+        console.error('Error fetching webhook logs:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchWebhookLogs();
   }, [commissionId, refreshTrigger]);
 
@@ -121,7 +121,7 @@ function WebhookLogs({ commissionId, refreshTrigger }: { commissionId: string; r
   if (logs.length === 0) {
     return (
       <div className="text-sm text-gray-500 text-center py-4">
-        No webhook attempts yet. Click "Test Webhook" to fire a test webhook.
+        No webhook attempts yet. Click &quot;Test Webhook&quot; to fire a test webhook.
       </div>
     );
   }
