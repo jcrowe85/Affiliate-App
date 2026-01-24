@@ -93,6 +93,9 @@ export async function GET(request: NextRequest) {
           payout_terms_days: a.payout_terms_days,
           merchant_id: a.merchant_id,
           offer_id: a.offer_id,
+          webhook_url: a.webhook_url,
+          webhook_parameter_mapping: a.webhook_parameter_mapping,
+          redirect_base_url: a.redirect_base_url,
           offer: a.offer ? { id: a.offer.id, name: a.offer.name } : null,
           offers: a.affiliate_offers.map(ao => ({
             id: ao.offer.id,
@@ -147,6 +150,9 @@ export async function POST(request: NextRequest) {
       merchant_id,
       status = 'active',
       payout_terms_days = 30,
+      webhook_url,
+      webhook_parameter_mapping,
+      redirect_base_url,
     } = body;
 
     if (!first_name?.trim() || !last_name?.trim()) {
@@ -236,6 +242,9 @@ export async function POST(request: NextRequest) {
           password_hash,
           merchant_id: merchant_id?.trim() || null,
           offer_id: offer_id.trim(),
+          webhook_url: webhook_url?.trim() || null,
+          webhook_parameter_mapping: webhook_parameter_mapping || null,
+          redirect_base_url: redirect_base_url?.trim() || null,
           shopify_shop_id: shopId,
         },
       });

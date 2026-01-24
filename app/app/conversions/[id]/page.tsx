@@ -31,6 +31,7 @@ interface ConversionDetail {
       subscription_rebill_commission_value: string | null;
     };
     commission: {
+      id: string;
       amount: string;
       currency: string;
       status: string;
@@ -71,11 +72,151 @@ interface ConversionDetail {
   };
 }
 
+interface WebhookLog {
+  id: string;
+  webhook_url: string;
+  request_method: string;
+  request_params: Record<string, string> | null;
+  response_code: number | null;
+  response_body: string | null;
+  status: string;
+  error_message: string | null;
+  attempts: number;
+  last_attempt_at: string;
+  created_at: string;
+  affiliate: {
+    id: string;
+    name: string;
+    affiliate_number: number | null;
+    email: string;
+  };
+}
+
+function WebhookLogs({ commissionId, refreshTrigger }: { commissionId: string; refreshTrigger?: number }) {
+  const [logs, setLogs] = useState<WebhookLog[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchWebhookLogs = async () => {
+    try {
+      const res = await fetch(`/api/admin/webhook-logs/${commissionId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setLogs(data.logs || []);
+      }
+    } catch (err) {
+      console.error('Error fetching webhook logs:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchWebhookLogs();
+  }, [commissionId, refreshTrigger]);
+
+  if (loading) {
+    return <div className="text-sm text-gray-500">Loading webhook logs...</div>;
+  }
+
+  if (logs.length === 0) {
+    return (
+      <div className="text-sm text-gray-500 text-center py-4">
+        No webhook attempts yet. Click "Test Webhook" to fire a test webhook.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {logs.map((log) => (
+        <div
+          key={log.id}
+          className={`border rounded-lg p-4 ${
+            log.status === 'success'
+              ? 'bg-green-50 border-green-200'
+              : log.status === 'failed'
+              ? 'bg-red-50 border-red-200'
+              : 'bg-yellow-50 border-yellow-200'
+          }`}
+        >
+          <div className="flex items-start justify-between mb-2">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <span
+                  className={`px-2 py-1 text-xs font-semibold rounded ${
+                    log.status === 'success'
+                      ? 'bg-green-200 text-green-800'
+                      : log.status === 'failed'
+                      ? 'bg-red-200 text-red-800'
+                      : 'bg-yellow-200 text-yellow-800'
+                  }`}
+                >
+                  {log.status.toUpperCase()}
+                </span>
+                {log.response_code && (
+                  <span className="text-xs text-gray-500">HTTP {log.response_code}</span>
+                )}
+                <span className="text-xs text-gray-500">
+                  Attempt {log.attempts} • {new Date(log.last_attempt_at).toLocaleString()}
+                </span>
+              </div>
+              <div className="text-sm font-mono text-gray-700 break-all mb-2">
+                {log.webhook_url}
+              </div>
+              {log.request_params && Object.keys(log.request_params).length > 0 && (
+                <details className="mt-2 mb-2">
+                  <summary className="text-sm text-gray-600 cursor-pointer hover:text-gray-900">
+                    View Request Parameters ({Object.keys(log.request_params).length} parameters)
+                  </summary>
+                  <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-blue-300">
+                          <th className="text-left py-1 px-2 font-semibold text-gray-700">Parameter</th>
+                          <th className="text-left py-1 px-2 font-semibold text-gray-700">Value</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(log.request_params).map(([key, value]) => (
+                          <tr key={key} className="border-b border-blue-200">
+                            <td className="py-1 px-2 font-mono text-gray-800">{key}</td>
+                            <td className="py-1 px-2 font-mono text-gray-600 break-all">{String(value)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </details>
+              )}
+              {log.error_message && (
+                <div className="text-sm text-red-600 mb-2">
+                  <strong>Error:</strong> {log.error_message}
+                </div>
+              )}
+              {log.response_body && (
+                <details className="mt-2">
+                  <summary className="text-sm text-gray-600 cursor-pointer hover:text-gray-900">
+                    View Response Body
+                  </summary>
+                  <pre className="mt-2 p-2 bg-gray-100 rounded text-xs overflow-auto max-h-40">
+                    {log.response_body}
+                  </pre>
+                </details>
+              )}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function ConversionDetailPage() {
   const params = useParams();
   const router = useRouter();
   const [data, setData] = useState<ConversionDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [webhookRefreshTrigger, setWebhookRefreshTrigger] = useState(0);
 
   useEffect(() => {
     if (params.id) {
@@ -295,6 +436,36 @@ export default function ConversionDetailPage() {
               <p className="text-sm text-gray-900">{formatDate(conversion.commission.eligible_date)}</p>
             </div>
           </div>
+        </div>
+
+        {/* Webhook Logs */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Affiliate Webhook Logs</h2>
+            <button
+              onClick={async () => {
+                try {
+                  const res = await fetch(`/api/admin/webhook-logs/${conversion.commission.id}`, {
+                    method: 'POST',
+                  });
+                  const data = await res.json();
+                  if (res.ok) {
+                    alert(data.message);
+                    // Trigger refresh of webhook logs
+                    setWebhookRefreshTrigger(prev => prev + 1);
+                  } else {
+                    alert(`Error: ${data.error}`);
+                  }
+                } catch (err) {
+                  alert('Failed to fire webhook');
+                }
+              }}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm"
+            >
+              Test Webhook
+            </button>
+          </div>
+          <WebhookLogs commissionId={conversion.commission.id} refreshTrigger={webhookRefreshTrigger} />
         </div>
 
         {/* Subscription Details */}

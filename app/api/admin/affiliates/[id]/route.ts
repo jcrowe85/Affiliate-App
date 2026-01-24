@@ -53,6 +53,10 @@ export async function PATCH(
       payout_method,
       payout_identifier,
       payout_terms_days,
+      webhook_url,
+      webhook_parameter_mapping,
+      redirect_base_url,
+      affiliate_number,
     } = body;
 
     const data: Record<string, unknown> = {};
@@ -82,6 +86,9 @@ export async function PATCH(
     if (payout_method !== undefined) data.payout_method = payout_method || null;
     if (payout_identifier !== undefined) data.payout_identifier = payout_identifier || null;
     if (payout_terms_days !== undefined) data.payout_terms_days = payout_terms_days;
+    if (webhook_url !== undefined) data.webhook_url = webhook_url?.trim() || null;
+    if (webhook_parameter_mapping !== undefined) data.webhook_parameter_mapping = webhook_parameter_mapping || null;
+    if (redirect_base_url !== undefined) data.redirect_base_url = redirect_base_url?.trim() || null;
 
     if (password?.trim()) {
       data.password_hash = await hashPassword(password);
@@ -113,6 +120,31 @@ export async function PATCH(
           { status: 400 }
         );
       }
+    }
+
+    // Handle affiliate_number update
+    if (affiliate_number !== undefined && affiliate_number !== null) {
+      const numValue = typeof affiliate_number === 'string' ? parseInt(affiliate_number, 10) : affiliate_number;
+      if (isNaN(numValue)) {
+        return NextResponse.json(
+          { error: 'Invalid affiliate number' },
+          { status: 400 }
+        );
+      }
+      // Check if affiliate_number is already in use by another affiliate
+      const existing = await prisma.affiliate.findFirst({
+        where: {
+          shopify_shop_id: admin.shopify_shop_id,
+          affiliate_number: numValue,
+        },
+      });
+      if (existing && existing.id !== params.id) {
+        return NextResponse.json(
+          { error: 'Affiliate number already in use' },
+          { status: 400 }
+        );
+      }
+      data.affiliate_number = numValue;
     }
 
     // Validate offer if provided
@@ -162,6 +194,9 @@ export async function PATCH(
         status: updated.status,
         merchant_id: updated.merchant_id,
         offer_id: updated.offer_id,
+        webhook_url: updated.webhook_url,
+        webhook_parameter_mapping: updated.webhook_parameter_mapping,
+        redirect_base_url: updated.redirect_base_url,
         offer: updated.offer ? { id: updated.offer.id, name: updated.offer.name, offer_number: updated.offer.offer_number } : null,
       },
     });

@@ -31,6 +31,14 @@ export async function POST(request: NextRequest) {
     const userAgentHint = body.user_agent_hint || '';
     const timestamp = body.timestamp || Date.now();
     
+    // Capture postback parameters from URL
+    const postbackTransactionId = body.transaction_id || null;
+    const postbackAffiliateId = body.affiliate_id || null;
+    const postbackSub1 = body.sub1 || null;
+    const postbackSub2 = body.sub2 || null;
+    const postbackSub3 = body.sub3 || null;
+    const postbackSub4 = body.sub4 || null;
+    
     // Skip tracking for internal traffic markers
     if (affiliateNumberParam === 'internal' || affiliateNumberParam === 'direct') {
       return NextResponse.json(
@@ -88,6 +96,21 @@ export async function POST(request: NextRequest) {
         { error: 'Affiliate not found or inactive' },
         { status: 404 }
       );
+    }
+
+    // Update affiliate with postback parameters if provided
+    if (postbackTransactionId || postbackAffiliateId || postbackSub1 || postbackSub2 || postbackSub3 || postbackSub4) {
+      await prisma.affiliate.update({
+        where: { id: affiliate.id },
+        data: {
+          ...(postbackTransactionId && { postback_transaction_id: postbackTransactionId }),
+          ...(postbackAffiliateId && { postback_affiliate_id: postbackAffiliateId }),
+          ...(postbackSub1 && { postback_sub1: postbackSub1 }),
+          ...(postbackSub2 && { postback_sub2: postbackSub2 }),
+          ...(postbackSub3 && { postback_sub3: postbackSub3 }),
+          ...(postbackSub4 && { postback_sub4: postbackSub4 }),
+        },
+      });
     }
 
     // Get IP and user agent from request
@@ -193,6 +216,13 @@ export async function GET(request: NextRequest) {
       referrer: request.headers.get('referer') || '',
       user_agent_hint: request.headers.get('user-agent')?.substring(0, 100) || '',
       timestamp: Date.now(),
+      // Capture postback parameters from URL query string
+      transaction_id: searchParams.get('transaction_id') || null,
+      affiliate_id: searchParams.get('affiliate_id') || null,
+      sub1: searchParams.get('sub1') || null,
+      sub2: searchParams.get('sub2') || null,
+      sub3: searchParams.get('sub3') || null,
+      sub4: searchParams.get('sub4') || null,
     };
 
     // Create a new request-like object for POST handler

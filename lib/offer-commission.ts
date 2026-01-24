@@ -169,5 +169,14 @@ export async function createOfferCommission(
     },
   });
 
+  // Fire affiliate webhook if configured (fire in background, don't block)
+  if (affiliate?.webhook_url) {
+    import('./affiliate-webhook').then(({ fireAffiliateWebhook }) => {
+      fireAffiliateWebhook(commission.id, affiliateId).catch((error) => {
+        console.error('Error firing affiliate webhook:', error);
+      });
+    });
+  }
+
   return commission.id;
 }

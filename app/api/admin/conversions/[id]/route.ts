@@ -133,6 +133,7 @@ export async function GET(
           subscription_rebill_commission_value: offer?.subscription_rebill_commission_value?.toString() || null,
         },
         commission: {
+          id: commission.id,
           amount: commission.amount.toString(),
           currency: commission.currency,
           status: commission.status,

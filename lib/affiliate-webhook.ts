@@ -1,0 +1,300 @@
+import { prisma } from './db';
+
+/**
+ * Available database fields that can be mapped to webhook parameters
+ */
+export const AVAILABLE_WEBHOOK_FIELDS = {
+  // Commission fields
+  commission_id: 'Commission ID',
+  commission_amount: 'Commission Amount',
+  commission_currency: 'Commission Currency',
+  commission_status: 'Commission Status',
+  
+  // Order fields
+  order_id: 'Shopify Order ID',
+  order_number: 'Shopify Order Number',
+  order_total: 'Order Total',
+  order_currency: 'Order Currency',
+  order_date: 'Order Date',
+  
+  // Customer fields
+  customer_email: 'Customer Email',
+  customer_name: 'Customer Name',
+  
+  // Affiliate fields
+  affiliate_id: 'Affiliate ID (internal)',
+  affiliate_number: 'Affiliate Number',
+  affiliate_name: 'Affiliate Name',
+  affiliate_email: 'Affiliate Email',
+  
+  // Click/Attribution fields
+  click_id: 'Click ID',
+  landing_url: 'Landing URL',
+  
+  // Offer fields
+  offer_id: 'Offer ID',
+  offer_name: 'Offer Name',
+  
+  // Postback parameters (captured from affiliate redirect URL)
+  transaction_id: 'Transaction ID (from URL)',
+  affiliate_id_url: 'Affiliate ID (from URL)',
+  sub1: 'Sub1 (from URL)',
+  sub2: 'Sub2 (from URL)',
+  sub3: 'Sub3 (from URL)',
+  sub4: 'Sub4 (from URL)',
+  // Legacy postback parameter names (for backward compatibility)
+  postback_affiliate_id: 'Postback Affiliate ID',
+  postback_sub1: 'Postback Sub1',
+  postback_sub2: 'Postback Sub2',
+  postback_sub3: 'Postback Sub3',
+  postback_sub4: 'Postback Sub4',
+} as const;
+
+export type WebhookFieldKey = keyof typeof AVAILABLE_WEBHOOK_FIELDS;
+
+/**
+ * Fire affiliate webhook with parameter mapping
+ */
+export async function fireAffiliateWebhook(
+  commissionId: string,
+  affiliateId: string
+): Promise<boolean> {
+  // Get affiliate with webhook configuration
+  const affiliate = await prisma.affiliate.findUnique({
+    where: { id: affiliateId },
+  });
+
+  if (!affiliate || !affiliate.webhook_url) {
+    return false; // No webhook configured
+  }
+
+  // Get commission with all related data
+  const commission = await prisma.commission.findUnique({
+    where: { id: commissionId },
+    include: {
+      order_attribution: {
+        include: {
+          click: true,
+          affiliate: {
+            include: {
+              offer: true,
+            },
+          },
+        },
+      },
+      affiliate: {
+        include: {
+          offer: true,
+        },
+      },
+    },
+  });
+
+  if (!commission || !commission.order_attribution) {
+    return false;
+  }
+
+  const orderAttribution = commission.order_attribution;
+  const click = orderAttribution.click;
+  const offer = commission.affiliate.offer;
+
+  // Build data map from database
+  const dataMap: Record<string, string> = {
+    commission_id: commission.id,
+    commission_amount: commission.amount.toString(),
+    commission_currency: commission.currency,
+    commission_status: commission.status,
+    order_id: commission.shopify_order_id,
+    order_number: orderAttribution.shopify_order_number,
+    order_total: orderAttribution.order_total?.toString() || '0',
+    order_currency: orderAttribution.order_currency || 'USD',
+    order_date: commission.created_at.toISOString(),
+    customer_email: orderAttribution.customer_email || '',
+    customer_name: orderAttribution.customer_name || '',
+    affiliate_id: commission.affiliate_id,
+    affiliate_number: commission.affiliate.affiliate_number?.toString() || '',
+    affiliate_name: commission.affiliate.name,
+    affiliate_email: commission.affiliate.email,
+    click_id: click?.id || '',
+    landing_url: click?.landing_url || '',
+    offer_id: offer?.id || '',
+    offer_name: offer?.name || '',
+    // Postback parameters captured from affiliate redirect URL
+    // transaction_id comes from URL parameter, not Shopify order ID
+    transaction_id: commission.affiliate.postback_transaction_id || '',
+    // Direct sub parameter aliases (for easier mapping in webhook URLs)
+    sub1: commission.affiliate.postback_sub1 || '',
+    sub2: commission.affiliate.postback_sub2 || '',
+    sub3: commission.affiliate.postback_sub3 || '',
+    sub4: commission.affiliate.postback_sub4 || '',
+    // Legacy postback parameter names (for backward compatibility)
+    affiliate_id_url: commission.affiliate.postback_affiliate_id || '',
+    postback_affiliate_id: commission.affiliate.postback_affiliate_id || '',
+    postback_sub1: commission.affiliate.postback_sub1 || '',
+    postback_sub2: commission.affiliate.postback_sub2 || '',
+    postback_sub3: commission.affiliate.postback_sub3 || '',
+    postback_sub4: commission.affiliate.postback_sub4 || '',
+  };
+
+  // Get parameter mapping from affiliate
+  // Support both old format (Record<string, string>) and new format (Record<string, { type: 'fixed' | 'dynamic', value: string }>)
+  const parameterMappingRaw = (affiliate.webhook_parameter_mapping as any) || {};
+
+  // Build URL with mapped parameters
+  let webhookUrl = affiliate.webhook_url;
+  const urlParams = new URLSearchParams();
+
+  // Replace placeholders in URL (e.g., {sub3}, {conversion_id})
+  // First, extract all placeholders from the URL
+  const placeholderRegex = /\{([^}]+)\}/g;
+  const placeholders = new Set<string>();
+  let match;
+  while ((match = placeholderRegex.exec(webhookUrl)) !== null) {
+    placeholders.add(match[1]);
+  }
+
+  // Map each placeholder to its value (either fixed or from database)
+  for (const placeholder of placeholders) {
+    const mapping = parameterMappingRaw[placeholder];
+    let value: string | undefined;
+
+    if (!mapping) {
+      continue; // No mapping for this placeholder
+    }
+
+    // Handle new format: { type: 'fixed' | 'dynamic', value: string }
+    if (typeof mapping === 'object' && mapping.type) {
+      if (mapping.type === 'fixed') {
+        value = mapping.value;
+      } else if (mapping.type === 'dynamic' && dataMap[mapping.value] !== undefined) {
+        value = dataMap[mapping.value];
+      }
+    } 
+    // Handle legacy format: string (database field name)
+    else if (typeof mapping === 'string' && dataMap[mapping] !== undefined) {
+      value = dataMap[mapping];
+    }
+
+    if (value !== undefined) {
+      // Replace placeholder in URL
+      webhookUrl = webhookUrl.replace(`{${placeholder}}`, encodeURIComponent(value));
+    }
+  }
+
+  // Also handle query parameters (if mapping specifies them)
+  for (const [placeholder, mapping] of Object.entries(parameterMappingRaw)) {
+    // Skip if already replaced in URL
+    if (webhookUrl.includes(`{${placeholder}}`)) {
+      continue;
+    }
+
+    let value: string | undefined;
+
+    // Handle new format
+    if (typeof mapping === 'object' && mapping && 'type' in mapping) {
+      if (mapping.type === 'fixed') {
+        value = mapping.value;
+      } else if (mapping.type === 'dynamic' && dataMap[mapping.value] !== undefined) {
+        value = dataMap[mapping.value];
+      }
+    }
+    // Handle legacy format
+    else if (typeof mapping === 'string' && dataMap[mapping] !== undefined) {
+      value = dataMap[mapping];
+    }
+
+    if (value !== undefined) {
+      urlParams.append(placeholder, value);
+    }
+  }
+
+  // Add query parameters if any
+  if (urlParams.toString()) {
+    webhookUrl += (webhookUrl.includes('?') ? '&' : '?') + urlParams.toString();
+  }
+
+  // Send webhook
+  let success = false;
+  let responseCode: number | null = null;
+  let responseBody: string | null = null;
+  let errorMessage: string | null = null;
+
+  // Extract request parameters from the final webhook URL for logging
+  const requestParams: Record<string, string> = {};
+  try {
+    const urlObj = new URL(webhookUrl);
+    urlObj.searchParams.forEach((value, key) => {
+      requestParams[key] = value;
+    });
+  } catch (e) {
+    // URL parsing failed, skip parameter extraction
+  }
+
+  // Create webhook log entry before attempting
+  const webhookLog = await prisma.affiliateWebhookLog.create({
+    data: {
+      commission_id: commissionId,
+      affiliate_id: affiliateId,
+      webhook_url: webhookUrl,
+      request_method: 'GET',
+      request_params: requestParams, // Store the actual parameter values sent
+      status: 'pending',
+      shopify_shop_id: commission.shopify_shop_id,
+    },
+  });
+
+  try {
+    const response = await fetch(webhookUrl, {
+      method: 'GET',
+      headers: {
+        'User-Agent': 'Fleur-Affiliates/1.0',
+      },
+      // Timeout after 10 seconds
+      signal: AbortSignal.timeout(10000),
+    });
+
+    responseCode = response.status;
+    success = response.ok;
+    
+    // Try to read response body (limit to 1000 chars)
+    try {
+      responseBody = await response.text();
+      if (responseBody.length > 1000) {
+        responseBody = responseBody.substring(0, 1000) + '... (truncated)';
+      }
+    } catch (e) {
+      responseBody = null;
+    }
+
+    if (!success) {
+      errorMessage = `HTTP ${response.status}: ${responseBody?.substring(0, 200) || 'No response body'}`;
+    }
+  } catch (error: any) {
+    errorMessage = error.message || 'Unknown error';
+    if (error.name === 'AbortError') {
+      errorMessage = 'Request timeout (10s)';
+    }
+  }
+
+  // Update webhook log with results
+  await prisma.affiliateWebhookLog.update({
+    where: { id: webhookLog.id },
+    data: {
+      status: success ? 'success' : 'failed',
+      response_code: responseCode,
+      response_body: responseBody,
+      error_message: errorMessage,
+      last_attempt_at: new Date(),
+    },
+  });
+
+  // Also log to console for debugging
+  console.log(`[Webhook] Affiliate ${affiliateId}, Commission ${commissionId}:`, {
+    url: webhookUrl,
+    success,
+    responseCode,
+    error: errorMessage,
+  });
+
+  return success;
+}

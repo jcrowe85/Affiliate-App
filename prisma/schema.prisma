@@ -54,30 +54,39 @@ model AffiliateOffer {
 }
 
 model Affiliate {
-  id                String   @id @default(cuid())
-  affiliate_number  Int? // short, unique per shop (30483, 30484, …) for display/search
-  name              String // legacy; prefer first_name + last_name
-  first_name        String?
-  last_name         String?
-  company           String?
-  email             String   @unique
-  paypal_email      String?
-  address_line1     String?
-  address_line2     String?
-  city              String?
-  state             String?
-  zip               String?
-  phone             String?
-  status            String   @default("active") // active, suspended, banned
-  payout_method     String? // paypal, ach_external, invoice
-  payout_identifier String? // paypal email or external ref
-  payout_terms_days Int      @default(30) // Net-30 default
-  password_hash     String?
-  merchant_id       String? // unique per shop
-  offer_id          String?
-  shopify_shop_id   String
-  created_at        DateTime @default(now())
-  updated_at        DateTime @updatedAt
+  id                        String   @id @default(cuid())
+  affiliate_number          Int? // short, unique per shop (30483, 30484, …) for display/search
+  name                      String // legacy; prefer first_name + last_name
+  first_name                String?
+  last_name                 String?
+  company                   String?
+  email                     String   @unique
+  paypal_email              String?
+  address_line1             String?
+  address_line2             String?
+  city                      String?
+  state                     String?
+  zip                       String?
+  phone                     String?
+  status                    String   @default("active") // active, suspended, banned
+  payout_method             String? // paypal, ach_external, invoice
+  payout_identifier         String? // paypal email or external ref
+  payout_terms_days         Int      @default(30) // Net-30 default
+  password_hash             String?
+  merchant_id               String? // unique per shop
+  offer_id                  String?
+  webhook_url               String? // Webhook URL for affiliate partner postbacks
+  webhook_parameter_mapping Json? // Maps partner parameters to database fields (e.g., {"sub3": "order_number", "conversion_id": "commission_id"})
+  redirect_base_url         String? // Base URL for affiliate redirects
+  postback_transaction_id   String? // Captured from URL parameter transaction_id
+  postback_affiliate_id     String? // Captured from URL parameter affiliate_id
+  postback_sub1             String? // Captured from URL parameter sub1
+  postback_sub2             String? // Captured from URL parameter sub2
+  postback_sub3             String? // Captured from URL parameter sub3
+  postback_sub4             String? // Captured from URL parameter sub4
+  shopify_shop_id           String
+  created_at                DateTime @default(now())
+  updated_at                DateTime @updatedAt
 
   offer            Offer?                    @relation(fields: [offer_id], references: [id], onDelete: SetNull)
   links            AffiliateLink[]
@@ -87,6 +96,7 @@ model Affiliate {
   subscriptions    SubscriptionAttribution[]
   fraud_flags      FraudFlag[]
   affiliate_offers AffiliateOffer[]
+  webhook_logs      AffiliateWebhookLog[]
 
   @@unique([shopify_shop_id, affiliate_number])
   @@unique([shopify_shop_id, merchant_id])
@@ -194,6 +204,7 @@ model Commission {
   postback_logs     PostbackLog[]
   fraud_flags       FraudFlag[]
   payout_runs       PayoutRunCommission[]
+  webhook_logs      AffiliateWebhookLog[]
 
   @@index([affiliate_id, status])
   @@index([shopify_order_id])
@@ -281,6 +292,34 @@ model PostbackLog {
 
   @@index([commission_id])
   @@index([status, last_attempt_at])
+}
+
+model AffiliateWebhookLog {
+  id              String   @id @default(cuid())
+  commission_id   String
+  affiliate_id    String
+  webhook_url     String   // The actual URL that was called
+  request_method    String   @default("GET")
+  request_body     String?  // JSON body if POST request
+  request_params   Json?    // The actual parameter values that were sent (for GET requests, extracted from URL)
+  response_code    Int?
+  response_body    String?
+  status           String   @default("pending") // pending, success, failed
+  error_message    String?
+  attempts         Int      @default(1)
+  last_attempt_at  DateTime @default(now())
+  shopify_shop_id  String
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  // Relations
+  commission Commission @relation(fields: [commission_id], references: [id], onDelete: Cascade)
+  affiliate  Affiliate  @relation(fields: [affiliate_id], references: [id], onDelete: Cascade)
+
+  @@index([commission_id])
+  @@index([affiliate_id])
+  @@index([status, last_attempt_at])
+  @@index([shopify_shop_id])
 }
 
 model FraudFlag {

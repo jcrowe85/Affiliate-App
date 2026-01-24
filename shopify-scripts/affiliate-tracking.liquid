@@ -92,6 +92,14 @@
     console.log('Affiliate tracking: Detected ref parameter:', affiliateNumber);
     console.log('Calling tracking API:', `${apiUrl}?ref=${affiliateNumber}&shop=${SHOP_ID}`);
     
+    // Capture postback parameters from URL (transaction_id, affiliate_id, sub1, sub2, sub3, sub4)
+    const transactionId = getUrlParameter('transaction_id');
+    const affiliateId = getUrlParameter('affiliate_id');
+    const sub1 = getUrlParameter('sub1');
+    const sub2 = getUrlParameter('sub2');
+    const sub3 = getUrlParameter('sub3');
+    const sub4 = getUrlParameter('sub4');
+    
     // Call tracking API to record click (POST for better deduplication)
     const trackingData = {
       ref: affiliateNumber,
@@ -100,8 +108,19 @@
       referrer: document.referrer || '',
       user_agent_hint: navigator.userAgent.substring(0, 100), // First 100 chars for bot detection
       timestamp: Date.now(),
+      // Postback parameters from affiliate redirect URL
+      transaction_id: transactionId || null,
+      affiliate_id: affiliateId || null,
+      sub1: sub1 || null,
+      sub2: sub2 || null,
+      sub3: sub3 || null,
+      sub4: sub4 || null,
     };
 
+    // LAST-TOUCH ATTRIBUTION: Always overwrite previous affiliate data
+    // This ensures the most recent affiliate click wins, even if cookies/localStorage exist
+    console.log('🔄 New affiliate click detected - will overwrite any existing tracking data');
+    
     fetch(apiUrl, {
       method: 'POST',
       headers: {
@@ -119,24 +138,30 @@
     .then(data => {
       console.log('Tracking API response data:', data);
       if (data.success && data.clickId && data.affiliateId) {
+        // LAST-TOUCH ATTRIBUTION: Always overwrite previous affiliate data
+        // This ensures the most recent affiliate click wins
+        console.log('✅ Setting NEW affiliate tracking data (overwriting any previous):', {
+          newAffiliateNumber: data.affiliateNumber,
+          newClickId: data.clickId,
+          newAffiliateId: data.affiliateId
+        });
+        
         // Set tracking cookies (30 days) with Secure flag on HTTPS
+        // This OVERWRITES any existing cookies
         setCookie('affiliate_click_id', data.clickId, 30);
         setCookie('affiliate_id', data.affiliateId, 30);
         
-        // Store in sessionStorage for checkout
+        // Store in sessionStorage for checkout (OVERWRITES previous)
         sessionStorage.setItem('affiliate_click_id', data.clickId);
         sessionStorage.setItem('affiliate_id', data.affiliateId);
         
-        // Store in localStorage as durable fallback (survives cookie clears)
+        // Store in localStorage as durable fallback (OVERWRITES previous)
+        // This is critical for last-touch attribution
         setLocalStorage('affiliate_click_id', data.clickId);
         setLocalStorage('affiliate_id', data.affiliateId);
         
-        console.log('✅ Affiliate tracking initialized successfully:', {
-          affiliateNumber: data.affiliateNumber,
-          clickId: data.clickId,
-          affiliateId: data.affiliateId
-        });
-        console.log('✅ Cookies set: affiliate_click_id, affiliate_id');
+        console.log('✅ New affiliate tracking data saved to cookies, sessionStorage, and localStorage');
+        console.log('✅ Previous affiliate data has been overwritten (last-touch attribution)');
       } else {
         console.error('❌ Tracking API response missing required data:', data);
         console.error('Expected: success=true, clickId, affiliateId');
@@ -151,52 +176,62 @@
       });
     });
   } else {
-    // No ref parameter - check if we have existing cookies
-    const existingClickId = getCookie('affiliate_click_id');
-    if (existingClickId) {
-      console.log('No ref parameter, but existing tracking cookies found:', {
-        affiliate_click_id: existingClickId,
-        affiliate_id: getCookie('affiliate_id')
+    // No ref parameter - this is a normal visit (not from affiliate link)
+    // Restore existing tracking data if available (for attribution window)
+    console.log('No ref parameter - checking for existing affiliate tracking data');
+    
+    // Get existing affiliate tracking cookies
+    let affiliateClickId = getCookie('affiliate_click_id');
+    let affiliateId = getCookie('affiliate_id');
+
+    // ATTRIBUTION POLICY: Restore from localStorage if cookies missing (cookie caps/clears)
+    // This ensures tracking persists even if cookies are cleared, BUT only if no new affiliate click
+    if (!affiliateClickId) {
+      const storedClickId = getLocalStorage('affiliate_click_id');
+      if (storedClickId) {
+        console.log('Restoring affiliate_click_id from localStorage (cookie was cleared)');
+        affiliateClickId = storedClickId;
+        setCookie('affiliate_click_id', storedClickId, 30); // Re-set cookie
+      }
+    }
+    if (!affiliateId) {
+      const storedAffiliateId = getLocalStorage('affiliate_id');
+      if (storedAffiliateId) {
+        console.log('Restoring affiliate_id from localStorage (cookie was cleared)');
+        affiliateId = storedAffiliateId;
+        setCookie('affiliate_id', storedAffiliateId, 30); // Re-set cookie
+      }
+    }
+
+    // If we have affiliate tracking data, ensure it's stored in all storage types
+    if (affiliateClickId || affiliateId) {
+      console.log('Existing affiliate tracking data found:', {
+        affiliate_click_id: affiliateClickId,
+        affiliate_id: affiliateId
       });
+      // Store in sessionStorage for checkout
+      if (affiliateClickId) {
+        sessionStorage.setItem('affiliate_click_id', affiliateClickId);
+      }
+      if (affiliateId) {
+        sessionStorage.setItem('affiliate_id', affiliateId);
+      }
     } else {
-      console.log('No ref parameter and no existing cookies - normal visit (not from affiliate link)');
+      console.log('No existing affiliate tracking data - normal visit (not from affiliate link)');
     }
   }
 
-  // Get existing affiliate tracking cookies (from previous visit or path-based link)
+  // Get current affiliate tracking data (either newly set or restored)
+  // This will be used for cart attributes
   let affiliateClickId = getCookie('affiliate_click_id');
   let affiliateId = getCookie('affiliate_id');
-
-  // ATTRIBUTION POLICY: Restore from localStorage if cookies missing (cookie caps/clears)
-  // This ensures tracking persists even if cookies are cleared
+  
+  // Fallback to localStorage if cookies are missing
   if (!affiliateClickId) {
-    const storedClickId = getLocalStorage('affiliate_click_id');
-    if (storedClickId) {
-      console.log('Restoring affiliate_click_id from localStorage (cookie was cleared)');
-      affiliateClickId = storedClickId;
-      setCookie('affiliate_click_id', storedClickId, 30); // Re-set cookie
-    }
+    affiliateClickId = getLocalStorage('affiliate_click_id');
   }
   if (!affiliateId) {
-    const storedAffiliateId = getLocalStorage('affiliate_id');
-    if (storedAffiliateId) {
-      console.log('Restoring affiliate_id from localStorage (cookie was cleared)');
-      affiliateId = storedAffiliateId;
-      setCookie('affiliate_id', storedAffiliateId, 30); // Re-set cookie
-    }
-  }
-
-  // If we have affiliate tracking data, ensure it's stored in all storage types
-  if (affiliateClickId || affiliateId) {
-    // Store in sessionStorage for checkout
-    if (affiliateClickId) {
-      sessionStorage.setItem('affiliate_click_id', affiliateClickId);
-      setLocalStorage('affiliate_click_id', affiliateClickId);
-    }
-    if (affiliateId) {
-      sessionStorage.setItem('affiliate_id', affiliateId);
-      setLocalStorage('affiliate_id', affiliateId);
-    }
+    affiliateId = getLocalStorage('affiliate_id');
   }
 
   // For Shopify checkout, pass affiliate data as cart attributes

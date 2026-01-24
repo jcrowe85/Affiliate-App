@@ -83,15 +83,53 @@ export async function POST(request: NextRequest) {
     // Update or create each webhook
     for (const webhook of webhooks) {
       try {
-        // Find existing webhook by topic
-        const existing = existingWebhooks.find(
+        // Find all existing webhooks with this topic
+        const existingForTopic = existingWebhooks.filter(
           (w: any) => w.topic === webhook.topic
         );
 
-        if (existing) {
-          // Update existing webhook
+        // Find the one that matches the new URL (if any)
+        const matchingWebhook = existingForTopic.find(
+          (w: any) => w.address === webhook.address
+        );
+
+        // Delete all old webhooks with this topic that don't match the new URL
+        for (const oldWebhook of existingForTopic) {
+          if (oldWebhook.address !== webhook.address) {
+            try {
+              const deleteResponse = await fetch(
+                `https://${shop}/admin/api/2026-01/webhooks/${oldWebhook.id}.json`,
+                {
+                  method: 'DELETE',
+                  headers: {
+                    'X-Shopify-Access-Token': accessToken,
+                    'Content-Type': 'application/json',
+                  },
+                }
+              );
+
+              if (deleteResponse.ok) {
+                console.log(`🗑️  Deleted old webhook: ${webhook.topic} (${oldWebhook.address})`);
+                updated.push(`${webhook.topic} (deleted old: ${oldWebhook.address})`);
+              } else {
+                const errorText = await deleteResponse.text();
+                console.warn(`⚠️  Failed to delete old webhook ${oldWebhook.id}: ${errorText}`);
+              }
+            } catch (deleteError: any) {
+              console.warn(`⚠️  Error deleting old webhook ${oldWebhook.id}:`, deleteError.message);
+            }
+          }
+        }
+
+        if (matchingWebhook) {
+          // Webhook with correct URL already exists, no action needed
+          console.log(`✅ Webhook already correct: ${webhook.topic}`);
+          updated.push(`${webhook.topic} (already correct)`);
+        } else if (existingForTopic.length > 0) {
+          // Update the first existing webhook to the new URL
+          const webhookToUpdate = existingForTopic[0];
           const updateResponse = await fetch(
-            `https://${shop}/admin/api/2026-01/webhooks/${existing.id}.json`,
+            `https://${shop}/admin/api/2026-01/webhooks/${webhookToUpdate.id}.json`,
             {
               method: 'PUT',
               headers: {
@@ -100,7 +138,7 @@ export async function POST(request: NextRequest) {
               },
               body: JSON.stringify({
                 webhook: {
-                  id: existing.id,
+                  id: webhookToUpdate.id,
                   address: webhook.address,
                   format: 'json',
                 },
@@ -116,7 +154,7 @@ export async function POST(request: NextRequest) {
           console.log(`✅ Updated webhook: ${webhook.topic}`);
           updated.push(`${webhook.topic} (updated)`);
         } else {
-          // Create new webhook if it doesn't exist
+          // Create new webhook if none exist
           const createResponse = await fetch(
             `https://${shop}/admin/api/2026-01/webhooks.json`,
             {

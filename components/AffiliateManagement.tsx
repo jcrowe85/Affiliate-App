@@ -2,6 +2,34 @@
 
 import { useState, useEffect } from 'react';
 
+// Helper function to normalize redirect URL - ensures trailing slash after domain
+function normalizeRedirectUrl(url: string): string {
+  if (!url || !url.trim()) {
+    return url;
+  }
+  
+  const trimmed = url.trim();
+  
+  try {
+    const urlObj = new URL(trimmed);
+    // If pathname is empty (just domain), ensure it ends with '/'
+    // If pathname exists, preserve it as-is (user might have a specific path)
+    if (!urlObj.pathname || urlObj.pathname === '') {
+      urlObj.pathname = '/';
+    }
+    // Return the normalized URL (without query params or hash - those will be added separately)
+    return `${urlObj.protocol}//${urlObj.host}${urlObj.pathname}`;
+  } catch (e) {
+    // If URL parsing fails, try to add trailing slash manually for simple domain URLs
+    // Match URLs like https://example.com (no path, no query, no hash)
+    if (trimmed.match(/^https?:\/\/[^\/\?#]+$/)) {
+      return `${trimmed}/`;
+    }
+    // If it already has a path or query params, return as-is
+    return trimmed;
+  }
+}
+
 interface Offer {
   id: string;
   name: string;
@@ -31,6 +59,9 @@ interface Affiliate {
   payout_terms_days: number;
   merchant_id: string | null;
   offer_id: string | null;
+  webhook_url: string | null;
+  webhook_parameter_mapping: Record<string, { type: 'fixed' | 'dynamic'; value: string } | string> | null;
+  redirect_base_url: string | null;
   offer: { id: string; name: string } | null;
   offers?: Array<{ id: string; name: string; offer_number: number | null }>;
   created_at: string;
@@ -64,6 +95,28 @@ const defaultForm = {
   merchant_id: '',
   status: 'active' as string,
   payout_terms_days: 30,
+  webhook_url: '',
+  webhook_parameter_mapping: {
+    // Default postback parameters with example mappings
+    transaction_id: { type: 'dynamic' as const, value: 'transaction_id' },
+    affiliate_id: { type: 'dynamic' as const, value: 'postback_affiliate_id' },
+    sub1: { type: 'dynamic' as const, value: 'sub1' },
+    sub2: { type: 'dynamic' as const, value: 'sub2' },
+    sub3: { type: 'dynamic' as const, value: 'sub3' },
+    sub4: { type: 'dynamic' as const, value: 'sub4' },
+    // Example additional parameters
+    adv4: { type: 'dynamic' as const, value: 'order_number' },
+    amount: { type: 'dynamic' as const, value: 'commission_amount' },
+  } as Record<string, { type: 'fixed' | 'dynamic'; value: string }>,
+  redirect_base_url: '',
+  redirect_parameters_enabled: {
+    transaction_id: true,
+    affiliate_id: true,
+    sub1: true,
+    sub2: true,
+    sub3: true,
+    sub4: true,
+  } as Record<string, boolean>,
 };
 
 export default function AffiliateManagement() {
@@ -96,6 +149,7 @@ export default function AffiliateManagement() {
   const [selectedOfferId, setSelectedOfferId] = useState('');
   const [error, setError] = useState('');
   const [copiedAffiliateId, setCopiedAffiliateId] = useState<string | null>(null);
+  const [draggedWebhookParam, setDraggedWebhookParam] = useState<string | null>(null);
 
   useEffect(() => {
     fetchAffiliates();
@@ -158,6 +212,11 @@ export default function AffiliateManagement() {
           merchant_id: formData.merchant_id.trim(),
           status: formData.status,
           payout_terms_days: formData.payout_terms_days,
+          webhook_url: formData.webhook_url.trim() || null,
+          webhook_parameter_mapping: Object.keys(formData.webhook_parameter_mapping || {}).length > 0 
+            ? formData.webhook_parameter_mapping 
+            : null,
+          redirect_base_url: formData.redirect_base_url.trim() || null,
         }),
       });
       const data = await res.json();
@@ -198,6 +257,11 @@ export default function AffiliateManagement() {
         merchant_id: formData.merchant_id.trim() || null,
         status: formData.status,
         payout_terms_days: formData.payout_terms_days,
+        webhook_url: formData.webhook_url.trim() || null,
+        webhook_parameter_mapping: Object.keys(formData.webhook_parameter_mapping || {}).length > 0 
+          ? formData.webhook_parameter_mapping 
+          : null,
+        redirect_base_url: formData.redirect_base_url.trim() || null,
       };
       if (formData.password) payload.password = formData.password;
 
@@ -253,6 +317,53 @@ export default function AffiliateManagement() {
       merchant_id: affiliate.merchant_id || '',
       status: affiliate.status,
       payout_terms_days: affiliate.payout_terms_days,
+      webhook_url: affiliate.webhook_url || '',
+      webhook_parameter_mapping: (() => {
+        const mapping = affiliate.webhook_parameter_mapping;
+        const converted: Record<string, { type: 'fixed' | 'dynamic'; value: string }> = {};
+        
+        // Convert existing mappings
+        if (mapping) {
+          for (const [key, value] of Object.entries(mapping)) {
+            if (typeof value === 'string') {
+              // Old format: assume it's a dynamic field
+              converted[key] = { type: 'dynamic', value };
+            } else if (value && typeof value === 'object' && 'type' in value && 'value' in value) {
+              // New format: already correct
+              converted[key] = value as { type: 'fixed' | 'dynamic'; value: string };
+            }
+          }
+        }
+        
+        // Extract parameters from the saved webhook URL
+        // Only add parameters that are actually in the URL, don't add defaults
+        if (affiliate.webhook_url) {
+          try {
+            const urlObj = new URL(affiliate.webhook_url);
+            // Extract parameters from query string
+            urlObj.searchParams.forEach((value, key) => {
+              if (value.startsWith('{') && value.endsWith('}')) {
+                // This is a placeholder - extract the field name from inside the braces
+                const fieldName = value.slice(1, -1);
+                // If not already in mapping, add it with the field name as the value
+                if (!converted[key]) {
+                  converted[key] = { type: 'dynamic', value: fieldName || '' };
+                }
+              } else {
+                // This is a fixed value - add it to mapping
+                if (!converted[key]) {
+                  converted[key] = { type: 'fixed', value: value };
+                }
+              }
+            });
+          } catch (e) {
+            // Invalid URL, skip extraction
+          }
+        }
+        
+        return converted;
+      })(),
+      redirect_base_url: affiliate.redirect_base_url || '',
     });
     setShowForm(true);
   };
@@ -625,6 +736,650 @@ export default function AffiliateManagement() {
                     />
                   </div>
                 </div>
+              </div>
+
+              {/* Redirect URL */}
+              <div className="border-t border-gray-200 pt-6 mt-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Redirect URL</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Redirect URL
+                    </label>
+                    <input
+                      type="url"
+                      value={formData.redirect_base_url}
+                      onChange={(e) => {
+                        setFormData({ ...formData, redirect_base_url: e.target.value });
+                      }}
+                      onBlur={(e) => {
+                        // Normalize URL when user leaves the field
+                        const normalized = normalizeRedirectUrl(e.target.value);
+                        if (normalized !== e.target.value) {
+                          setFormData({ ...formData, redirect_base_url: normalized });
+                        }
+                      }}
+                      placeholder={formData.redirect_base_url || editingAffiliate?.redirect_base_url || 'https://example.com'}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Enter the base URL for affiliate redirects. Parameters will be automatically appended below.
+                    </p>
+                  </div>
+
+                  {/* Affiliate Reference ID (read-only) */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Affiliate Reference ID (ref)
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={editingAffiliate?.affiliate_number || 'To be generated after account creation'}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 font-mono text-sm cursor-not-allowed"
+                    />
+                    <p className="mt-1 text-xs text-gray-500 italic">
+                      This parameter will be automatically appended to the redirect URL after account creation.
+                    </p>
+                  </div>
+
+                  {/* Redirect URL Parameters */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      URL Parameters
+                    </label>
+                    <p className="text-xs text-gray-500 mb-3">
+                      Select which parameters to include in the redirect URL. The <code className="bg-gray-100 px-1 rounded">ref</code> parameter is always included.
+                    </p>
+                    <div className="space-y-2">
+                      {[
+                        { key: 'transaction_id', label: 'Transaction ID' },
+                        { key: 'affiliate_id', label: 'Affiliate ID' },
+                        { key: 'sub1', label: 'Sub1' },
+                        { key: 'sub2', label: 'Sub2' },
+                        { key: 'sub3', label: 'Sub3' },
+                        { key: 'sub4', label: 'Sub4' },
+                      ].map((param) => (
+                        <div key={param.key} className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id={`redirect_param_${param.key}`}
+                            checked={formData.redirect_parameters_enabled?.[param.key] !== false}
+                            onChange={(e) => {
+                              setFormData({
+                                ...formData,
+                                redirect_parameters_enabled: {
+                                  ...formData.redirect_parameters_enabled,
+                                  [param.key]: e.target.checked,
+                                },
+                              });
+                            }}
+                            className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                          />
+                          <label
+                            htmlFor={`redirect_param_${param.key}`}
+                            className="text-sm text-gray-700 cursor-pointer"
+                          >
+                            <code className="bg-gray-100 px-1 rounded">{param.key}</code> - {param.label}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Preview URL */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Preview URL (with parameters)
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={(() => {
+                          if (!formData.redirect_base_url || !formData.redirect_base_url.trim()) {
+                            return 'Enter a redirect URL above to see preview';
+                          }
+                          
+                          try {
+                            const baseUrl = normalizeRedirectUrl(formData.redirect_base_url);
+                            const affiliateNumber = editingAffiliate?.affiliate_number;
+                            
+                            // Build parameters based on enabled settings
+                            // Manually construct URL to avoid URL encoding of placeholders
+                            const params = [];
+                            if (affiliateNumber) {
+                              params.push(`ref=${affiliateNumber}`);
+                            } else {
+                              params.push('ref={ref}');
+                            }
+                            
+                            // Add enabled parameters
+                            const enabledParams = formData.redirect_parameters_enabled || {};
+                            if (enabledParams.transaction_id !== false) {
+                              params.push('transaction_id={transaction_id}');
+                            }
+                            if (enabledParams.affiliate_id !== false) {
+                              params.push('affiliate_id={affiliate_id}');
+                            }
+                            if (enabledParams.sub1 !== false) {
+                              params.push('sub1={sub1}');
+                            }
+                            if (enabledParams.sub2 !== false) {
+                              params.push('sub2={sub2}');
+                            }
+                            if (enabledParams.sub3 !== false) {
+                              params.push('sub3={sub3}');
+                            }
+                            if (enabledParams.sub4 !== false) {
+                              params.push('sub4={sub4}');
+                            }
+                            
+                            return `${baseUrl}?${params.join('&')}`;
+                          } catch (e) {
+                            return 'Invalid URL format';
+                          }
+                        })()}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 font-mono text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const previewUrl = (() => {
+                            if (!formData.redirect_base_url || !formData.redirect_base_url.trim()) {
+                              return '';
+                            }
+                            
+                            try {
+                              const baseUrl = normalizeRedirectUrl(formData.redirect_base_url);
+                              const affiliateNumber = editingAffiliate?.affiliate_number;
+                              
+                              const params = [];
+                              if (affiliateNumber) {
+                                params.push(`ref=${affiliateNumber}`);
+                              } else {
+                                params.push('ref={ref}');
+                              }
+                              
+                              const enabledParams = formData.redirect_parameters_enabled || {};
+                              if (enabledParams.transaction_id !== false) {
+                                params.push('transaction_id={transaction_id}');
+                              }
+                              if (enabledParams.affiliate_id !== false) {
+                                params.push('affiliate_id={affiliate_id}');
+                              }
+                              if (enabledParams.sub1 !== false) {
+                                params.push('sub1={sub1}');
+                              }
+                              if (enabledParams.sub2 !== false) {
+                                params.push('sub2={sub2}');
+                              }
+                              if (enabledParams.sub3 !== false) {
+                                params.push('sub3={sub3}');
+                              }
+                              if (enabledParams.sub4 !== false) {
+                                params.push('sub4={sub4}');
+                              }
+                              
+                              return `${baseUrl}?${params.join('&')}`;
+                            } catch (e) {
+                              return '';
+                            }
+                          })();
+                          
+                          if (previewUrl) {
+                            navigator.clipboard.writeText(previewUrl);
+                            setCopiedAffiliateId('redirect_url');
+                            setTimeout(() => setCopiedAffiliateId(null), 2000);
+                          }
+                        }}
+                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm"
+                        disabled={!editingAffiliate?.affiliate_number}
+                      >
+                        {copiedAffiliateId === 'redirect_url' ? 'Copied!' : 'Copy'}
+                      </button>
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500">
+                      This preview shows how the redirect URL will look with all parameters appended. The <code className="bg-gray-100 px-1 rounded">ref</code> parameter will use the affiliate number once the account is created.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Webhook Configuration */}
+              <div className="border-t border-gray-200 pt-6 mt-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Webhook Configuration</h3>
+                <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Webhook URL
+                      </label>
+                      <input
+                        type="url"
+                        value={formData.webhook_url || ''}
+                        onChange={(e) => setFormData({ ...formData, webhook_url: e.target.value })}
+                        onBlur={(e) => {
+                          // Normalize URL when user leaves the field
+                          const normalized = normalizeRedirectUrl(e.target.value);
+                          if (normalized !== e.target.value) {
+                            setFormData({ ...formData, webhook_url: normalized });
+                          }
+                        }}
+                        placeholder="https://example.com"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm"
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        Enter the base URL for webhook postbacks. Parameters will be automatically appended in the preview below.
+                      </p>
+                    </div>
+
+                    {/* Preview Webhook URL */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Preview Webhook URL (with parameters)
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          readOnly
+                          value={(() => {
+                            if (!formData.webhook_url || !formData.webhook_url.trim()) {
+                              return 'Enter a webhook URL above to see preview';
+                            }
+                            
+                            // Show the actual saved webhook URL if it has parameters
+                            // Otherwise reconstruct from mappings
+                            try {
+                              const savedUrl = formData.webhook_url.trim();
+                              const urlObj = new URL(savedUrl);
+                              
+                              // If URL already has query parameters, show it as-is
+                              if (urlObj.search && urlObj.search.length > 1) {
+                                return savedUrl;
+                              }
+                              
+                              // No parameters in URL, reconstruct from mappings
+                              const baseUrl = normalizeRedirectUrl(savedUrl);
+                              const params: string[] = [];
+                              
+                              Object.entries(formData.webhook_parameter_mapping || {}).forEach(([placeholder, mapping]) => {
+                                if (!placeholder || !placeholder.trim()) return;
+                                
+                                const mappingValue = typeof mapping === 'string' 
+                                  ? { type: 'dynamic' as const, value: mapping }
+                                  : mapping || { type: 'dynamic' as const, value: '' };
+                                
+                                if (mappingValue.type === 'fixed') {
+                                  params.push(`${placeholder}=${mappingValue.value}`);
+                                } else if (mappingValue.value) {
+                                  params.push(`${placeholder}={${mappingValue.value}}`);
+                                }
+                              });
+                              
+                              return params.length > 0 
+                                ? `${baseUrl}?${params.join('&')}`
+                                : baseUrl;
+                            } catch (e) {
+                              // If URL parsing fails, show the raw URL
+                              return formData.webhook_url.trim();
+                            }
+                          })()}
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 font-mono text-sm"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const previewUrl = (() => {
+                              if (!formData.webhook_url || !formData.webhook_url.trim()) {
+                                return '';
+                              }
+                              
+                              try {
+                                const savedUrl = formData.webhook_url.trim();
+                                const urlObj = new URL(savedUrl);
+                                
+                                // If URL already has query parameters, use it as-is
+                                if (urlObj.search && urlObj.search.length > 1) {
+                                  return savedUrl;
+                                }
+                                
+                                // Otherwise reconstruct from mappings
+                                const baseUrl = normalizeRedirectUrl(savedUrl);
+                                const params: string[] = [];
+                                
+                                Object.entries(formData.webhook_parameter_mapping || {}).forEach(([placeholder, mapping]) => {
+                                  if (!placeholder || !placeholder.trim()) return;
+                                  
+                                  const mappingValue = typeof mapping === 'string' 
+                                    ? { type: 'dynamic' as const, value: mapping }
+                                    : mapping || { type: 'dynamic' as const, value: '' };
+                                  
+                                  if (mappingValue.type === 'fixed') {
+                                    params.push(`${placeholder}=${mappingValue.value}`);
+                                  } else if (mappingValue.value) {
+                                    params.push(`${placeholder}={${mappingValue.value}}`);
+                                  }
+                                });
+                                
+                                return params.length > 0 
+                                  ? `${baseUrl}?${params.join('&')}`
+                                  : baseUrl;
+                              } catch (e) {
+                                return formData.webhook_url.trim();
+                              }
+                            })();
+                            
+                            if (previewUrl) {
+                              navigator.clipboard.writeText(previewUrl);
+                              alert('Preview webhook URL copied to clipboard!');
+                            }
+                          }}
+                          disabled={!formData.webhook_url || !formData.webhook_url.trim()}
+                          className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-sm"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                      <p className="mt-1 text-xs text-gray-500">
+                        This preview shows how the webhook URL will look with all mapped parameters appended.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Parameter Mapping
+                      </label>
+                      <p className="text-xs text-gray-500 mb-3">
+                        Map placeholders in your webhook URL to either fixed values or dynamic database fields. For example, map {'{sub3}'} to &quot;order_number&quot; (dynamic) or &quot;613&quot; (fixed).
+                      </p>
+                      
+                      <div className="space-y-2">
+                        {(() => {
+                          // Get ordered list of parameters (maintain insertion order)
+                          const mapping = formData.webhook_parameter_mapping || {};
+                          const paramKeys = Object.keys(mapping);
+                          
+                          return paramKeys.map((placeholder, idx) => {
+                            const mappingValue = typeof mapping[placeholder] === 'string' 
+                              ? { type: 'dynamic' as const, value: mapping[placeholder] as string } // Legacy format support
+                              : (mapping[placeholder] as { type: 'fixed' | 'dynamic'; value: string }) || { type: 'dynamic' as const, value: '' };
+                            
+                            // Use index as stable key to prevent remounting when placeholder name changes
+                            return (
+                              <div 
+                                key={idx} 
+                                className={`flex gap-2 items-center p-2 rounded-lg border-2 transition-colors ${
+                                  draggedWebhookParam === placeholder 
+                                    ? 'border-indigo-500 bg-indigo-50' 
+                                    : 'border-transparent hover:border-gray-200'
+                                }`}
+                                draggable
+                                onDragStart={(e) => {
+                                  setDraggedWebhookParam(placeholder);
+                                  e.dataTransfer.effectAllowed = 'move';
+                                }}
+                                onDragOver={(e) => {
+                                  e.preventDefault();
+                                  e.dataTransfer.dropEffect = 'move';
+                                }}
+                                onDrop={(e) => {
+                                  e.preventDefault();
+                                  const targetPlaceholder = placeholder;
+                                  if (draggedWebhookParam && draggedWebhookParam !== targetPlaceholder) {
+                                    const newMapping = { ...formData.webhook_parameter_mapping };
+                                    const keys = Object.keys(newMapping);
+                                    const draggedIndex = keys.indexOf(draggedWebhookParam);
+                                    const targetIndex = keys.indexOf(targetPlaceholder);
+                                    
+                                    // Reorder the keys
+                                    keys.splice(draggedIndex, 1);
+                                    keys.splice(targetIndex, 0, draggedWebhookParam);
+                                    
+                                    // Create new ordered mapping
+                                    const reorderedMapping: Record<string, { type: 'fixed' | 'dynamic'; value: string } | string> = {};
+                                    keys.forEach(key => {
+                                      reorderedMapping[key] = newMapping[key];
+                                    });
+                                    
+                                    setFormData({ 
+                                      ...formData, 
+                                      webhook_parameter_mapping: reorderedMapping 
+                                    });
+                                  }
+                                  setDraggedWebhookParam(null);
+                                }}
+                                onDragEnd={() => {
+                                  setDraggedWebhookParam(null);
+                                }}
+                              >
+                                <div 
+                                  className="cursor-move text-gray-400 hover:text-gray-600 flex items-center"
+                                  title="Drag to reorder"
+                                >
+                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                                  </svg>
+                                </div>
+                                <input
+                                  type="text"
+                                  value={placeholder}
+                                  onChange={(e) => {
+                                    // Use a functional update to prevent focus loss
+                                    setFormData(prev => {
+                                      const newMapping = { ...prev.webhook_parameter_mapping };
+                                      // Only update if the value actually changed
+                                      if (e.target.value !== placeholder) {
+                                        delete newMapping[placeholder];
+                                        newMapping[e.target.value] = mappingValue;
+                                      }
+                                      return { ...prev, webhook_parameter_mapping: newMapping };
+                                    });
+                                  }}
+                                  placeholder="Placeholder (e.g., sub3)"
+                                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                />
+                                <span className="text-gray-500">→</span>
+                                <select
+                                  value={mappingValue.type}
+                                  onChange={(e) => {
+                                    const newMapping = { ...formData.webhook_parameter_mapping };
+                                    newMapping[placeholder] = {
+                                      type: e.target.value as 'fixed' | 'dynamic',
+                                      value: mappingValue.value || '',
+                                    };
+                                    setFormData({ ...formData, webhook_parameter_mapping: newMapping });
+                                  }}
+                                  className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                >
+                                  <option value="dynamic">Dynamic</option>
+                                  <option value="fixed">Fixed</option>
+                                </select>
+                                {mappingValue.type === 'dynamic' ? (
+                                  <select
+                                    value={mappingValue.value}
+                                    onChange={(e) => {
+                                      setFormData(prev => {
+                                        const newMapping = { ...prev.webhook_parameter_mapping };
+                                        newMapping[placeholder] = {
+                                          type: 'dynamic',
+                                          value: e.target.value,
+                                        };
+                                        return { ...prev, webhook_parameter_mapping: newMapping };
+                                      });
+                                    }}
+                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                  >
+                                    <option value="">Select field...</option>
+                                    <optgroup label="Commission">
+                                      <option value="commission_id">Commission ID</option>
+                                      <option value="commission_amount">Commission Amount</option>
+                                      <option value="commission_currency">Commission Currency</option>
+                                      <option value="commission_status">Commission Status</option>
+                                    </optgroup>
+                                    <optgroup label="Order">
+                                      <option value="order_id">Shopify Order ID</option>
+                                      <option value="order_number">Shopify Order Number</option>
+                                      <option value="order_total">Order Total</option>
+                                      <option value="order_currency">Order Currency</option>
+                                      <option value="order_date">Order Date</option>
+                                    </optgroup>
+                                    <optgroup label="Customer">
+                                      <option value="customer_email">Customer Email</option>
+                                      <option value="customer_name">Customer Name</option>
+                                    </optgroup>
+                                    <optgroup label="Affiliate">
+                                      <option value="affiliate_id">Affiliate ID (internal)</option>
+                                      <option value="affiliate_number">Affiliate Number</option>
+                                      <option value="affiliate_name">Affiliate Name</option>
+                                      <option value="affiliate_email">Affiliate Email</option>
+                                    </optgroup>
+                                    <optgroup label="URL Parameters (from Redirect)">
+                                      <option value="transaction_id">Transaction ID (from URL)</option>
+                                      <option value="affiliate_id_url">Affiliate ID (from URL)</option>
+                                      <option value="sub1">Sub1 (from URL)</option>
+                                      <option value="sub2">Sub2 (from URL)</option>
+                                      <option value="sub3">Sub3 (from URL)</option>
+                                      <option value="sub4">Sub4 (from URL)</option>
+                                    </optgroup>
+                                    <optgroup label="Legacy Postback Parameters">
+                                      <option value="postback_affiliate_id">Postback Affiliate ID</option>
+                                      <option value="postback_sub1">Postback Sub1</option>
+                                      <option value="postback_sub2">Postback Sub2</option>
+                                      <option value="postback_sub3">Postback Sub3</option>
+                                      <option value="postback_sub4">Postback Sub4</option>
+                                    </optgroup>
+                                    <optgroup label="Other">
+                                      <option value="click_id">Click ID</option>
+                                      <option value="landing_url">Landing URL</option>
+                                      <option value="offer_id">Offer ID</option>
+                                      <option value="offer_name">Offer Name</option>
+                                    </optgroup>
+                                  </select>
+                                ) : (
+                                  <input
+                                    type="text"
+                                    value={mappingValue.value}
+                                    onChange={(e) => {
+                                      setFormData(prev => {
+                                        const newMapping = { ...prev.webhook_parameter_mapping };
+                                        newMapping[placeholder] = {
+                                          type: 'fixed',
+                                          value: e.target.value,
+                                        };
+                                        return { ...prev, webhook_parameter_mapping: newMapping };
+                                      });
+                                    }}
+                                    placeholder="Fixed value (e.g., 613)"
+                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                  />
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const newMapping = { ...formData.webhook_parameter_mapping };
+                                    delete newMapping[placeholder];
+                                    
+                                    // Preview will automatically update when mapping is removed
+                                    setFormData({ 
+                                      ...formData, 
+                                      webhook_parameter_mapping: newMapping
+                                    });
+                                  }}
+                                  className="px-3 py-2 text-red-600 hover:text-red-800"
+                                  title="Remove this mapping"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            );
+                          });
+                        })()}
+                        
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newMapping = { ...formData.webhook_parameter_mapping || {} };
+                            newMapping[''] = { type: 'dynamic', value: '' };
+                            setFormData({ ...formData, webhook_parameter_mapping: newMapping });
+                          }}
+                          className="text-sm text-indigo-600 hover:text-indigo-800"
+                        >
+                          + Add Mapping
+                        </button>
+                      </div>
+                      
+                      {/* Show available parameters that aren't in the URL */}
+                      {(() => {
+                        // Get parameters currently in the webhook URL
+                        const paramsInUrl = new Set<string>();
+                        if (formData.webhook_url) {
+                          try {
+                            const urlObj = new URL(formData.webhook_url);
+                            urlObj.searchParams.forEach((value, key) => {
+                              paramsInUrl.add(key);
+                            });
+                          } catch (e) {
+                            // Invalid URL
+                          }
+                        }
+                        
+                        // Get parameters that are mapped but might not be in URL
+                        const mappedParams = new Set(Object.keys(formData.webhook_parameter_mapping || {}));
+                        
+                        // Common parameters that might be useful to add
+                        const commonParams = [
+                          { key: 'transaction_id', label: 'Transaction ID' },
+                          { key: 'affiliate_id', label: 'Affiliate ID' },
+                          { key: 'sub1', label: 'Sub1' },
+                          { key: 'sub2', label: 'Sub2' },
+                          { key: 'sub3', label: 'Sub3' },
+                          { key: 'sub4', label: 'Sub4' },
+                          { key: 'order_number', label: 'Order Number' },
+                          { key: 'commission_amount', label: 'Commission Amount' },
+                        ];
+                        
+                        // Filter to only show parameters not in URL and not already mapped
+                        const availableParams = commonParams.filter(
+                          param => !paramsInUrl.has(param.key) && !mappedParams.has(param.key)
+                        );
+                        
+                        if (availableParams.length === 0) return null;
+                        
+                        return (
+                          <div className="mt-4 pt-4 border-t border-gray-200">
+                            <p className="text-xs text-gray-500 mb-2">Available parameters to add:</p>
+                            <div className="flex flex-wrap gap-2">
+                              {availableParams.map(param => (
+                                <button
+                                  key={param.key}
+                                  type="button"
+                                  onClick={() => {
+                                    const newMapping = { ...formData.webhook_parameter_mapping || {} };
+                                    // Try to guess a good default mapping
+                                    let defaultValue = '';
+                                    if (['transaction_id', 'sub1', 'sub2', 'sub3', 'sub4'].includes(param.key)) {
+                                      defaultValue = param.key;
+                                    } else if (param.key === 'affiliate_id') {
+                                      defaultValue = 'postback_affiliate_id';
+                                    } else if (param.key === 'order_number') {
+                                      defaultValue = 'order_number';
+                                    } else if (param.key === 'commission_amount') {
+                                      defaultValue = 'commission_amount';
+                                    }
+                                    newMapping[param.key] = { type: 'dynamic', value: defaultValue };
+                                    setFormData({ ...formData, webhook_parameter_mapping: newMapping });
+                                  }}
+                                  className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded border border-gray-300"
+                                >
+                                  + {param.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
               </div>
             </div>
 
