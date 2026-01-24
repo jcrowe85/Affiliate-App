@@ -163,11 +163,12 @@ export async function fireAffiliateWebhook(
     }
 
     // Handle new format: { type: 'fixed' | 'dynamic', value: string }
-    if (typeof mapping === 'object' && mapping.type) {
-      if (mapping.type === 'fixed') {
-        value = mapping.value;
-      } else if (mapping.type === 'dynamic' && dataMap[mapping.value] !== undefined) {
-        value = dataMap[mapping.value];
+    if (typeof mapping === 'object' && mapping && 'type' in mapping && 'value' in mapping) {
+      const typedMapping = mapping as { type: 'fixed' | 'dynamic'; value: string };
+      if (typedMapping.type === 'fixed') {
+        value = typedMapping.value;
+      } else if (typedMapping.type === 'dynamic' && dataMap[typedMapping.value] !== undefined) {
+        value = dataMap[typedMapping.value];
       }
     } 
     // Handle legacy format: string (database field name)
@@ -191,11 +192,12 @@ export async function fireAffiliateWebhook(
     let value: string | undefined;
 
     // Handle new format
-    if (typeof mapping === 'object' && mapping && 'type' in mapping) {
-      if (mapping.type === 'fixed') {
-        value = mapping.value;
-      } else if (mapping.type === 'dynamic' && dataMap[mapping.value] !== undefined) {
-        value = dataMap[mapping.value];
+    if (typeof mapping === 'object' && mapping && 'type' in mapping && 'value' in mapping) {
+      const typedMapping = mapping as { type: 'fixed' | 'dynamic'; value: string };
+      if (typedMapping.type === 'fixed') {
+        value = typedMapping.value;
+      } else if (typedMapping.type === 'dynamic' && dataMap[typedMapping.value] !== undefined) {
+        value = dataMap[typedMapping.value];
       }
     }
     // Handle legacy format
