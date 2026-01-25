@@ -290,31 +290,41 @@ export default function OffersManagement() {
                     <option value="percentage">Percentage</option>
                   </select>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className={formData.commission_type === 'percentage' ? 'grid grid-cols-1 gap-4' : 'grid grid-cols-1 sm:grid-cols-2 gap-4'}>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
-                    <input
-                      type="number"
-                      required
-                      min={0}
-                      step={formData.commission_type === 'percentage' ? 0.01 : 1}
-                      value={formData.amount}
-                      onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    />
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {formData.commission_type === 'percentage' ? 'Commission %' : 'Amount'}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        required
+                        min={0}
+                        max={formData.commission_type === 'percentage' ? 100 : undefined}
+                        step={formData.commission_type === 'percentage' ? 0.01 : 1}
+                        value={formData.amount}
+                        onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      />
+                      {formData.commission_type === 'percentage' && (
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">%</span>
+                      )}
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
-                    <select
-                      value={formData.currency}
-                      onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    >
-                      <option value="USD">USD</option>
-                      <option value="EUR">EUR</option>
-                      <option value="GBP">GBP</option>
-                    </select>
-                  </div>
+                  {formData.commission_type === 'flat_rate' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+                      <select
+                        value={formData.currency}
+                        onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      >
+                        <option value="USD">USD</option>
+                        <option value="EUR">EUR</option>
+                        <option value="GBP">GBP</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Commission terms</label>

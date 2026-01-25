@@ -46,6 +46,7 @@ export async function PATCH(
       state,
       zip,
       phone,
+      source,
       offer_id,
       password,
       merchant_id,
@@ -81,6 +82,7 @@ export async function PATCH(
     if (state !== undefined) data.state = state?.trim() || null;
     if (zip !== undefined) data.zip = zip?.trim() || null;
     if (phone !== undefined) data.phone = phone?.trim() || null;
+    if (source !== undefined) data.source = source?.trim() || null;
     if (merchant_id !== undefined) data.merchant_id = merchant_id?.trim() || null;
     if (status !== undefined) data.status = status;
     if (payout_method !== undefined) data.payout_method = payout_method || null;

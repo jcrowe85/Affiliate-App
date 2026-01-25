@@ -84,6 +84,7 @@ model Affiliate {
   postback_sub2             String? // Captured from URL parameter sub2
   postback_sub3             String? // Captured from URL parameter sub3
   postback_sub4             String? // Captured from URL parameter sub4
+  source                    String? // Where the affiliate came from (e.g., "Referral", "Cold Outreach", "Partner Network")
   shopify_shop_id           String
   created_at                DateTime @default(now())
   updated_at                DateTime @updatedAt

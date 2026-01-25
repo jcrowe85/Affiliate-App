@@ -53,6 +53,7 @@ interface Affiliate {
   state: string | null;
   zip: string | null;
   phone: string | null;
+  source: string | null;
   status: string;
   payout_method: string | null;
   payout_identifier: string | null;
@@ -117,6 +118,7 @@ const defaultForm = {
     sub3: true,
     sub4: true,
   } as Record<string, boolean>,
+  source: '',
 };
 
 export default function AffiliateManagement() {
@@ -311,6 +313,7 @@ export default function AffiliateManagement() {
       state: affiliate.state || '',
       zip: affiliate.zip || '',
       phone: affiliate.phone || '',
+      source: affiliate.source || '',
       offer_id: affiliate.offer_id || '',
       password: '',
       confirm_password: '',
@@ -709,6 +712,19 @@ export default function AffiliateManagement() {
                   </div>
                 )}
 
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Source</label>
+                  <input
+                    type="text"
+                    value={formData.source}
+                    onChange={(e) => setFormData({ ...formData, source: e.target.value })}
+                    placeholder="e.g., Referral, Cold Outreach, Partner Network"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Where this affiliate came from (optional)
+                  </p>
+                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Unique Merchant ID</label>
                   <input

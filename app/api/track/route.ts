@@ -39,18 +39,25 @@ export async function POST(request: NextRequest) {
     const postbackSub3 = body.sub3 || null;
     const postbackSub4 = body.sub4 || null;
     
+    // CORS headers for all responses
+    const corsHeaders = {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    };
+
     // Skip tracking for internal traffic markers
     if (affiliateNumberParam === 'internal' || affiliateNumberParam === 'direct') {
       return NextResponse.json(
         { error: 'Internal traffic - no tracking' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
     
     if (!affiliateNumberParam || !shop) {
       return NextResponse.json(
         { error: 'Missing ref parameter or shop' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -58,7 +65,7 @@ export async function POST(request: NextRequest) {
     if (isNaN(affiliateNumber)) {
       return NextResponse.json(
         { error: 'Invalid affiliate number' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -78,7 +85,7 @@ export async function POST(request: NextRequest) {
       // Allow Shopify bots but block others
       return NextResponse.json(
         { error: 'Bot detected - no tracking' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -177,7 +184,14 @@ export async function POST(request: NextRequest) {
     console.error('Track API error:', error);
     return NextResponse.json(
       { error: error.message || 'Tracking failed' },
-      { status: 500 }
+      { 
+        status: 500,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type',
+        }
+      }
     );
   }
 }
