@@ -8,6 +8,8 @@ import PayoutRuns from '@/components/PayoutRuns';
 import PixelTest from '@/components/PixelTest';
 import Conversions from '@/components/Conversions';
 import WebhookManager from '@/components/WebhookManager';
+import Analytics from '@/components/Analytics';
+import AnalyticsWidget from '@/components/AnalyticsWidget';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface DashboardStats {
@@ -88,7 +90,7 @@ interface PayoutObligation {
   }>;
 }
 
-type Tab = 'overview' | 'pending' | 'fraud' | 'payouts' | 'performance' | 'affiliates' | 'offers' | 'payout-runs' | 'pixel-test' | 'conversions' | 'webhooks';
+type Tab = 'overview' | 'pending' | 'fraud' | 'payouts' | 'performance' | 'affiliates' | 'offers' | 'payout-runs' | 'pixel-test' | 'conversions' | 'webhooks' | 'analytics';
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -392,6 +394,7 @@ export default function AdminDashboard() {
             <div className="px-2 py-1 text-xs font-semibold text-slate-400 uppercase tracking-wider">Performance</div>
           </div>
           {btn('performance', 'Reports', icons.chart)}
+          {btn('analytics', 'Analytics', icons.chart)}
           {btn('conversions', 'Conversions', icons.target)}
           {btn('affiliates', 'Affiliates', icons.users)}
           {btn('offers', 'Offers', icons.tag)}
@@ -449,6 +452,7 @@ export default function AdminDashboard() {
               {activeTab === 'pixel-test' && 'Pixel Test'}
               {activeTab === 'webhooks' && 'Webhooks'}
               {activeTab === 'payout-runs' && 'Payout Runs'}
+              {activeTab === 'analytics' && 'Analytics'}
             </h2>
           </div>
         </div>
@@ -457,6 +461,9 @@ export default function AdminDashboard() {
         {/* Overview Tab */}
         {activeTab === 'overview' && (
           <div className="space-y-8">
+            {/* Analytics Widget */}
+            <AnalyticsWidget />
+
             {/* Performance Graph */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
               <div className="mb-6">
@@ -974,6 +981,11 @@ export default function AdminDashboard() {
         {/* Webhooks Tab */}
         {activeTab === 'webhooks' && (
           <WebhookManager />
+        )}
+
+        {/* Analytics Tab */}
+        {activeTab === 'analytics' && (
+          <Analytics />
         )}
         </div>
       </main>

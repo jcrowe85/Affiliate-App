@@ -1,0 +1,378 @@
+'use client';
+
+import { useEffect, useState, useCallback } from 'react';
+
+interface AnalyticsMetrics {
+  total_visitors: number;
+  unique_visitors: number;
+  sessions: number;
+  bounce_rate: number;
+  avg_session_time: number;
+  pages_per_session: number;
+}
+
+interface ActiveVisitor {
+  session_id: string;
+  currentPage: string;
+  device: string;
+  location: string;
+  lastSeen: number;
+}
+
+interface PageData {
+  path: string;
+  url: string;
+  views?: number;
+  entries?: number;
+  exits?: number;
+  bounceRate?: number;
+}
+
+interface TrafficSource {
+  source: string;
+  visitors: number;
+  percentage: number;
+}
+
+interface DeviceData {
+  type: string;
+  count: number;
+  percentage: number;
+}
+
+interface BrowserData {
+  name: string;
+  count: number;
+  percentage: number;
+}
+
+interface GeographyData {
+  country: string;
+  visitors: number;
+  percentage: number;
+}
+
+interface AnalyticsData {
+  metrics: AnalyticsMetrics;
+  activeVisitors: ActiveVisitor[];
+  topPages: PageData[];
+  entryPages: PageData[];
+  exitPages: PageData[];
+  trafficSources: TrafficSource[];
+  devices: DeviceData[];
+  browsers: BrowserData[];
+  geography: GeographyData[];
+}
+
+export default function Analytics() {
+  const [data, setData] = useState<AnalyticsData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [timeRange, setTimeRange] = useState('24h');
+  const [refreshInterval, setRefreshInterval] = useState(10); // seconds
+
+  const fetchAnalytics = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/analytics/stats?timeRange=${timeRange}`);
+      if (response.status === 401) {
+        window.location.href = '/login';
+        return;
+      }
+      const analyticsData = await response.json();
+      setData(analyticsData);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
+      setLoading(false);
+    }
+  }, [timeRange]);
+
+  useEffect(() => {
+    fetchAnalytics();
+    const interval = setInterval(fetchAnalytics, refreshInterval * 1000);
+    return () => clearInterval(interval);
+  }, [fetchAnalytics, refreshInterval]);
+
+  const formatTime = (seconds: number) => {
+    if (seconds < 60) return `${Math.round(seconds)}s`;
+    if (seconds < 3600) {
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.round(seconds % 60);
+      return `${mins}m ${secs}s`;
+    }
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    return `${hours}h ${mins}m`;
+  };
+
+  const formatTimeAgo = (timestamp: number) => {
+    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+    if (seconds < 60) return 'Just now';
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+    return `${Math.floor(seconds / 86400)}d ago`;
+  };
+
+  if (loading && !data) {
+    return (
+      <div className="bg-white rounded-xl shadow-lg p-12 text-center border border-gray-200">
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-indigo-600 mb-4"></div>
+        <p className="text-gray-500">Loading analytics...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Controls */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <label className="text-sm font-medium text-gray-700">Time Range:</label>
+          <select
+            value={timeRange}
+            onChange={(e) => setTimeRange(e.target.value)}
+            className="border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="1h">Last Hour</option>
+            <option value="24h">Last 24 Hours</option>
+            <option value="7d">Last 7 Days</option>
+            <option value="30d">Last 30 Days</option>
+          </select>
+        </div>
+        <button
+          onClick={fetchAnalytics}
+          className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium"
+        >
+          Refresh
+        </button>
+      </div>
+
+      {/* Key Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+          <div className="text-sm text-gray-600 mb-1">Total Visitors</div>
+          <div className="text-2xl font-bold text-gray-900">
+            {data?.metrics.total_visitors.toLocaleString() || '0'}
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+          <div className="text-sm text-gray-600 mb-1">Unique Visitors</div>
+          <div className="text-2xl font-bold text-gray-900">
+            {data?.metrics.unique_visitors.toLocaleString() || '0'}
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+          <div className="text-sm text-gray-600 mb-1">Bounce Rate</div>
+          <div className="text-2xl font-bold text-gray-900">
+            {data?.metrics.bounce_rate.toFixed(1)}%
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+          <div className="text-sm text-gray-600 mb-1">Avg Session Time</div>
+          <div className="text-2xl font-bold text-gray-900">
+            {data ? formatTime(data.metrics.avg_session_time) : '0s'}
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+          <div className="text-sm text-gray-600 mb-1">Pages/Session</div>
+          <div className="text-2xl font-bold text-gray-900">
+            {data?.metrics.pages_per_session.toFixed(1) || '0'}
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+          <div className="text-sm text-gray-600 mb-1">Active Now</div>
+          <div className="text-2xl font-bold text-indigo-600">
+            {data?.activeVisitors.length || 0}
+          </div>
+        </div>
+      </div>
+
+      {/* Active Visitors */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900">Active Visitors</h3>
+        </div>
+        <div className="divide-y divide-gray-200">
+          {data?.activeVisitors.length ? (
+            data.activeVisitors.map((visitor, idx) => (
+              <div key={idx} className="px-6 py-4 hover:bg-gray-50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-medium text-gray-900">{visitor.currentPage}</div>
+                    <div className="text-sm text-gray-500 mt-1">
+                      {visitor.device} • {visitor.location}
+                    </div>
+                  </div>
+                  <div className="text-sm text-gray-500">{formatTimeAgo(visitor.lastSeen)}</div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="px-6 py-8 text-center text-gray-500">No active visitors</div>
+          )}
+        </div>
+      </div>
+
+      {/* Two Column Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Top Pages */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900">Top Pages</h3>
+          </div>
+          <div className="divide-y divide-gray-200">
+            {data?.topPages.length ? (
+              data.topPages.map((page, idx) => (
+                <div key={idx} className="px-6 py-4 hover:bg-gray-50">
+                  <div className="flex items-center justify-between">
+                    <div className="font-medium text-gray-900 truncate flex-1">{page.path}</div>
+                    <div className="ml-4 text-sm text-gray-600">
+                      {page.views} views • {page.bounceRate?.toFixed(1)}% bounce
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="px-6 py-8 text-center text-gray-500">No page data</div>
+            )}
+          </div>
+        </div>
+
+        {/* Traffic Sources */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900">Traffic Sources</h3>
+          </div>
+          <div className="divide-y divide-gray-200">
+            {data?.trafficSources.length ? (
+              data.trafficSources.map((source, idx) => (
+                <div key={idx} className="px-6 py-4 hover:bg-gray-50">
+                  <div className="flex items-center justify-between">
+                    <div className="font-medium text-gray-900">{source.source}</div>
+                    <div className="ml-4 text-sm text-gray-600">
+                      {source.visitors} ({source.percentage.toFixed(1)}%)
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="px-6 py-8 text-center text-gray-500">No traffic source data</div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Entry/Exit Pages */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900">Top Entry Pages</h3>
+          </div>
+          <div className="divide-y divide-gray-200">
+            {data?.entryPages.length ? (
+              data.entryPages.map((page, idx) => (
+                <div key={idx} className="px-6 py-4 hover:bg-gray-50">
+                  <div className="flex items-center justify-between">
+                    <div className="font-medium text-gray-900 truncate flex-1">{page.path}</div>
+                    <div className="ml-4 text-sm text-gray-600">{page.entries} entries</div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="px-6 py-8 text-center text-gray-500">No entry page data</div>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900">Top Exit Pages</h3>
+          </div>
+          <div className="divide-y divide-gray-200">
+            {data?.exitPages.length ? (
+              data.exitPages.map((page, idx) => (
+                <div key={idx} className="px-6 py-4 hover:bg-gray-50">
+                  <div className="flex items-center justify-between">
+                    <div className="font-medium text-gray-900 truncate flex-1">{page.path}</div>
+                    <div className="ml-4 text-sm text-gray-600">{page.exits} exits</div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="px-6 py-8 text-center text-gray-500">No exit page data</div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Devices & Browsers */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900">Devices</h3>
+          </div>
+          <div className="divide-y divide-gray-200">
+            {data?.devices.length ? (
+              data.devices.map((device, idx) => (
+                <div key={idx} className="px-6 py-4 hover:bg-gray-50">
+                  <div className="flex items-center justify-between">
+                    <div className="font-medium text-gray-900 capitalize">{device.type}</div>
+                    <div className="ml-4 text-sm text-gray-600">
+                      {device.count} ({device.percentage.toFixed(1)}%)
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="px-6 py-8 text-center text-gray-500">No device data</div>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900">Browsers</h3>
+          </div>
+          <div className="divide-y divide-gray-200">
+            {data?.browsers.length ? (
+              data.browsers.map((browser, idx) => (
+                <div key={idx} className="px-6 py-4 hover:bg-gray-50">
+                  <div className="flex items-center justify-between">
+                    <div className="font-medium text-gray-900">{browser.name}</div>
+                    <div className="ml-4 text-sm text-gray-600">
+                      {browser.count} ({browser.percentage.toFixed(1)}%)
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="px-6 py-8 text-center text-gray-500">No browser data</div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Geography */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900">Geographic Distribution</h3>
+        </div>
+        <div className="divide-y divide-gray-200">
+          {data?.geography.length ? (
+            data.geography.map((geo, idx) => (
+              <div key={idx} className="px-6 py-4 hover:bg-gray-50">
+                <div className="flex items-center justify-between">
+                  <div className="font-medium text-gray-900">{geo.country}</div>
+                  <div className="ml-4 text-sm text-gray-600">
+                    {geo.visitors} visitors ({geo.percentage.toFixed(1)}%)
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="px-6 py-8 text-center text-gray-500">No geographic data</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
