@@ -91,6 +91,11 @@ export async function GET(request: NextRequest) {
       take: 50,
     });
 
+    // Debug: Log session count and affiliate IDs
+    console.log('[Analytics Stats] Sessions found:', sessions.length);
+    console.log('[Analytics Stats] Sessions with affiliate_id:', sessions.filter(s => s.affiliate_id).length);
+    console.log('[Analytics Stats] Sample affiliate_ids:', sessions.slice(0, 5).map(s => s.affiliate_id));
+
     // Calculate metrics
     const totalVisitors = sessions.length;
     const uniqueVisitors = new Set(sessions.map(s => s.visitor_id)).size;
@@ -268,8 +273,15 @@ export async function GET(request: NextRequest) {
       avg_session_time: number;
     }>();
 
+    // Debug logging
+    console.log('[Analytics Stats] Total sessions:', sessions.length);
+    console.log('[Analytics Stats] Sessions with affiliate_id:', sessions.filter(s => s.affiliate_id).length);
+
     sessions.forEach(session => {
-      if (!session.affiliate_id) return;
+      if (!session.affiliate_id) {
+        console.log('[Analytics Stats] Skipping session without affiliate_id:', session.id);
+        return;
+      }
       
       const key = session.affiliate_id;
       const existing = affiliateMap.get(key) || {
