@@ -144,6 +144,14 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchDashboardData();
+    
+    // Auto-refresh every 30 seconds for live updates
+    const interval = setInterval(() => {
+      fetchDashboardData();
+    }, 30000); // 30 seconds
+    
+    // Cleanup interval on unmount
+    return () => clearInterval(interval);
   }, [fetchDashboardData]);
 
   const handleApprove = async (commissionId: string) => {
