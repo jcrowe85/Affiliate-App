@@ -98,6 +98,7 @@ model Affiliate {
   fraud_flags      FraudFlag[]
   affiliate_offers AffiliateOffer[]
   webhook_logs     AffiliateWebhookLog[]
+  visitor_sessions VisitorSession[]
 
   @@unique([shopify_shop_id, affiliate_number])
   @@unique([shopify_shop_id, merchant_id])
@@ -399,6 +400,8 @@ model VisitorSession {
   session_id       String // Client-generated session ID
   visitor_id       String // Fingerprint-based visitor ID
   shopify_shop_id  String
+  affiliate_id     String? // Affiliate who drove this traffic
+  affiliate_number Int? // Affiliate number for display
   entry_page       String // First page visited
   exit_page        String? // Last page visited
   start_time       BigInt // Timestamp in milliseconds
@@ -422,9 +425,11 @@ model VisitorSession {
   updated_at       DateTime @updatedAt
 
   events VisitorEvent[]
+  affiliate Affiliate? @relation(fields: [affiliate_id], references: [id], onDelete: SetNull)
 
   @@unique([session_id])
   @@index([shopify_shop_id, start_time])
+  @@index([affiliate_id, start_time])
   @@index([visitor_id])
   @@index([shopify_shop_id, created_at])
 }

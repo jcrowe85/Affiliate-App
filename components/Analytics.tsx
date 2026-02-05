@@ -17,6 +17,9 @@ interface ActiveVisitor {
   device: string;
   location: string;
   lastSeen: number;
+  affiliate_id?: string;
+  affiliate_number?: number | null;
+  affiliate_name?: string;
 }
 
 interface PageData {
@@ -52,6 +55,17 @@ interface GeographyData {
   percentage: number;
 }
 
+interface AffiliateData {
+  affiliate_id: string;
+  affiliate_number: number | null;
+  affiliate_name: string;
+  sessions: number;
+  visitors: number;
+  page_views: number;
+  bounce_rate: number;
+  avg_session_time: number;
+}
+
 interface AnalyticsData {
   metrics: AnalyticsMetrics;
   activeVisitors: ActiveVisitor[];
@@ -62,6 +76,7 @@ interface AnalyticsData {
   devices: DeviceData[];
   browsers: BrowserData[];
   geography: GeographyData[];
+  affiliates: AffiliateData[];
 }
 
 export default function Analytics() {
@@ -233,6 +248,55 @@ export default function Analytics() {
         </div>
       </div>
 
+      {/* Affiliate Traffic Overview */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900">Traffic by Affiliate</h3>
+          <p className="text-sm text-gray-500 mt-1">Live affiliate traffic analytics</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Affiliate</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sessions</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Visitors</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Page Views</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bounce Rate</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avg Session</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {data?.affiliates && data.affiliates.length > 0 ? (
+                data.affiliates.map((affiliate, idx) => (
+                  <tr key={idx} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="font-medium text-gray-900">
+                        {affiliate.affiliate_name}
+                        {affiliate.affiliate_number && (
+                          <span className="ml-2 text-sm text-gray-500">#{affiliate.affiliate_number}</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{affiliate.sessions}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{affiliate.visitors}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{affiliate.page_views}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{affiliate.bounce_rate.toFixed(1)}%</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{formatTime(affiliate.avg_session_time)}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                    No affiliate traffic data available
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       {/* Active Visitors */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200">
@@ -247,6 +311,9 @@ export default function Analytics() {
                     <div className="font-medium text-gray-900">{visitor.currentPage}</div>
                     <div className="text-sm text-gray-500 mt-1">
                       {visitor.device} • {visitor.location}
+                      {'affiliate_name' in visitor && visitor.affiliate_name && (
+                        <span className="ml-2">• {visitor.affiliate_name}</span>
+                      )}
                     </div>
                   </div>
                   <div className="text-sm text-gray-500">{formatTimeAgo(visitor.lastSeen)}</div>

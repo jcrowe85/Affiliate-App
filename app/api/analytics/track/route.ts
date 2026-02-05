@@ -21,6 +21,8 @@ export async function POST(request: NextRequest) {
       device,
       timestamp,
       event_data,
+      affiliate_id,
+      affiliate_number,
     } = body;
 
     // Log incoming request for debugging
@@ -77,6 +79,8 @@ export async function POST(request: NextRequest) {
             session_id,
             visitor_id,
             shopify_shop_id: shopifyShopId,
+            affiliate_id: affiliate_id || null,
+            affiliate_number: affiliate_number ? parseInt(String(affiliate_number), 10) : null,
             entry_page: entryPage,
             start_time: BigInt(sessionStartTime),
             page_views: pageViews,
@@ -105,6 +109,8 @@ export async function POST(request: NextRequest) {
         visitorSession = await prisma.visitorSession.update({
           where: { id: visitorSession.id },
           data: {
+            ...(affiliate_id && { affiliate_id: affiliate_id }),
+            ...(affiliate_number && { affiliate_number: parseInt(String(affiliate_number), 10) }),
             page_views: updatedPageViews,
             pages_visited: updatedPagesVisited,
             is_bounce: updatedPageViews === 1,

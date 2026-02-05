@@ -30,10 +30,11 @@ export async function GET(request: NextRequest) {
     const startTime = Date.now() - getTimeRangeMs(timeRange);
     const startTimeBigInt = BigInt(startTime);
 
-    // Get all sessions in time range
+    // Get all sessions in time range (ONLY affiliate traffic)
     const sessions = await prisma.visitorSession.findMany({
       where: {
         shopify_shop_id: shopifyShopId,
+        affiliate_id: { not: null }, // Only affiliate traffic
         start_time: {
           gte: startTimeBigInt,
         },
@@ -44,10 +45,19 @@ export async function GET(request: NextRequest) {
             timestamp: 'desc',
           },
         },
+        affiliate: {
+          select: {
+            id: true,
+            affiliate_number: true,
+            name: true,
+            first_name: true,
+            last_name: true,
+          },
+        },
       },
     });
 
-    // Get active visitors (sessions with activity in last 5 minutes)
+    // Get active visitors (sessions with activity in last 5 minutes) - only affiliate traffic
     const fiveMinutesAgo = BigInt(Date.now() - 5 * 60 * 1000);
     const activeSessions = await prisma.visitorEvent.findMany({
       where: {
@@ -55,9 +65,24 @@ export async function GET(request: NextRequest) {
         timestamp: {
           gte: fiveMinutesAgo,
         },
+        session: {
+          affiliate_id: { not: null }, // Only affiliate traffic
+        },
       },
       include: {
-        session: true,
+        session: {
+          include: {
+            affiliate: {
+              select: {
+                id: true,
+                affiliate_number: true,
+                name: true,
+                first_name: true,
+                last_name: true,
+              },
+            },
+          },
+        },
       },
       orderBy: {
         timestamp: 'desc',
@@ -211,17 +236,82 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => b.visitors - a.visitors)
       .slice(0, 10);
 
-    // Format active visitors
-    const activeVisitors = activeSessions.map(event => {
-      const session = event.session;
-      return {
-        session_id: session.session_id,
-        currentPage: session.pages_visited[session.pages_visited.length - 1] || '/',
-        device: session.device_type || 'Unknown',
-        location: session.location_country || 'Unknown',
-        lastSeen: Number(session.updated_at.getTime()),
+    // Format active visitors (only affiliate traffic)
+    const activeVisitors = activeSessions
+      .filter(event => event.session.affiliate_id)
+      .map(event => {
+        const session = event.session;
+        return {
+          session_id: session.session_id,
+          currentPage: session.pages_visited[session.pages_visited.length - 1] || '/',
+          device: session.device_type || 'Unknown',
+          location: session.location_country || 'Unknown',
+          lastSeen: Number(session.updated_at.getTime()),
+          affiliate_id: session.affiliate_id,
+          affiliate_number: session.affiliate_number,
+          affiliate_name: session.affiliate?.name || 
+                         (session.affiliate?.first_name && session.affiliate?.last_name 
+                           ? `${session.affiliate.first_name} ${session.affiliate.last_name}` 
+                           : `Affiliate #${session.affiliate_number || 'N/A'}`),
+        };
+      });
+
+    // Group sessions by affiliate
+    const affiliateMap = new Map<string, {
+      affiliate_id: string;
+      affiliate_number: number | null;
+      affiliate_name: string;
+      sessions: number;
+      visitors: Set<string>;
+      page_views: number;
+      bounce_rate: number;
+      avg_session_time: number;
+    }>();
+
+    sessions.forEach(session => {
+      if (!session.affiliate_id) return;
+      
+      const key = session.affiliate_id;
+      const existing = affiliateMap.get(key) || {
+        affiliate_id: session.affiliate_id,
+        affiliate_number: session.affiliate_number,
+        affiliate_name: session.affiliate?.name || 
+                       (session.affiliate?.first_name && session.affiliate?.last_name 
+                         ? `${session.affiliate.first_name} ${session.affiliate.last_name}` 
+                         : `Affiliate #${session.affiliate_number || 'N/A'}`),
+        sessions: 0,
+        visitors: new Set<string>(),
+        page_views: 0,
+        bounce_rate: 0,
+        avg_session_time: 0,
       };
+
+      existing.sessions++;
+      existing.visitors.add(session.visitor_id);
+      existing.page_views += session.page_views;
+      existing.avg_session_time += session.total_time || 0;
+      
+      affiliateMap.set(key, existing);
     });
+
+    // Calculate metrics per affiliate
+    const affiliates = Array.from(affiliateMap.values()).map(aff => {
+      const sessionsWithTime = sessions.filter(s => 
+        s.affiliate_id === aff.affiliate_id && s.total_time
+      ).length;
+      const bouncedSessions = sessions.filter(s => 
+        s.affiliate_id === aff.affiliate_id && s.is_bounce
+      ).length;
+      
+      return {
+        ...aff,
+        visitors: aff.visitors.size,
+        bounce_rate: aff.sessions > 0 ? (bouncedSessions / aff.sessions) * 100 : 0,
+        avg_session_time: sessionsWithTime > 0 
+          ? aff.avg_session_time / sessionsWithTime 
+          : 0,
+      };
+    }).sort((a, b) => b.sessions - a.sessions);
 
     return NextResponse.json({
       metrics: {
@@ -240,6 +330,7 @@ export async function GET(request: NextRequest) {
       devices,
       browsers,
       geography,
+      affiliates, // New: affiliate-organized data
     });
   } catch (error: any) {
     console.error('Analytics stats error:', error);

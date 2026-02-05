@@ -414,8 +414,219 @@
       }
     });
     
-    // Update periodically to ensure attributes are set (fallback, but less frequently)
-    setInterval(updateCartAttributes, 10000); // Every 10 seconds as fallback
-  }
-})();
-</script>
+      // Update periodically to ensure attributes are set (fallback, but less frequently)
+      setInterval(updateCartAttributes, 10000); // Every 10 seconds as fallback
+    }
+
+    // ============================================
+    // ANALYTICS TRACKING (for affiliate traffic only)
+    // ============================================
+    // Track pageviews and sessions ONLY for affiliate traffic (when ?ref= is present)
+    const ANALYTICS_API_URL = 'https://affiliates.tryfleur.com/api/analytics/track';
+    
+    // Store current affiliate info for analytics tracking
+    let currentAffiliateId = null;
+    let currentAffiliateNumber = null;
+    
+    // Generate or retrieve visitor ID (fingerprint-based, persistent)
+    function getOrCreateVisitorId() {
+      let visitorId = getLocalStorage('analytics_visitor_id');
+      if (!visitorId) {
+        // Generate a simple fingerprint (in production, use a more robust method)
+        const fingerprint = [
+          navigator.userAgent,
+          navigator.language,
+          screen.width + 'x' + screen.height,
+          new Date().getTimezoneOffset(),
+        ].join('|');
+        visitorId = btoa(fingerprint).substring(0, 32); // Base64 encode and truncate
+        setLocalStorage('analytics_visitor_id', visitorId);
+      }
+      return visitorId;
+    }
+
+    // Generate or retrieve session ID (new session every 30 minutes of inactivity)
+    function getOrCreateSessionId() {
+      const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+      const lastActivity = parseInt(getLocalStorage('analytics_last_activity') || '0');
+      const now = Date.now();
+      
+      let sessionId = getLocalStorage('analytics_session_id');
+      
+      // Create new session if timeout exceeded or no session exists
+      if (!sessionId || (now - lastActivity > SESSION_TIMEOUT)) {
+        sessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        setLocalStorage('analytics_session_id', sessionId);
+        setLocalStorage('analytics_session_start', now.toString());
+        setLocalStorage('analytics_page_views', '1');
+        setLocalStorage('analytics_pages_visited', JSON.stringify([window.location.pathname]));
+      } else {
+        // Update existing session
+        const pageViews = parseInt(getLocalStorage('analytics_page_views') || '0') + 1;
+        const pagesVisited = JSON.parse(getLocalStorage('analytics_pages_visited') || '[]');
+        if (!pagesVisited.includes(window.location.pathname)) {
+          pagesVisited.push(window.location.pathname);
+        }
+        setLocalStorage('analytics_page_views', pageViews.toString());
+        setLocalStorage('analytics_pages_visited', JSON.stringify(pagesVisited));
+      }
+      
+      setLocalStorage('analytics_last_activity', now.toString());
+      return sessionId;
+    }
+
+    // Track pageview for analytics (ONLY for affiliate traffic)
+    function trackPageView() {
+      // Only track if we have affiliate information
+      if (!currentAffiliateId && !currentAffiliateNumber) {
+        // Try to get from cookies/localStorage (from affiliate click tracking)
+        const storedAffiliateId = getCookie('affiliate_id') || getLocalStorage('affiliate_id');
+        const storedClickId = getCookie('affiliate_click_id') || getLocalStorage('affiliate_click_id');
+        
+        if (!storedAffiliateId || !storedClickId) {
+          return; // No affiliate data, skip analytics tracking
+        }
+        
+        currentAffiliateId = storedAffiliateId;
+        // Try to extract affiliate number from URL or stored data
+        const urlRef = getUrlParameter('ref');
+        if (urlRef && urlRef !== 'internal' && urlRef !== 'direct') {
+          currentAffiliateNumber = urlRef;
+        }
+      }
+      
+      // Still no affiliate data? Skip tracking
+      if (!currentAffiliateId) {
+        return;
+      }
+      
+      try {
+        const visitorId = getOrCreateVisitorId();
+        const sessionId = getOrCreateSessionId();
+        const sessionStart = parseInt(getLocalStorage('analytics_session_start') || Date.now().toString());
+        const pageViews = parseInt(getLocalStorage('analytics_page_views') || '1');
+        const pagesVisited = JSON.parse(getLocalStorage('analytics_pages_visited') || JSON.stringify([window.location.pathname]));
+        
+        const analyticsData = {
+          event: 'page_view',
+          session_id: sessionId,
+          visitor_id: visitorId,
+          shop: SHOP_ID,
+          affiliate_id: currentAffiliateId,
+          affiliate_number: currentAffiliateNumber,
+          page: {
+            path: window.location.pathname,
+            url: window.location.href,
+            title: document.title,
+          },
+          session: {
+            start_time: sessionStart,
+            entry_page: pagesVisited[0] || window.location.pathname,
+            pages_visited: pagesVisited,
+            page_views: pageViews,
+            time_on_page: 0, // Will be calculated on next pageview
+          },
+          referrer: {
+            type: document.referrer ? 'external' : 'direct',
+            url: document.referrer || '',
+            domain: document.referrer ? new URL(document.referrer).hostname : '',
+          },
+          device: {
+            type: /Mobile|Android|iPhone|iPad/.test(navigator.userAgent) ? 'mobile' : 'desktop',
+            userAgent: navigator.userAgent,
+            screenWidth: screen.width,
+            screenHeight: screen.height,
+            language: navigator.language,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          },
+          timestamp: Date.now(),
+        };
+
+        // Send analytics event (non-blocking)
+        fetch(ANALYTICS_API_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(analyticsData),
+          keepalive: true, // Ensure request completes even if page unloads
+        }).catch(err => {
+          console.warn('Analytics tracking error (non-critical):', err);
+        });
+      } catch (err) {
+        console.warn('Analytics tracking error (non-critical):', err);
+      }
+    }
+
+    // Only track analytics if we have affiliate data
+    // This will be set when affiliate click tracking succeeds
+    // We'll track after the affiliate API call completes
+    if (refParam && refParam !== 'internal' && refParam !== 'direct') {
+      // Wait for affiliate tracking to complete, then track analytics
+      // The affiliate tracking sets cookies/localStorage which we'll use
+      setTimeout(() => {
+        const storedAffiliateId = getCookie('affiliate_id') || getLocalStorage('affiliate_id');
+        if (storedAffiliateId) {
+          currentAffiliateId = storedAffiliateId;
+          currentAffiliateNumber = refParam;
+          trackPageView();
+        }
+      }, 500); // Small delay to ensure affiliate tracking completes first
+    } else {
+      // Check if we have existing affiliate data (from previous page in session)
+      const storedAffiliateId = getCookie('affiliate_id') || getLocalStorage('affiliate_id');
+      if (storedAffiliateId) {
+        currentAffiliateId = storedAffiliateId;
+        trackPageView();
+      }
+    }
+
+    // Track pageview on navigation (for SPAs) - only if affiliate data exists
+    let lastPath = window.location.pathname;
+    const observer = new MutationObserver(() => {
+      if (window.location.pathname !== lastPath) {
+        lastPath = window.location.pathname;
+        setTimeout(() => {
+          // Check if we still have affiliate data
+          const storedAffiliateId = getCookie('affiliate_id') || getLocalStorage('affiliate_id');
+          if (storedAffiliateId) {
+            currentAffiliateId = storedAffiliateId;
+            trackPageView();
+          }
+        }, 100);
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    // Track time on page before unload - only if affiliate data exists
+    let pageStartTime = Date.now();
+    window.addEventListener('beforeunload', () => {
+      const storedAffiliateId = getCookie('affiliate_id') || getLocalStorage('affiliate_id');
+      if (!storedAffiliateId) {
+        return; // No affiliate data, skip
+      }
+      
+      const timeOnPage = Date.now() - pageStartTime;
+      const visitorId = getOrCreateVisitorId();
+      const sessionId = getOrCreateSessionId();
+      
+      // Send page exit event
+      fetch(ANALYTICS_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event: 'page_exit',
+          session_id: sessionId,
+          visitor_id: visitorId,
+          shop: SHOP_ID,
+          affiliate_id: storedAffiliateId,
+          affiliate_number: currentAffiliateNumber,
+          page: { path: window.location.pathname },
+          event_data: { time_on_page: timeOnPage },
+          timestamp: Date.now(),
+        }),
+        keepalive: true,
+      }).catch(() => {}); // Ignore errors on unload
+    });
+  })();
+  </script>
