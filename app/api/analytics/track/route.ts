@@ -53,7 +53,25 @@ export async function POST(request: NextRequest) {
       shopifyShopId = shop.replace('.myshopify.com', '');
     }
     
-    console.log('[Analytics Track] Processing for shop:', shopifyShopId);
+    // If we have affiliate_number but not affiliate_id, look it up
+    let finalAffiliateId = affiliate_id;
+    if (!finalAffiliateId && affiliate_number) {
+      const affiliate = await prisma.affiliate.findFirst({
+        where: {
+          shopify_shop_id: shopifyShopId,
+          affiliate_number: parseInt(String(affiliate_number), 10),
+        },
+        select: { id: true },
+      });
+      if (affiliate) {
+        finalAffiliateId = affiliate.id;
+        console.log('[Analytics Track] Looked up affiliate_id from affiliate_number:', finalAffiliateId);
+      } else {
+        console.warn('[Analytics Track] Affiliate not found for number:', affiliate_number);
+      }
+    }
+    
+    console.log('[Analytics Track] Processing for shop:', shopifyShopId, 'affiliate_id:', finalAffiliateId, 'affiliate_number:', affiliate_number);
 
     // Handle page_view events - update or create session
     if (event === 'page_view') {
@@ -79,7 +97,7 @@ export async function POST(request: NextRequest) {
             session_id,
             visitor_id,
             shopify_shop_id: shopifyShopId,
-            affiliate_id: affiliate_id || null,
+            affiliate_id: finalAffiliateId || null,
             affiliate_number: affiliate_number ? parseInt(String(affiliate_number), 10) : null,
             entry_page: entryPage,
             start_time: BigInt(sessionStartTime),
@@ -109,7 +127,7 @@ export async function POST(request: NextRequest) {
         visitorSession = await prisma.visitorSession.update({
           where: { id: visitorSession.id },
           data: {
-            ...(affiliate_id && { affiliate_id: affiliate_id }),
+            ...(finalAffiliateId && { affiliate_id: finalAffiliateId }),
             ...(affiliate_number && { affiliate_number: parseInt(String(affiliate_number), 10) }),
             page_views: updatedPageViews,
             pages_visited: updatedPagesVisited,

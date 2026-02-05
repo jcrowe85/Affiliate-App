@@ -162,6 +162,13 @@
         
         console.log('✅ New affiliate tracking data saved to cookies, sessionStorage, and localStorage');
         console.log('✅ Previous affiliate data has been overwritten (last-touch attribution)');
+        
+        // Set affiliate info for analytics tracking
+        currentAffiliateId = data.affiliateId;
+        currentAffiliateNumber = data.affiliateNumber;
+        
+        // Track analytics pageview now that we have affiliate data
+        trackPageView();
       } else {
         console.error('❌ Tracking API response missing required data:', data);
         console.error('Expected: success=true, clickId, affiliateId');
@@ -477,27 +484,24 @@
 
     // Track pageview for analytics (ONLY for affiliate traffic)
     function trackPageView() {
-      // Only track if we have affiliate information
-      if (!currentAffiliateId && !currentAffiliateNumber) {
-        // Try to get from cookies/localStorage (from affiliate click tracking)
+      // Try to get affiliate info from current variables or cookies/localStorage
+      if (!currentAffiliateId) {
         const storedAffiliateId = getCookie('affiliate_id') || getLocalStorage('affiliate_id');
-        const storedClickId = getCookie('affiliate_click_id') || getLocalStorage('affiliate_click_id');
-        
-        if (!storedAffiliateId || !storedClickId) {
-          return; // No affiliate data, skip analytics tracking
+        if (storedAffiliateId) {
+          currentAffiliateId = storedAffiliateId;
         }
-        
-        currentAffiliateId = storedAffiliateId;
-        // Try to extract affiliate number from URL or stored data
+      }
+      
+      if (!currentAffiliateNumber) {
         const urlRef = getUrlParameter('ref');
         if (urlRef && urlRef !== 'internal' && urlRef !== 'direct') {
           currentAffiliateNumber = urlRef;
         }
       }
       
-      // Still no affiliate data? Skip tracking
-      if (!currentAffiliateId) {
-        return;
+      // We need at least affiliate_number to track (affiliate_id is preferred but number works)
+      if (!currentAffiliateId && !currentAffiliateNumber) {
+        return; // No affiliate data, skip analytics tracking
       }
       
       try {
@@ -559,19 +563,23 @@
     }
 
     // Only track analytics if we have affiliate data
-    // This will be set when affiliate click tracking succeeds
-    // We'll track after the affiliate API call completes
     if (refParam && refParam !== 'internal' && refParam !== 'direct') {
-      // Wait for affiliate tracking to complete, then track analytics
-      // The affiliate tracking sets cookies/localStorage which we'll use
-      setTimeout(() => {
-        const storedAffiliateId = getCookie('affiliate_id') || getLocalStorage('affiliate_id');
-        if (storedAffiliateId) {
-          currentAffiliateId = storedAffiliateId;
-          currentAffiliateNumber = refParam;
-          trackPageView();
-        }
-      }, 500); // Small delay to ensure affiliate tracking completes first
+      // Set affiliate number immediately from URL
+      currentAffiliateNumber = refParam;
+      
+      // Try to get affiliateId from existing cookies/localStorage (from previous visit)
+      const storedAffiliateId = getCookie('affiliate_id') || getLocalStorage('affiliate_id');
+      if (storedAffiliateId) {
+        currentAffiliateId = storedAffiliateId;
+      }
+      
+      // Track immediately with affiliate number (API will look up affiliate_id if needed)
+      // This ensures we don't miss the pageview even if the affiliate API call is slow
+      console.log('📊 Tracking analytics pageview for affiliate:', currentAffiliateNumber);
+      trackPageView();
+      
+      // Also track again after affiliate API completes (to update with affiliate_id if we got it)
+      // This is handled in the .then() callback above where we set currentAffiliateId and call trackPageView()
     } else {
       // Check if we have existing affiliate data (from previous page in session)
       const storedAffiliateId = getCookie('affiliate_id') || getLocalStorage('affiliate_id');
