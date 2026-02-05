@@ -56,18 +56,40 @@ export async function POST(request: NextRequest) {
     // If we have affiliate_number but not affiliate_id, look it up
     let finalAffiliateId = affiliate_id;
     if (!finalAffiliateId && affiliate_number) {
-      const affiliate = await prisma.affiliate.findFirst({
-        where: {
-          shopify_shop_id: shopifyShopId,
-          affiliate_number: parseInt(String(affiliate_number), 10),
-        },
-        select: { id: true },
-      });
-      if (affiliate) {
-        finalAffiliateId = affiliate.id;
-        console.log('[Analytics Track] Looked up affiliate_id from affiliate_number:', finalAffiliateId);
-      } else {
-        console.warn('[Analytics Track] Affiliate not found for number:', affiliate_number);
+      try {
+        const affiliateNumberInt = parseInt(String(affiliate_number), 10);
+        console.log('[Analytics Track] Looking up affiliate:', {
+          shopifyShopId,
+          affiliate_number: affiliateNumberInt,
+          affiliate_number_type: typeof affiliate_number,
+        });
+        
+        const affiliate = await prisma.affiliate.findFirst({
+          where: {
+            shopify_shop_id: shopifyShopId,
+            affiliate_number: affiliateNumberInt,
+          },
+          select: { id: true, affiliate_number: true },
+        });
+        
+        if (affiliate) {
+          finalAffiliateId = affiliate.id;
+          console.log('[Analytics Track] ✅ Looked up affiliate_id from affiliate_number:', {
+            affiliate_id: finalAffiliateId,
+            affiliate_number: affiliate.affiliate_number,
+          });
+        } else {
+          console.warn('[Analytics Track] ❌ Affiliate not found for number:', {
+            shopifyShopId,
+            affiliate_number: affiliateNumberInt,
+            available_affiliates: await prisma.affiliate.findMany({
+              where: { shopify_shop_id: shopifyShopId },
+              select: { affiliate_number: true },
+            }).then(affs => affs.map(a => a.affiliate_number)),
+          });
+        }
+      } catch (err) {
+        console.error('[Analytics Track] Error looking up affiliate:', err);
       }
     }
     

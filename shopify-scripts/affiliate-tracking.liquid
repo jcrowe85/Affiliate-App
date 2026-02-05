@@ -436,18 +436,29 @@
     let currentAffiliateNumber = null;
     
     // Generate or retrieve visitor ID (fingerprint-based, persistent)
+    // Each device should have a unique visitor_id based on device characteristics
     function getOrCreateVisitorId() {
       let visitorId = getLocalStorage('analytics_visitor_id');
       if (!visitorId) {
-        // Generate a simple fingerprint (in production, use a more robust method)
+        // Generate a device fingerprint that's unique per device
+        // Include more device-specific data to ensure desktop and phone are different
         const fingerprint = [
           navigator.userAgent,
           navigator.language,
           screen.width + 'x' + screen.height,
+          screen.colorDepth || 24,
           new Date().getTimezoneOffset(),
+          navigator.platform || '',
+          navigator.hardwareConcurrency || 0,
+          navigator.maxTouchPoints || 0, // Phones have touch, desktops usually don't
         ].join('|');
         visitorId = btoa(fingerprint).substring(0, 32); // Base64 encode and truncate
         setLocalStorage('analytics_visitor_id', visitorId);
+        console.log('📱 Generated new visitor_id:', visitorId, 'for device:', {
+          userAgent: navigator.userAgent.substring(0, 50),
+          screen: screen.width + 'x' + screen.height,
+          touchPoints: navigator.maxTouchPoints,
+        });
       }
       return visitorId;
     }
@@ -510,6 +521,13 @@
         const sessionStart = parseInt(getLocalStorage('analytics_session_start') || Date.now().toString());
         const pageViews = parseInt(getLocalStorage('analytics_page_views') || '1');
         const pagesVisited = JSON.parse(getLocalStorage('analytics_pages_visited') || JSON.stringify([window.location.pathname]));
+        
+        console.log('📊 Sending analytics pageview:', {
+          visitor_id: visitorId.substring(0, 8) + '...',
+          session_id: sessionId.substring(0, 8) + '...',
+          affiliate_id: currentAffiliateId,
+          affiliate_number: currentAffiliateNumber,
+        });
         
         const analyticsData = {
           event: 'page_view',
