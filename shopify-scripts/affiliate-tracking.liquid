@@ -69,6 +69,10 @@
     return urlParams.get(name);
   }
 
+  // Store current affiliate info for analytics tracking (declared early so it's available everywhere)
+  let currentAffiliateId = null;
+  let currentAffiliateNumber = null;
+  
   // Check for ?ref= parameter (affiliate tracking)
   const refParam = getUrlParameter('ref');
   
@@ -167,8 +171,21 @@
         currentAffiliateId = data.affiliateId;
         currentAffiliateNumber = data.affiliateNumber;
         
+        console.log('📊 Setting affiliate data for analytics:', {
+          affiliateId: currentAffiliateId,
+          affiliateNumber: currentAffiliateNumber
+        });
+        
         // Track analytics pageview now that we have affiliate data
-        trackPageView();
+        try {
+          if (typeof trackPageView === 'function') {
+            trackPageView();
+          } else {
+            console.error('❌ trackPageView is not a function - analytics section may not be loaded yet');
+          }
+        } catch (err) {
+          console.error('❌ Error calling trackPageView:', err);
+        }
       } else {
         console.error('❌ Tracking API response missing required data:', data);
         console.error('Expected: success=true, clickId, affiliateId');
@@ -431,9 +448,7 @@
     // Track pageviews and sessions ONLY for affiliate traffic (when ?ref= is present)
     const ANALYTICS_API_URL = 'https://affiliates.tryfleur.com/api/analytics/track';
     
-    // Store current affiliate info for analytics tracking
-    let currentAffiliateId = null;
-    let currentAffiliateNumber = null;
+    // Note: currentAffiliateId and currentAffiliateNumber are declared at the top of the script
     
     // Generate or retrieve visitor ID (fingerprint-based, persistent)
     // Each device should have a unique visitor_id based on device characteristics
@@ -495,11 +510,18 @@
 
     // Track pageview for analytics (ONLY for affiliate traffic)
     function trackPageView() {
+      console.log('🔍 trackPageView() called', {
+        currentAffiliateId: currentAffiliateId ? currentAffiliateId.substring(0, 8) + '...' : null,
+        currentAffiliateNumber,
+        timestamp: Date.now()
+      });
+      
       // Try to get affiliate info from current variables or cookies/localStorage
       if (!currentAffiliateId) {
         const storedAffiliateId = getCookie('affiliate_id') || getLocalStorage('affiliate_id');
         if (storedAffiliateId) {
           currentAffiliateId = storedAffiliateId;
+          console.log('📦 Restored affiliate_id from storage:', storedAffiliateId.substring(0, 8) + '...');
         }
       }
       
@@ -507,13 +529,20 @@
         const urlRef = getUrlParameter('ref');
         if (urlRef && urlRef !== 'internal' && urlRef !== 'direct') {
           currentAffiliateNumber = urlRef;
+          console.log('📦 Restored affiliate_number from URL:', urlRef);
         }
       }
       
       // We need at least affiliate_number to track (affiliate_id is preferred but number works)
       if (!currentAffiliateId && !currentAffiliateNumber) {
+        console.warn('⚠️ No affiliate data available, skipping analytics tracking');
         return; // No affiliate data, skip analytics tracking
       }
+      
+      console.log('✅ Proceeding with analytics tracking:', {
+        hasAffiliateId: !!currentAffiliateId,
+        affiliateNumber: currentAffiliateNumber
+      });
       
       try {
         const visitorId = getOrCreateVisitorId();
