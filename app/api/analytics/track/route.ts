@@ -23,14 +23,35 @@ export async function POST(request: NextRequest) {
       event_data,
     } = body;
 
+    // Log incoming request for debugging
+    console.log('[Analytics Track] Received:', {
+      event,
+      shop,
+      has_session_id: !!session_id,
+      has_visitor_id: !!visitor_id,
+      page_path: page?.path,
+    });
+
     if (!session_id || !visitor_id || !shop || !event) {
+      console.error('[Analytics Track] Missing required fields:', {
+        has_session_id: !!session_id,
+        has_visitor_id: !!visitor_id,
+        has_shop: !!shop,
+        has_event: !!event,
+      });
       return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
+        { error: 'Missing required fields', received: { event, has_session_id: !!session_id, has_visitor_id: !!visitor_id, shop } },
+        { status: 400, headers: { 'Access-Control-Allow-Origin': '*' } }
       );
     }
 
-    const shopifyShopId = shop.replace('.myshopify.com', '');
+    // Extract shop ID - handle both formats: "shop.myshopify.com" and just "shop"
+    let shopifyShopId = shop;
+    if (shop.includes('.myshopify.com')) {
+      shopifyShopId = shop.replace('.myshopify.com', '');
+    }
+    
+    console.log('[Analytics Track] Processing for shop:', shopifyShopId);
 
     // Handle page_view events - update or create session
     if (event === 'page_view') {
@@ -40,13 +61,17 @@ export async function POST(request: NextRequest) {
       const pageViews = sessionData?.page_views || 1;
       const timeOnPage = sessionData?.time_on_page || 0;
 
-      // Find or create session
-      let visitorSession = await prisma.visitorSession.findUnique({
-        where: { session_id },
+      // Find or create session by session_id (client-generated ID)
+      let visitorSession = await prisma.visitorSession.findFirst({
+        where: { 
+          session_id: session_id,
+          shopify_shop_id: shopifyShopId,
+        },
       });
 
       if (!visitorSession) {
         // Create new session
+        console.log('[Analytics Track] Creating new session:', session_id);
         visitorSession = await prisma.visitorSession.create({
           data: {
             session_id,
@@ -68,7 +93,9 @@ export async function POST(request: NextRequest) {
             is_bounce: pageViews === 1,
           },
         });
+        console.log('[Analytics Track] Session created:', visitorSession.id);
       } else {
+        console.log('[Analytics Track] Updating existing session:', visitorSession.id);
         // Update existing session
         const updatedPagesVisited = Array.from(
           new Set([...visitorSession.pages_visited, ...pagesVisited])
@@ -87,7 +114,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Create page view event
-      await prisma.visitorEvent.create({
+      const event = await prisma.visitorEvent.create({
         data: {
           session_id: visitorSession.id,
           visitor_id,
@@ -103,10 +130,14 @@ export async function POST(request: NextRequest) {
           timestamp: BigInt(timestamp),
         },
       });
+      console.log('[Analytics Track] Event created:', event.id);
     } else if (event === 'page_exit') {
       // Handle page exit - update session end time
-      const visitorSession = await prisma.visitorSession.findUnique({
-        where: { session_id },
+      const visitorSession = await prisma.visitorSession.findFirst({
+        where: { 
+          session_id: session_id,
+          shopify_shop_id: shopifyShopId,
+        },
       });
 
       if (visitorSession) {
@@ -142,8 +173,11 @@ export async function POST(request: NextRequest) {
       }
     } else {
       // Handle other events (scroll, click, etc.)
-      const visitorSession = await prisma.visitorSession.findUnique({
-        where: { session_id },
+      const visitorSession = await prisma.visitorSession.findFirst({
+        where: { 
+          session_id: session_id,
+          shopify_shop_id: shopifyShopId,
+        },
       });
 
       if (visitorSession) {
@@ -162,7 +196,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true }, {
+    console.log('[Analytics Track] Successfully processed event:', event);
+    return NextResponse.json({ success: true, message: 'Event tracked' }, {
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -170,9 +205,10 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error('Analytics tracking error:', error);
+    console.error('[Analytics Track] Error:', error);
+    console.error('[Analytics Track] Error stack:', error.stack);
     return NextResponse.json(
-      { error: error.message || 'Tracking failed' },
+      { error: error.message || 'Tracking failed', details: error.toString() },
       {
         status: 500,
         headers: {

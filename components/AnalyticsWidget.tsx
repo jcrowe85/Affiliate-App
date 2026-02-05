@@ -35,9 +35,53 @@ export default function AnalyticsWidget() {
       }
     };
 
+    // Initial fetch
     fetchData();
-    const interval = setInterval(fetchData, 30000); // Refresh every 30 seconds
-    return () => clearInterval(interval);
+
+    // Set up SSE for real-time updates
+    const eventSource = new EventSource('/api/analytics/stream');
+    
+    eventSource.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        if (message.type === 'update' && message.data) {
+          setData(prevData => {
+            if (!prevData) {
+              // If no previous data, fetch full data
+              fetchData();
+              return prevData;
+            }
+            return {
+              ...prevData,
+              activeVisitors: message.data.activeVisitors || prevData.activeVisitors,
+              metrics: {
+                ...prevData.metrics,
+                ...message.data.metrics,
+              },
+            };
+          });
+        }
+      } catch (error) {
+        console.error('Error parsing SSE message:', error);
+      }
+    };
+
+    eventSource.onerror = () => {
+      // Fallback to polling if SSE fails
+      const interval = setInterval(fetchData, 10000);
+      return () => {
+        clearInterval(interval);
+        eventSource.close();
+      };
+    };
+
+    // Fallback polling
+    const interval = setInterval(fetchData, 30000);
+
+    return () => {
+      eventSource.close();
+      clearInterval(interval);
+    };
   }, []);
 
   const formatTime = (seconds: number) => {

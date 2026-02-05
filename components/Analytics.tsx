@@ -86,10 +86,57 @@ export default function Analytics() {
     }
   }, [timeRange]);
 
+  // Set up Server-Sent Events for real-time updates
   useEffect(() => {
+    // Initial fetch
     fetchAnalytics();
+
+    // Set up SSE connection for real-time updates
+    const eventSource = new EventSource('/api/analytics/stream');
+    
+    eventSource.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        if (message.type === 'update' && message.data) {
+          // Update active visitors in real-time
+          if (message.data.activeVisitors) {
+            setData(prevData => {
+              if (!prevData) return prevData;
+              return {
+                ...prevData,
+                activeVisitors: message.data.activeVisitors,
+                metrics: {
+                  ...prevData.metrics,
+                  ...message.data.metrics,
+                },
+              };
+            });
+          }
+        } else if (message.type === 'error') {
+          console.error('SSE error:', message.message);
+        }
+      } catch (error) {
+        console.error('Error parsing SSE message:', error);
+      }
+    };
+
+    eventSource.onerror = (error) => {
+      console.error('SSE connection error:', error);
+      // Fallback to polling if SSE fails
+      const interval = setInterval(fetchAnalytics, refreshInterval * 1000);
+      return () => {
+        clearInterval(interval);
+        eventSource.close();
+      };
+    };
+
+    // Fallback polling for time range changes (SSE only updates active visitors)
     const interval = setInterval(fetchAnalytics, refreshInterval * 1000);
-    return () => clearInterval(interval);
+
+    return () => {
+      eventSource.close();
+      clearInterval(interval);
+    };
   }, [fetchAnalytics, refreshInterval]);
 
   const formatTime = (seconds: number) => {
