@@ -78,7 +78,7 @@
   
   // Check if this is internal traffic first (ref=internal or ref=direct)
   if (refParam === 'internal' || refParam === 'direct') {
-    console.log('Internal traffic detected (ref=' + refParam + ') - skipping affiliate tracking');
+    // Internal traffic - skip tracking
   } else if (refParam) {
     // Found ?ref= parameter with affiliate number - track this click
     const affiliateNumber = refParam;
@@ -92,9 +92,6 @@
     
     // Normalize API URL (fix double https:// or other issues)
     const apiUrl = normalizedApiUrl || TRACKING_API_URL.replace(/^https?:\/\/https?:\/\//, 'https://').replace(/\/+$/, '');
-    
-    console.log('Affiliate tracking: Detected ref parameter:', affiliateNumber);
-    console.log('Calling tracking API:', `${apiUrl}?ref=${affiliateNumber}&shop=${SHOP_ID}`);
     
     // Capture postback parameters from URL (transaction_id, affiliate_id, sub1, sub2, sub3, sub4)
     const transactionId = getUrlParameter('transaction_id');
@@ -123,8 +120,6 @@
 
     // LAST-TOUCH ATTRIBUTION: Always overwrite previous affiliate data
     // This ensures the most recent affiliate click wins, even if cookies/localStorage exist
-    console.log('🔄 New affiliate click detected - will overwrite any existing tracking data');
-    
     fetch(apiUrl, {
       method: 'POST',
       headers: {
@@ -133,22 +128,15 @@
       body: JSON.stringify(trackingData),
     })
     .then(response => {
-      console.log('Tracking API response status:', response.status);
       if (!response.ok) {
         throw new Error(`API returned ${response.status}: ${response.statusText}`);
       }
       return response.json();
     })
     .then(data => {
-      console.log('Tracking API response data:', data);
       if (data.success && data.clickId && data.affiliateId) {
         // LAST-TOUCH ATTRIBUTION: Always overwrite previous affiliate data
         // This ensures the most recent affiliate click wins
-        console.log('✅ Setting NEW affiliate tracking data (overwriting any previous):', {
-          newAffiliateNumber: data.affiliateNumber,
-          newClickId: data.clickId,
-          newAffiliateId: data.affiliateId
-        });
         
         // Set tracking cookies (30 days) with Secure flag on HTTPS
         // This OVERWRITES any existing cookies
@@ -164,27 +152,13 @@
         setLocalStorage('affiliate_click_id', data.clickId);
         setLocalStorage('affiliate_id', data.affiliateId);
         
-        console.log('✅ New affiliate tracking data saved to cookies, sessionStorage, and localStorage');
-        console.log('✅ Previous affiliate data has been overwritten (last-touch attribution)');
-        
         // Set affiliate info for analytics tracking
         currentAffiliateId = data.affiliateId;
         currentAffiliateNumber = data.affiliateNumber;
         
-        console.log('📊 Setting affiliate data for analytics:', {
-          affiliateId: currentAffiliateId,
-          affiliateNumber: currentAffiliateNumber
-        });
-        
         // Track analytics pageview now that we have affiliate data
-        try {
-          if (typeof trackPageView === 'function') {
-            trackPageView();
-          } else {
-            console.error('❌ trackPageView is not a function - analytics section may not be loaded yet');
-          }
-        } catch (err) {
-          console.error('❌ Error calling trackPageView:', err);
+        if (typeof trackPageView === 'function') {
+          trackPageView();
         }
       } else {
         console.error('❌ Tracking API response missing required data:', data);
@@ -202,7 +176,6 @@
   } else {
     // No ref parameter - this is a normal visit (not from affiliate link)
     // Restore existing tracking data if available (for attribution window)
-    console.log('No ref parameter - checking for existing affiliate tracking data');
     
     // Get existing affiliate tracking cookies
     let affiliateClickId = getCookie('affiliate_click_id');
@@ -213,7 +186,6 @@
     if (!affiliateClickId) {
       const storedClickId = getLocalStorage('affiliate_click_id');
       if (storedClickId) {
-        console.log('Restoring affiliate_click_id from localStorage (cookie was cleared)');
         affiliateClickId = storedClickId;
         setCookie('affiliate_click_id', storedClickId, 30); // Re-set cookie
       }
@@ -221,7 +193,6 @@
     if (!affiliateId) {
       const storedAffiliateId = getLocalStorage('affiliate_id');
       if (storedAffiliateId) {
-        console.log('Restoring affiliate_id from localStorage (cookie was cleared)');
         affiliateId = storedAffiliateId;
         setCookie('affiliate_id', storedAffiliateId, 30); // Re-set cookie
       }
@@ -229,10 +200,6 @@
 
     // If we have affiliate tracking data, ensure it's stored in all storage types
     if (affiliateClickId || affiliateId) {
-      console.log('Existing affiliate tracking data found:', {
-        affiliate_click_id: affiliateClickId,
-        affiliate_id: affiliateId
-      });
       // Store in sessionStorage for checkout
       if (affiliateClickId) {
         sessionStorage.setItem('affiliate_click_id', affiliateClickId);
@@ -240,8 +207,6 @@
       if (affiliateId) {
         sessionStorage.setItem('affiliate_id', affiliateId);
       }
-    } else {
-      console.log('No existing affiliate tracking data - normal visit (not from affiliate link)');
     }
   }
 
@@ -267,7 +232,6 @@
   function updateCartAttributes() {
     // Debounce: prevent multiple simultaneous calls
     if (cartUpdateInProgress) {
-      console.log('Cart update already in progress, skipping...');
       return;
     }
 
@@ -333,7 +297,6 @@
           return response.json();
         } else if (response.status === 409) {
           // 409 Conflict - cart is locked, but that's okay, attributes might already be set
-          console.log('Cart update conflict (409) - attributes may already be set');
           return null; // Don't treat as error
         } else {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -342,7 +305,6 @@
       .then(data => {
         if (data) {
           lastCartAttributes = attributesKey; // Remember what we set
-          console.log('✅ Cart attributes updated:', attributes);
         }
       })
       .catch(err => {
@@ -390,7 +352,6 @@
       const checkoutButton = target.closest('a[href*="/checkout"], button[type="submit"], form[action*="/checkout"], [name="checkout"], [data-checkout], .cart__checkout, .checkout-button');
       
       if (checkoutButton) {
-        console.log('Checkout button clicked - ensuring cart attributes are set before checkout');
         // Set attributes immediately (synchronously if possible, or with minimal delay)
         // Remove debounce for this critical moment
         const storedClickId = sessionStorage.getItem('affiliate_click_id');
@@ -417,11 +378,8 @@
               body: JSON.stringify({ attributes }),
               keepalive: true // Keep request alive even if page unloads
             })
-            .then(() => {
-              console.log('✅ Cart attributes set before checkout:', attributes);
-            })
-            .catch((err) => {
-              console.error('❌ Failed to set cart attributes before checkout:', err);
+            .catch(() => {
+              // Silently fail - checkout should proceed regardless
             });
           }
         }
@@ -433,7 +391,6 @@
       const form = e.target;
       if (form && (form.action && form.action.includes('/checkout') || 
                    form.action && form.action.includes('/cart'))) {
-        console.log('Checkout form submitted - ensuring cart attributes are set');
         updateCartAttributes(); // Call without debounce delay
       }
     });
@@ -447,8 +404,6 @@
     // ============================================
     // Track pageviews and sessions ONLY for affiliate traffic (when ?ref= is present)
     const ANALYTICS_API_URL = 'https://affiliates.tryfleur.com/api/analytics/track';
-    
-    // Note: currentAffiliateId and currentAffiliateNumber are declared at the top of the script
     
     // Generate or retrieve visitor ID (fingerprint-based, persistent)
     // Each device should have a unique visitor_id based on device characteristics
@@ -469,11 +424,6 @@
         ].join('|');
         visitorId = btoa(fingerprint).substring(0, 32); // Base64 encode and truncate
         setLocalStorage('analytics_visitor_id', visitorId);
-        console.log('📱 Generated new visitor_id:', visitorId, 'for device:', {
-          userAgent: navigator.userAgent.substring(0, 50),
-          screen: screen.width + 'x' + screen.height,
-          touchPoints: navigator.maxTouchPoints,
-        });
       }
       return visitorId;
     }
@@ -510,18 +460,11 @@
 
     // Track pageview for analytics (ONLY for affiliate traffic)
     function trackPageView() {
-      console.log('🔍 trackPageView() called', {
-        currentAffiliateId: currentAffiliateId ? currentAffiliateId.substring(0, 8) + '...' : null,
-        currentAffiliateNumber,
-        timestamp: Date.now()
-      });
-      
       // Try to get affiliate info from current variables or cookies/localStorage
       if (!currentAffiliateId) {
         const storedAffiliateId = getCookie('affiliate_id') || getLocalStorage('affiliate_id');
         if (storedAffiliateId) {
           currentAffiliateId = storedAffiliateId;
-          console.log('📦 Restored affiliate_id from storage:', storedAffiliateId.substring(0, 8) + '...');
         }
       }
       
@@ -529,20 +472,13 @@
         const urlRef = getUrlParameter('ref');
         if (urlRef && urlRef !== 'internal' && urlRef !== 'direct') {
           currentAffiliateNumber = urlRef;
-          console.log('📦 Restored affiliate_number from URL:', urlRef);
         }
       }
       
       // We need at least affiliate_number to track (affiliate_id is preferred but number works)
       if (!currentAffiliateId && !currentAffiliateNumber) {
-        console.warn('⚠️ No affiliate data available, skipping analytics tracking');
         return; // No affiliate data, skip analytics tracking
       }
-      
-      console.log('✅ Proceeding with analytics tracking:', {
-        hasAffiliateId: !!currentAffiliateId,
-        affiliateNumber: currentAffiliateNumber
-      });
       
       try {
         const visitorId = getOrCreateVisitorId();
@@ -550,13 +486,6 @@
         const sessionStart = parseInt(getLocalStorage('analytics_session_start') || Date.now().toString());
         const pageViews = parseInt(getLocalStorage('analytics_page_views') || '1');
         const pagesVisited = JSON.parse(getLocalStorage('analytics_pages_visited') || JSON.stringify([window.location.pathname]));
-        
-        console.log('📊 Sending analytics pageview:', {
-          visitor_id: visitorId.substring(0, 8) + '...',
-          session_id: sessionId.substring(0, 8) + '...',
-          affiliate_id: currentAffiliateId,
-          affiliate_number: currentAffiliateNumber,
-        });
         
         const analyticsData = {
           event: 'page_view',
@@ -610,6 +539,7 @@
     }
 
     // Only track analytics if we have affiliate data
+    // This runs immediately when page loads if refParam is present
     if (refParam && refParam !== 'internal' && refParam !== 'direct') {
       // Set affiliate number immediately from URL
       currentAffiliateNumber = refParam;
@@ -622,8 +552,11 @@
       
       // Track immediately with affiliate number (API will look up affiliate_id if needed)
       // This ensures we don't miss the pageview even if the affiliate API call is slow
-      console.log('📊 Tracking analytics pageview for affiliate:', currentAffiliateNumber);
-      trackPageView();
+      setTimeout(function() {
+        if (typeof trackPageView === 'function') {
+          trackPageView();
+        }
+      }, 100);
       
       // Also track again after affiliate API completes (to update with affiliate_id if we got it)
       // This is handled in the .then() callback above where we set currentAffiliateId and call trackPageView()
@@ -632,7 +565,11 @@
       const storedAffiliateId = getCookie('affiliate_id') || getLocalStorage('affiliate_id');
       if (storedAffiliateId) {
         currentAffiliateId = storedAffiliateId;
-        trackPageView();
+        setTimeout(function() {
+          if (typeof trackPageView === 'function') {
+            trackPageView();
+          }
+        }, 100);
       }
     }
 
