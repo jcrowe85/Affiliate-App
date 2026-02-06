@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
     const shopifyShopId = admin.shopify_shop_id;
     const searchParams = request.nextUrl.searchParams;
     const timeRange = searchParams.get('timeRange') || '24h';
+    const viewMode = searchParams.get('viewMode') || 'realtime'; // 'realtime' or 'historical'
     const startTime = Date.now() - getTimeRangeMs(timeRange);
     const startTimeBigInt = BigInt(startTime);
 
@@ -57,68 +58,133 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Get active visitors (sessions updated in last 30 minutes) - only affiliate traffic
-    // Using 30 minutes instead of 5 minutes to account for users who are viewing but not actively clicking
-    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
-    const activeSessionsList = await prisma.visitorSession.findMany({
-      where: {
-        shopify_shop_id: shopifyShopId,
-        affiliate_id: { not: null }, // Only affiliate traffic
-        updated_at: {
-          gte: thirtyMinutesAgo,
-        },
-      },
-      include: {
-        affiliate: {
-          select: {
-            id: true,
-            affiliate_number: true,
-            name: true,
-            first_name: true,
-            last_name: true,
+    // Determine which sessions to show based on view mode
+    let sessionsList: typeof sessions;
+    let uniqueActiveSessions: Array<{ session: typeof sessions[0]; event: typeof sessions[0]['events'][0] | null }>;
+    
+    if (viewMode === 'realtime') {
+      // Real-time mode: Only show sessions updated in last 30 minutes
+      const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+      sessionsList = await prisma.visitorSession.findMany({
+        where: {
+          shopify_shop_id: shopifyShopId,
+          affiliate_id: { not: null }, // Only affiliate traffic
+          updated_at: {
+            gte: thirtyMinutesAgo,
           },
         },
-      },
-      orderBy: {
-        updated_at: 'desc',
-      },
-      take: 50,
-    });
-    
-    // Get the most recent event for each active session to capture URL parameters and current page
-    const sessionIds = activeSessionsList.map(s => s.id);
-    
-    // Get all recent page_view events for these sessions, ordered by timestamp
-    const allRecentEvents = await prisma.visitorEvent.findMany({
-      where: {
-        session_id: { in: sessionIds },
-        event_type: 'page_view',
-        timestamp: {
-          gte: BigInt(Date.now() - 30 * 60 * 1000), // Only events from last 30 minutes
+        include: {
+          affiliate: {
+            select: {
+              id: true,
+              affiliate_number: true,
+              name: true,
+              first_name: true,
+              last_name: true,
+            },
+          },
         },
-      },
-      orderBy: {
-        timestamp: 'desc',
-      },
-      take: 1000, // Get enough to find most recent per session
-    });
-    
-    // Create a map of session_id to most recent event (first one encountered is most recent due to ordering)
-    const eventMap = new Map<string, typeof allRecentEvents[0]>();
-    allRecentEvents.forEach(event => {
-      if (!eventMap.has(event.session_id)) {
-        eventMap.set(event.session_id, event);
-      }
-    });
-    
-    // Combine sessions with their most recent events
-    const uniqueActiveSessions = activeSessionsList.map(session => {
-      const recentEvent = eventMap.get(session.id);
-      return {
-        session: session,
-        event: recentEvent || null,
-      };
-    });
+        orderBy: {
+          updated_at: 'desc',
+        },
+        take: 50,
+      });
+      
+      // Get the most recent event for each active session to capture URL parameters and current page
+      const sessionIds = sessionsList.map(s => s.id);
+      
+      // Get all recent page_view events for these sessions, ordered by timestamp
+      const allRecentEvents = await prisma.visitorEvent.findMany({
+        where: {
+          session_id: { in: sessionIds },
+          event_type: 'page_view',
+          timestamp: {
+            gte: BigInt(Date.now() - 30 * 60 * 1000), // Only events from last 30 minutes
+          },
+        },
+        orderBy: {
+          timestamp: 'desc',
+        },
+        take: 1000, // Get enough to find most recent per session
+      });
+      
+      // Create a map of session_id to most recent event (first one encountered is most recent due to ordering)
+      const eventMap = new Map<string, typeof allRecentEvents[0]>();
+      allRecentEvents.forEach(event => {
+        if (!eventMap.has(event.session_id)) {
+          eventMap.set(event.session_id, event);
+        }
+      });
+      
+      // Combine sessions with their most recent events
+      uniqueActiveSessions = sessionsList.map(session => {
+        const recentEvent = eventMap.get(session.id);
+        return {
+          session: session,
+          event: recentEvent || null,
+        };
+      });
+    } else {
+      // Historical mode: Show all sessions within time range
+      sessionsList = await prisma.visitorSession.findMany({
+        where: {
+          shopify_shop_id: shopifyShopId,
+          affiliate_id: { not: null }, // Only affiliate traffic
+          start_time: {
+            gte: startTimeBigInt,
+          },
+        },
+        include: {
+          affiliate: {
+            select: {
+              id: true,
+              affiliate_number: true,
+              name: true,
+              first_name: true,
+              last_name: true,
+            },
+          },
+        },
+        orderBy: {
+          start_time: 'desc',
+        },
+      });
+      
+      // Get the most recent event for each historical session
+      const sessionIds = sessionsList.map(s => s.id);
+      
+      // Get all page_view events for these sessions within the time range
+      const allHistoricalEvents = await prisma.visitorEvent.findMany({
+        where: {
+          session_id: { in: sessionIds },
+          event_type: 'page_view',
+          timestamp: {
+            gte: startTimeBigInt,
+          },
+        },
+        orderBy: {
+          timestamp: 'desc',
+        },
+        take: 5000, // Get enough to find most recent per session
+      });
+      
+      // Create a map of session_id to most recent event
+      const eventMap = new Map<string, typeof allHistoricalEvents[0]>();
+      allHistoricalEvents.forEach(event => {
+        if (!eventMap.has(event.session_id)) {
+          eventMap.set(event.session_id, event);
+        }
+      });
+      
+      // Combine sessions with their most recent events
+      uniqueActiveSessions = sessionsList.map(session => {
+        const recentEvent = eventMap.get(session.id);
+        return {
+          session: session,
+          event: recentEvent || null,
+        };
+      });
+    }
 
     // Debug: Log session count and affiliate IDs
     console.log('[Analytics Stats] Sessions found:', sessions.length);
@@ -412,6 +478,7 @@ export async function GET(request: NextRequest) {
       browsers,
       geography,
       affiliates, // New: affiliate-organized data
+      viewMode, // Include view mode in response
     });
   } catch (error: any) {
     console.error('Analytics stats error:', error);

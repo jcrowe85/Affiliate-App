@@ -93,11 +93,12 @@ export default function Analytics() {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState('24h');
+  const [viewMode, setViewMode] = useState<'realtime' | 'historical'>('realtime');
   const [refreshInterval, setRefreshInterval] = useState(10); // seconds
 
   const fetchAnalytics = useCallback(async () => {
     try {
-      const response = await fetch(`/api/analytics/stats?timeRange=${timeRange}`);
+      const response = await fetch(`/api/analytics/stats?timeRange=${timeRange}&viewMode=${viewMode}`);
       if (response.status === 401) {
         window.location.href = '/login';
         return;
@@ -109,7 +110,7 @@ export default function Analytics() {
       console.error('Error fetching analytics:', error);
       setLoading(false);
     }
-  }, [timeRange]);
+  }, [timeRange, viewMode]);
 
   // Set up Server-Sent Events for real-time updates
   useEffect(() => {
@@ -123,8 +124,8 @@ export default function Analytics() {
       try {
         const message = JSON.parse(event.data);
         if (message.type === 'update' && message.data) {
-          // Update affiliates in real-time
-          if (message.data.affiliates) {
+          // Only update in real-time mode (SSE doesn't make sense for historical)
+          if (viewMode === 'realtime' && message.data.affiliates) {
             setData(prevData => {
               if (!prevData) return prevData;
               return {
@@ -156,13 +157,16 @@ export default function Analytics() {
     };
 
     // Fallback polling for time range changes (SSE only updates active visitors)
-    const interval = setInterval(fetchAnalytics, refreshInterval * 1000);
+    // Only poll in real-time mode
+    const interval = viewMode === 'realtime' 
+      ? setInterval(fetchAnalytics, refreshInterval * 1000)
+      : null;
 
     return () => {
       eventSource.close();
-      clearInterval(interval);
+      if (interval) clearInterval(interval);
     };
-  }, [fetchAnalytics, refreshInterval]);
+  }, [fetchAnalytics, refreshInterval, viewMode]);
 
   const formatTime = (seconds: number) => {
     if (seconds < 60) return `${Math.round(seconds)}s`;
@@ -196,26 +200,58 @@ export default function Analytics() {
   return (
     <div className="space-y-6">
       {/* Controls */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <label className="text-sm font-medium text-gray-700">Time Range:</label>
-          <select
-            value={timeRange}
-            onChange={(e) => setTimeRange(e.target.value)}
-            className="border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-4">
+            <label className="text-sm font-medium text-gray-700">Time Range:</label>
+            <select
+              value={timeRange}
+              onChange={(e) => setTimeRange(e.target.value)}
+              className="border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="1h">Last Hour</option>
+              <option value="24h">Last 24 Hours</option>
+              <option value="7d">Last 7 Days</option>
+              <option value="30d">Last 30 Days</option>
+            </select>
+          </div>
+          <button
+            onClick={fetchAnalytics}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium"
           >
-            <option value="1h">Last Hour</option>
-            <option value="24h">Last 24 Hours</option>
-            <option value="7d">Last 7 Days</option>
-            <option value="30d">Last 30 Days</option>
-          </select>
+            Refresh
+          </button>
         </div>
-        <button
-          onClick={fetchAnalytics}
-          className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium"
-        >
-          Refresh
-        </button>
+        <div className="flex items-center gap-4">
+          <label className="text-sm font-medium text-gray-700">View Mode:</label>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setViewMode('realtime')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                viewMode === 'realtime'
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Real-Time
+            </button>
+            <button
+              onClick={() => setViewMode('historical')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                viewMode === 'historical'
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Historical
+            </button>
+          </div>
+          <span className="text-xs text-gray-500">
+            {viewMode === 'realtime' 
+              ? 'Showing active sessions (last 30 minutes)' 
+              : `Showing all sessions (${timeRange === '1h' ? 'last hour' : timeRange === '24h' ? 'last 24 hours' : timeRange === '7d' ? 'last 7 days' : 'last 30 days'})`}
+          </span>
+        </div>
       </div>
 
       {/* Key Metrics */}
@@ -262,7 +298,11 @@ export default function Analytics() {
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-semibold text-gray-900">Traffic by Affiliate</h3>
-          <p className="text-sm text-gray-500 mt-1">Active sessions (updated in last 30 minutes)</p>
+          <p className="text-sm text-gray-500 mt-1">
+            {viewMode === 'realtime' 
+              ? 'Active sessions (updated in last 30 minutes)' 
+              : `Historical sessions (${timeRange === '1h' ? 'last hour' : timeRange === '24h' ? 'last 24 hours' : timeRange === '7d' ? 'last 7 days' : 'last 30 days'})`}
+          </p>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
