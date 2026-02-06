@@ -421,6 +421,7 @@ model VisitorSession {
   referrer_domain  String?
   location_country String?
   location_city    String?
+  url_params       Json? // Persistent URL parameters from initial visit (stored as key-value pairs)
   created_at       DateTime @default(now())
   updated_at       DateTime @updatedAt
 

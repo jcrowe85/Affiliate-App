@@ -272,8 +272,12 @@ export async function GET(request: NextRequest) {
       .map(item => {
         const session = item.session;
         const event = item.event;
+        // Get URL parameters: prefer event's URL params, fall back to session's persistent URL params
         const eventData = event?.event_data as any;
-        const urlParams = (eventData?.url_params || {}) as Record<string, string>;
+        const eventUrlParams = (eventData?.url_params || {}) as Record<string, string>;
+        const sessionUrlParams = (session.url_params as Record<string, string>) || {};
+        // Merge: event params take precedence, but session params persist if event doesn't have them
+        const urlParams = { ...sessionUrlParams, ...eventUrlParams };
         // Use the most recent event's page_path, or fall back to last page in pages_visited
         const currentPage = event?.page_path || session.pages_visited[session.pages_visited.length - 1] || '/';
         return {
@@ -341,9 +345,12 @@ export async function GET(request: NextRequest) {
       existing.page_views += session.page_views;
       existing.avg_session_time += session.total_time || 0;
       
-      // Get URL parameters from the event (if available)
+      // Get URL parameters: prefer event's URL params, fall back to session's persistent URL params
       const eventData = event?.event_data as any;
-      const urlParams = (eventData?.url_params || {}) as Record<string, string>;
+      const eventUrlParams = (eventData?.url_params || {}) as Record<string, string>;
+      const sessionUrlParams = (session.url_params as Record<string, string>) || {};
+      // Merge: event params take precedence, but session params persist if event doesn't have them
+      const urlParams = { ...sessionUrlParams, ...eventUrlParams };
       
       // Add active visitor info with URL parameters
       // Use the most recent event's page_path as the current page (always up-to-date)

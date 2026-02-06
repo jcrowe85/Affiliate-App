@@ -613,6 +613,17 @@
       }
     });
     observer.observe(document.body, { childList: true, subtree: true });
+    
+    // Track pageview on browser back/forward navigation
+    window.addEventListener('popstate', () => {
+      setTimeout(() => {
+        const storedAffiliateId = getCookie('affiliate_id') || getLocalStorage('affiliate_id');
+        if (storedAffiliateId) {
+          currentAffiliateId = storedAffiliateId;
+          trackPageView();
+        }
+      }, 100);
+    });
 
     // Track time on page before unload - only if affiliate data exists
     let pageStartTime = Date.now();

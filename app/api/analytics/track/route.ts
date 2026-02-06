@@ -111,8 +111,11 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      // Extract URL params from page data
+      const urlParams = page?.url_params || {};
+      
       if (!visitorSession) {
-        // Create new session
+        // Create new session - store URL params from initial visit
         console.log('[Analytics Track] Creating new session:', session_id);
         visitorSession = await prisma.visitorSession.create({
           data: {
@@ -135,6 +138,7 @@ export async function POST(request: NextRequest) {
             referrer_url: referrer?.url,
             referrer_domain: referrer?.domain,
             is_bounce: pageViews === 1,
+            url_params: Object.keys(urlParams).length > 0 ? urlParams : null, // Store URL params in session
           },
         });
         console.log('[Analytics Track] Session created:', visitorSession.id);
@@ -145,6 +149,13 @@ export async function POST(request: NextRequest) {
           new Set([...visitorSession.pages_visited, ...pagesVisited])
         );
         const updatedPageViews = Math.max(visitorSession.page_views, pageViews);
+        
+        // Merge URL params: keep existing ones, add new ones if they don't exist
+        // Only update if new URL params are provided (don't overwrite with empty object)
+        const existingUrlParams = (visitorSession.url_params as Record<string, string>) || {};
+        const mergedUrlParams = Object.keys(urlParams).length > 0 
+          ? { ...existingUrlParams, ...urlParams } // Merge if new params exist
+          : existingUrlParams; // Keep existing if no new params
 
         visitorSession = await prisma.visitorSession.update({
           where: { id: visitorSession.id },
@@ -154,6 +165,7 @@ export async function POST(request: NextRequest) {
             page_views: updatedPageViews,
             pages_visited: updatedPagesVisited,
             is_bounce: updatedPageViews === 1,
+            url_params: Object.keys(mergedUrlParams).length > 0 ? mergedUrlParams : null,
             updated_at: new Date(),
           },
         });
