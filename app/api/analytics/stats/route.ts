@@ -403,6 +403,8 @@ export async function GET(request: NextRequest) {
       }>;
     }>();
 
+    console.log(`[Analytics Stats] Processing ${uniqueActiveSessions.length} sessions for affiliate grouping`);
+    
     // Use uniqueActiveSessions instead of all sessions for affiliate grouping
     uniqueActiveSessions.forEach(item => {
       const session = item.session;
@@ -455,6 +457,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Calculate metrics per affiliate (only for active sessions)
+    console.log(`[Analytics Stats] Found ${affiliateMap.size} unique affiliates with active sessions`);
     const affiliates = Array.from(affiliateMap.values()).map(aff => {
       const activeSessionsForAffiliate = uniqueActiveSessions.filter(item => 
         item.session.affiliate_id === aff.affiliate_id
