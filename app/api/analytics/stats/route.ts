@@ -57,49 +57,63 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Get active visitors (sessions with activity in last 5 minutes) - only affiliate traffic
-    const fiveMinutesAgo = BigInt(Date.now() - 5 * 60 * 1000);
-    const activeSessions = await prisma.visitorEvent.findMany({
+    // Get active visitors (sessions updated in last 30 minutes) - only affiliate traffic
+    // Using 30 minutes instead of 5 minutes to account for users who are viewing but not actively clicking
+    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+    const activeSessionsList = await prisma.visitorSession.findMany({
       where: {
         shopify_shop_id: shopifyShopId,
-        timestamp: {
-          gte: fiveMinutesAgo,
-        },
-        session: {
-          affiliate_id: { not: null }, // Only affiliate traffic
+        affiliate_id: { not: null }, // Only affiliate traffic
+        updated_at: {
+          gte: thirtyMinutesAgo,
         },
       },
       include: {
-        session: {
-          include: {
-            affiliate: {
-              select: {
-                id: true,
-                affiliate_number: true,
-                name: true,
-                first_name: true,
-                last_name: true,
-              },
-            },
+        affiliate: {
+          select: {
+            id: true,
+            affiliate_number: true,
+            name: true,
+            first_name: true,
+            last_name: true,
           },
         },
       },
       orderBy: {
-        timestamp: 'desc',
+        updated_at: 'desc',
       },
-      take: 500, // Get more to find most recent per session
+      take: 50,
     });
     
-    // Group by session_id and get the most recent event for each session
-    const sessionEventMap = new Map<string, typeof activeSessions[0]>();
-    activeSessions.forEach(event => {
-      const sessionId = event.session.session_id;
-      if (!sessionEventMap.has(sessionId) || 
-          Number(event.timestamp) > Number(sessionEventMap.get(sessionId)!.timestamp)) {
-        sessionEventMap.set(sessionId, event);
+    // Get the most recent event for each active session to capture URL parameters
+    const sessionIds = activeSessionsList.map(s => s.id);
+    const recentEvents = await prisma.visitorEvent.findMany({
+      where: {
+        session_id: { in: sessionIds },
+        event_type: 'page_view',
+      },
+      orderBy: {
+        timestamp: 'desc',
+      },
+      distinct: ['session_id'],
+    });
+    
+    // Create a map of session_id to most recent event
+    const eventMap = new Map<string, typeof recentEvents[0]>();
+    recentEvents.forEach(event => {
+      if (!eventMap.has(event.session_id)) {
+        eventMap.set(event.session_id, event);
       }
     });
-    const uniqueActiveSessions = Array.from(sessionEventMap.values()).slice(0, 50);
+    
+    // Combine sessions with their most recent events
+    const uniqueActiveSessions = activeSessionsList.map(session => {
+      const recentEvent = eventMap.get(session.id);
+      return {
+        session: session,
+        event: recentEvent || null,
+      };
+    });
 
     // Debug: Log session count and affiliate IDs
     console.log('[Analytics Stats] Sessions found:', sessions.length);
@@ -253,10 +267,11 @@ export async function GET(request: NextRequest) {
 
     // Format active visitors (only affiliate traffic)
     const activeVisitors = uniqueActiveSessions
-      .filter(event => event.session.affiliate_id)
-      .map(event => {
-        const session = event.session;
-        const eventData = event.event_data as any;
+      .filter(item => item.session.affiliate_id)
+      .map(item => {
+        const session = item.session;
+        const event = item.event;
+        const eventData = event?.event_data as any;
         const urlParams = (eventData?.url_params || {}) as Record<string, string>;
         return {
           session_id: session.session_id,
@@ -274,7 +289,7 @@ export async function GET(request: NextRequest) {
         };
       });
 
-    // Group ACTIVE sessions by affiliate (only sessions with activity in last 5 minutes)
+    // Group ACTIVE sessions by affiliate (sessions updated in last 30 minutes)
     const affiliateMap = new Map<string, {
       affiliate_id: string;
       affiliate_number: number | null;
@@ -295,8 +310,9 @@ export async function GET(request: NextRequest) {
     }>();
 
     // Use uniqueActiveSessions instead of all sessions for affiliate grouping
-    uniqueActiveSessions.forEach(event => {
-      const session = event.session;
+    uniqueActiveSessions.forEach(item => {
+      const session = item.session;
+      const event = item.event;
       if (!session.affiliate_id) {
         return;
       }
@@ -322,8 +338,8 @@ export async function GET(request: NextRequest) {
       existing.page_views += session.page_views;
       existing.avg_session_time += session.total_time || 0;
       
-      // Get URL parameters from the event
-      const eventData = event.event_data as any;
+      // Get URL parameters from the event (if available)
+      const eventData = event?.event_data as any;
       const urlParams = (eventData?.url_params || {}) as Record<string, string>;
       
       // Add active visitor info with URL parameters
@@ -341,14 +357,14 @@ export async function GET(request: NextRequest) {
 
     // Calculate metrics per affiliate (only for active sessions)
     const affiliates = Array.from(affiliateMap.values()).map(aff => {
-      const activeSessionsForAffiliate = uniqueActiveSessions.filter(e => 
-        e.session.affiliate_id === aff.affiliate_id
+      const activeSessionsForAffiliate = uniqueActiveSessions.filter(item => 
+        item.session.affiliate_id === aff.affiliate_id
       );
-      const sessionsWithTime = activeSessionsForAffiliate.filter(e => 
-        e.session.total_time
+      const sessionsWithTime = activeSessionsForAffiliate.filter(item => 
+        item.session.total_time
       ).length;
-      const bouncedSessions = activeSessionsForAffiliate.filter(e => 
-        e.session.is_bounce
+      const bouncedSessions = activeSessionsForAffiliate.filter(item => 
+        item.session.is_bounce
       ).length;
       
       return {
