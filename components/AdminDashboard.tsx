@@ -349,6 +349,9 @@ export default function AdminDashboard() {
     target: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z" /></svg>
     ),
+    document: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+    ),
     logout: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
     ),
@@ -400,7 +403,7 @@ export default function AdminDashboard() {
           <div className={`pt-2 px-2 pb-1 ${sidebarCollapsed ? 'md:hidden' : ''}`}>
             <div className="px-2 py-1 text-xs font-semibold text-slate-400 uppercase tracking-wider">Performance</div>
           </div>
-          {btn('performance', 'Reports', icons.chart)}
+          {btn('performance', 'Reports', icons.document)}
           {btn('analytics', 'Analytics', icons.chart)}
           {btn('conversions', 'Conversions', icons.target)}
           {btn('affiliates', 'Affiliates', icons.users)}
