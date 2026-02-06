@@ -290,6 +290,7 @@ export async function GET(request: NextRequest) {
         device: string;
         location: string;
         lastSeen: number;
+        url_params: Record<string, string>;
       }>;
     }>();
 
