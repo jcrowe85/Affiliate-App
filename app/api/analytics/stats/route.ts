@@ -266,6 +266,7 @@ export async function GET(request: NextRequest) {
       .slice(0, 10);
 
     // Format active visitors (only affiliate traffic)
+    // Use the most recent event's page_path as the current page (always up-to-date)
     const activeVisitors = uniqueActiveSessions
       .filter(item => item.session.affiliate_id)
       .map(item => {
@@ -273,9 +274,11 @@ export async function GET(request: NextRequest) {
         const event = item.event;
         const eventData = event?.event_data as any;
         const urlParams = (eventData?.url_params || {}) as Record<string, string>;
+        // Use the most recent event's page_path, or fall back to last page in pages_visited
+        const currentPage = event?.page_path || session.pages_visited[session.pages_visited.length - 1] || '/';
         return {
           session_id: session.session_id,
-          currentPage: session.pages_visited[session.pages_visited.length - 1] || '/',
+          currentPage: currentPage,
           device: session.device_type || 'Unknown',
           location: session.location_country || 'Unknown',
           lastSeen: Number(session.updated_at.getTime()),
@@ -343,9 +346,11 @@ export async function GET(request: NextRequest) {
       const urlParams = (eventData?.url_params || {}) as Record<string, string>;
       
       // Add active visitor info with URL parameters
+      // Use the most recent event's page_path as the current page (always up-to-date)
+      const currentPage = event?.page_path || session.pages_visited[session.pages_visited.length - 1] || '/';
       existing.active_visitors.push({
         session_id: session.session_id,
-        currentPage: session.pages_visited[session.pages_visited.length - 1] || '/',
+        currentPage: currentPage,
         device: session.device_type || 'Unknown',
         location: session.location_country || 'Unknown',
         lastSeen: Number(session.updated_at.getTime()),
