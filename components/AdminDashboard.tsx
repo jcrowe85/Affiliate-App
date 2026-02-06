@@ -9,7 +9,6 @@ import PixelTest from '@/components/PixelTest';
 import Conversions from '@/components/Conversions';
 import WebhookManager from '@/components/WebhookManager';
 import Analytics from '@/components/Analytics';
-import AnalyticsWidget from '@/components/AnalyticsWidget';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface DashboardStats {
@@ -469,9 +468,6 @@ export default function AdminDashboard() {
         {/* Overview Tab */}
         {activeTab === 'overview' && (
           <div className="space-y-8">
-            {/* Analytics Widget */}
-            <AnalyticsWidget />
-
             {/* Performance Graph */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
               <div className="mb-6">
