@@ -496,6 +496,12 @@
         return; // No affiliate data, skip analytics tracking
       }
       
+      console.log('🔵 Tracking pageview:', {
+        page: window.location.pathname,
+        affiliate_id: currentAffiliateId,
+        affiliate_number: currentAffiliateNumber
+      });
+      
       try {
         const visitorId = getOrCreateVisitorId();
         const sessionId = getOrCreateSessionId();
@@ -562,67 +568,95 @@
       }
     }
 
-    // Only track analytics if we have affiliate data
-    // This runs immediately when page loads if refParam is present
-    if (refParam && refParam !== 'internal' && refParam !== 'direct') {
-      // Set affiliate number immediately from URL
-      currentAffiliateNumber = refParam;
-      
-      // Try to get affiliateId from existing cookies/localStorage (from previous visit)
-      const storedAffiliateId = getCookie('affiliate_id') || getLocalStorage('affiliate_id');
-      if (storedAffiliateId) {
-        currentAffiliateId = storedAffiliateId;
-      }
-      
-      // Track immediately with affiliate number (API will look up affiliate_id if needed)
-      // This ensures we don't miss the pageview even if the affiliate API call is slow
-      setTimeout(function() {
-        if (typeof trackPageView === 'function') {
-          trackPageView();
+    // Track analytics on EVERY page load if we have affiliate data
+    // This ensures we track all page navigations, not just the initial visit
+    function initializeAnalyticsTracking() {
+      // Check if we have affiliate data from URL parameter
+      if (refParam && refParam !== 'internal' && refParam !== 'direct') {
+        // Set affiliate number immediately from URL
+        currentAffiliateNumber = refParam;
+        
+        // Try to get affiliateId from existing cookies/localStorage (from previous visit)
+        const storedAffiliateId = getCookie('affiliate_id') || getLocalStorage('affiliate_id');
+        if (storedAffiliateId) {
+          currentAffiliateId = storedAffiliateId;
         }
-      }, 100);
-      
-      // Also track again after affiliate API completes (to update with affiliate_id if we got it)
-      // This is handled in the .then() callback above where we set currentAffiliateId and call trackPageView()
-    } else {
-      // Check if we have existing affiliate data (from previous page in session)
-      const storedAffiliateId = getCookie('affiliate_id') || getLocalStorage('affiliate_id');
-      if (storedAffiliateId) {
-        currentAffiliateId = storedAffiliateId;
+        
+        // Track immediately with affiliate number (API will look up affiliate_id if needed)
         setTimeout(function() {
           if (typeof trackPageView === 'function') {
             trackPageView();
           }
         }, 100);
+        
+        // Also track again after affiliate API completes (to update with affiliate_id if we got it)
+        // This is handled in the .then() callback above where we set currentAffiliateId and call trackPageView()
+      } else {
+        // Check if we have existing affiliate data (from previous page in session)
+        const storedAffiliateId = getCookie('affiliate_id') || getLocalStorage('affiliate_id');
+        if (storedAffiliateId) {
+          currentAffiliateId = storedAffiliateId;
+          // Also try to get affiliate number from URL if present
+          const urlRef = getUrlParameter('ref');
+          if (urlRef && urlRef !== 'internal' && urlRef !== 'direct') {
+            currentAffiliateNumber = urlRef;
+          }
+          // Track pageview on every page load if we have affiliate data
+          setTimeout(function() {
+            if (typeof trackPageView === 'function') {
+              trackPageView();
+            }
+          }, 100);
+        }
       }
     }
+    
+    // Initialize tracking on page load
+    initializeAnalyticsTracking();
 
     // Track pageview on navigation (for SPAs) - only if affiliate data exists
     let lastPath = window.location.pathname;
-    const observer = new MutationObserver(() => {
-      if (window.location.pathname !== lastPath) {
-        lastPath = window.location.pathname;
+    let lastUrl = window.location.href;
+    
+    function trackNavigation() {
+      const currentPath = window.location.pathname;
+      const currentUrl = window.location.href;
+      
+      // Only track if path or URL actually changed
+      if (currentPath !== lastPath || currentUrl !== lastUrl) {
+        lastPath = currentPath;
+        lastUrl = currentUrl;
+        
         setTimeout(() => {
           // Check if we still have affiliate data
           const storedAffiliateId = getCookie('affiliate_id') || getLocalStorage('affiliate_id');
           if (storedAffiliateId) {
             currentAffiliateId = storedAffiliateId;
+            // Also check for ref parameter in case it's present
+            const urlRef = getUrlParameter('ref');
+            if (urlRef && urlRef !== 'internal' && urlRef !== 'direct') {
+              currentAffiliateNumber = urlRef;
+            }
             trackPageView();
           }
         }, 100);
       }
+    }
+    
+    // Watch for DOM changes (SPA navigation)
+    const observer = new MutationObserver(() => {
+      trackNavigation();
     });
     observer.observe(document.body, { childList: true, subtree: true });
     
     // Track pageview on browser back/forward navigation
     window.addEventListener('popstate', () => {
-      setTimeout(() => {
-        const storedAffiliateId = getCookie('affiliate_id') || getLocalStorage('affiliate_id');
-        if (storedAffiliateId) {
-          currentAffiliateId = storedAffiliateId;
-          trackPageView();
-        }
-      }, 100);
+      trackNavigation();
+    });
+    
+    // Also track on hashchange (some sites use hash routing)
+    window.addEventListener('hashchange', () => {
+      trackNavigation();
     });
 
     // Track time on page before unload - only if affiliate data exists

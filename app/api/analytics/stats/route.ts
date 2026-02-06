@@ -85,22 +85,27 @@ export async function GET(request: NextRequest) {
       take: 50,
     });
     
-    // Get the most recent event for each active session to capture URL parameters
+    // Get the most recent event for each active session to capture URL parameters and current page
     const sessionIds = activeSessionsList.map(s => s.id);
-    const recentEvents = await prisma.visitorEvent.findMany({
+    
+    // Get all recent page_view events for these sessions, ordered by timestamp
+    const allRecentEvents = await prisma.visitorEvent.findMany({
       where: {
         session_id: { in: sessionIds },
         event_type: 'page_view',
+        timestamp: {
+          gte: BigInt(Date.now() - 30 * 60 * 1000), // Only events from last 30 minutes
+        },
       },
       orderBy: {
         timestamp: 'desc',
       },
-      distinct: ['session_id'],
+      take: 1000, // Get enough to find most recent per session
     });
     
-    // Create a map of session_id to most recent event
-    const eventMap = new Map<string, typeof recentEvents[0]>();
-    recentEvents.forEach(event => {
+    // Create a map of session_id to most recent event (first one encountered is most recent due to ordering)
+    const eventMap = new Map<string, typeof allRecentEvents[0]>();
+    allRecentEvents.forEach(event => {
       if (!eventMap.has(event.session_id)) {
         eventMap.set(event.session_id, event);
       }
