@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 
 interface AnalyticsMetrics {
   total_visitors: number;
@@ -55,6 +55,14 @@ interface GeographyData {
   percentage: number;
 }
 
+interface ActiveVisitorInfo {
+  session_id: string;
+  currentPage: string;
+  device: string;
+  location: string;
+  lastSeen: number;
+}
+
 interface AffiliateData {
   affiliate_id: string;
   affiliate_number: number | null;
@@ -64,6 +72,7 @@ interface AffiliateData {
   page_views: number;
   bounce_rate: number;
   avg_session_time: number;
+  active_visitors?: ActiveVisitorInfo[];
 }
 
 interface AnalyticsData {
@@ -252,7 +261,7 @@ export default function Analytics() {
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-semibold text-gray-900">Traffic by Affiliate</h3>
-          <p className="text-sm text-gray-500 mt-1">Live affiliate traffic analytics</p>
+          <p className="text-sm text-gray-500 mt-1">Active sessions only (last 5 minutes)</p>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -269,26 +278,49 @@ export default function Analytics() {
             <tbody className="bg-white divide-y divide-gray-200">
               {data?.affiliates && data.affiliates.length > 0 ? (
                 data.affiliates.map((affiliate, idx) => (
-                  <tr key={idx} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="font-medium text-gray-900">
-                        {affiliate.affiliate_name}
-                        {affiliate.affiliate_number && (
-                          <span className="ml-2 text-sm text-gray-500">#{affiliate.affiliate_number}</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{affiliate.sessions}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{affiliate.visitors}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{affiliate.page_views}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{affiliate.bounce_rate.toFixed(1)}%</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{formatTime(affiliate.avg_session_time)}</td>
-                  </tr>
+                  <React.Fragment key={idx}>
+                    <tr className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="font-medium text-gray-900">
+                          {affiliate.affiliate_name}
+                          {affiliate.affiliate_number && (
+                            <span className="ml-2 text-sm text-gray-500">#{affiliate.affiliate_number}</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{affiliate.sessions}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{affiliate.visitors}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{affiliate.page_views}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{affiliate.bounce_rate.toFixed(1)}%</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{formatTime(affiliate.avg_session_time)}</td>
+                    </tr>
+                    {affiliate.active_visitors && affiliate.active_visitors.length > 0 && (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-3 bg-gray-50">
+                          <div className="space-y-2">
+                            <div className="text-xs font-medium text-gray-600 mb-2">Active Pages:</div>
+                            {affiliate.active_visitors.map((visitor, vIdx) => (
+                              <div key={vIdx} className="flex items-center justify-between text-sm text-gray-700 bg-white rounded px-3 py-2 border border-gray-200">
+                                <div className="flex items-center gap-3">
+                                  <span className="font-medium">{visitor.currentPage}</span>
+                                  <span className="text-xs text-gray-500">•</span>
+                                  <span className="text-xs text-gray-500">{visitor.device}</span>
+                                  <span className="text-xs text-gray-500">•</span>
+                                  <span className="text-xs text-gray-500">{visitor.location}</span>
+                                </div>
+                                <span className="text-xs text-gray-500">{formatTimeAgo(visitor.lastSeen)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 ))
               ) : (
                 <tr>
                   <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
-                    No affiliate traffic data available
+                    No active affiliate sessions
                   </td>
                 </tr>
               )}

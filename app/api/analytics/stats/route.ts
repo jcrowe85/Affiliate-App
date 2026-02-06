@@ -261,7 +261,7 @@ export async function GET(request: NextRequest) {
         };
       });
 
-    // Group sessions by affiliate
+    // Group ACTIVE sessions by affiliate (only sessions with activity in last 5 minutes)
     const affiliateMap = new Map<string, {
       affiliate_id: string;
       affiliate_number: number | null;
@@ -271,15 +271,19 @@ export async function GET(request: NextRequest) {
       page_views: number;
       bounce_rate: number;
       avg_session_time: number;
+      active_visitors: Array<{
+        session_id: string;
+        currentPage: string;
+        device: string;
+        location: string;
+        lastSeen: number;
+      }>;
     }>();
 
-    // Debug logging
-    console.log('[Analytics Stats] Total sessions:', sessions.length);
-    console.log('[Analytics Stats] Sessions with affiliate_id:', sessions.filter(s => s.affiliate_id).length);
-
-    sessions.forEach(session => {
+    // Use activeSessions instead of all sessions for affiliate grouping
+    activeSessions.forEach(event => {
+      const session = event.session;
       if (!session.affiliate_id) {
-        console.log('[Analytics Stats] Skipping session without affiliate_id:', session.id);
         return;
       }
       
@@ -296,6 +300,7 @@ export async function GET(request: NextRequest) {
         page_views: 0,
         bounce_rate: 0,
         avg_session_time: 0,
+        active_visitors: [],
       };
 
       existing.sessions++;
@@ -303,16 +308,28 @@ export async function GET(request: NextRequest) {
       existing.page_views += session.page_views;
       existing.avg_session_time += session.total_time || 0;
       
+      // Add active visitor info
+      existing.active_visitors.push({
+        session_id: session.session_id,
+        currentPage: session.pages_visited[session.pages_visited.length - 1] || '/',
+        device: session.device_type || 'Unknown',
+        location: session.location_country || 'Unknown',
+        lastSeen: Number(session.updated_at.getTime()),
+      });
+      
       affiliateMap.set(key, existing);
     });
 
-    // Calculate metrics per affiliate
+    // Calculate metrics per affiliate (only for active sessions)
     const affiliates = Array.from(affiliateMap.values()).map(aff => {
-      const sessionsWithTime = sessions.filter(s => 
-        s.affiliate_id === aff.affiliate_id && s.total_time
+      const activeSessionsForAffiliate = activeSessions.filter(e => 
+        e.session.affiliate_id === aff.affiliate_id
+      );
+      const sessionsWithTime = activeSessionsForAffiliate.filter(e => 
+        e.session.total_time
       ).length;
-      const bouncedSessions = sessions.filter(s => 
-        s.affiliate_id === aff.affiliate_id && s.is_bounce
+      const bouncedSessions = activeSessionsForAffiliate.filter(e => 
+        e.session.is_bounce
       ).length;
       
       return {
