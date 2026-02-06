@@ -504,7 +504,7 @@
         const pagesVisited = JSON.parse(getLocalStorage('analytics_pages_visited') || JSON.stringify([window.location.pathname]));
         
         // Capture URL parameters as key-value pairs
-        const urlParams: Record<string, string> = {};
+        const urlParams = {};
         const urlSearchParams = new URLSearchParams(window.location.search);
         urlSearchParams.forEach((value, key) => {
           urlParams[key] = value;
