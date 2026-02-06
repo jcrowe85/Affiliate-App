@@ -294,96 +294,103 @@ export default function Analytics() {
         </div>
       </div>
 
-      {/* Affiliate Traffic Overview */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">Traffic by Affiliate</h3>
-          <p className="text-sm text-gray-500 mt-1">
-            {viewMode === 'realtime' 
-              ? 'Active sessions (updated in last 30 minutes)' 
-              : `Historical sessions (${timeRange === '1h' ? 'last hour' : timeRange === '24h' ? 'last 24 hours' : timeRange === '7d' ? 'last 7 days' : 'last 30 days'})`}
-          </p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Affiliate</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sessions</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Visitors</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Page Views</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bounce Rate</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avg Session</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {data?.affiliates && data.affiliates.length > 0 ? (
-                data.affiliates.map((affiliate, idx) => (
-                  <React.Fragment key={idx}>
-                    <tr className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="font-medium text-gray-900">
-                          {affiliate.affiliate_name}
-                          {affiliate.affiliate_number && (
-                            <span className="ml-2 text-sm text-gray-500">#{affiliate.affiliate_number}</span>
-                          )}
+      {/* Affiliate Sessions - Individual Sections */}
+      {data?.affiliates && data.affiliates.length > 0 ? (
+        data.affiliates.map((affiliate, idx) => (
+          <div key={idx} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            {/* Affiliate Header */}
+            <div className="mb-6 pb-4 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-900">
+                    {affiliate.affiliate_name}
+                    {affiliate.affiliate_number && (
+                      <span className="ml-2 text-base font-normal text-gray-500">#{affiliate.affiliate_number}</span>
+                    )}
+                  </h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {viewMode === 'realtime' 
+                      ? 'Active sessions (updated in last 30 minutes)' 
+                      : `Historical sessions (${timeRange === '1h' ? 'last hour' : timeRange === '24h' ? 'last 24 hours' : timeRange === '7d' ? 'last 7 days' : 'last 30 days'})`}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Metrics Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="text-xs font-medium text-gray-600 mb-1">Sessions</div>
+                <div className="text-2xl font-bold text-gray-900">{affiliate.sessions}</div>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="text-xs font-medium text-gray-600 mb-1">Visitors</div>
+                <div className="text-2xl font-bold text-gray-900">{affiliate.visitors}</div>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="text-xs font-medium text-gray-600 mb-1">Page Views</div>
+                <div className="text-2xl font-bold text-gray-900">{affiliate.page_views}</div>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="text-xs font-medium text-gray-600 mb-1">Bounce Rate</div>
+                <div className="text-2xl font-bold text-gray-900">{affiliate.bounce_rate.toFixed(1)}%</div>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="text-xs font-medium text-gray-600 mb-1">Avg Session</div>
+                <div className="text-2xl font-bold text-gray-900">{formatTime(affiliate.avg_session_time)}</div>
+              </div>
+            </div>
+
+            {/* Active Pages */}
+            {affiliate.active_visitors && affiliate.active_visitors.length > 0 ? (
+              <div>
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">Active Pages ({affiliate.active_visitors.length})</h4>
+                <div className="space-y-3">
+                  {affiliate.active_visitors.map((visitor, vIdx) => (
+                    <div key={vIdx} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <span className="font-medium text-gray-900">{visitor.currentPage}</span>
+                          <span className="text-xs text-gray-500">•</span>
+                          <span className="text-xs text-gray-500">{visitor.device}</span>
+                          <span className="text-xs text-gray-500">•</span>
+                          <span className="text-xs text-gray-500">{visitor.location}</span>
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{affiliate.sessions}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{affiliate.visitors}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{affiliate.page_views}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{affiliate.bounce_rate.toFixed(1)}%</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{formatTime(affiliate.avg_session_time)}</td>
-                    </tr>
-                    {affiliate.active_visitors && affiliate.active_visitors.length > 0 && (
-                      <tr>
-                        <td colSpan={6} className="px-6 py-3 bg-gray-50">
-                          <div className="space-y-2">
-                            <div className="text-xs font-medium text-gray-600 mb-2">Active Pages:</div>
-                            {affiliate.active_visitors.map((visitor, vIdx) => (
-                              <div key={vIdx} className="bg-white rounded px-3 py-2 border border-gray-200">
-                                <div className="flex items-center justify-between text-sm text-gray-700 mb-2">
-                                  <div className="flex items-center gap-3">
-                                    <span className="font-medium">{visitor.currentPage}</span>
-                                    <span className="text-xs text-gray-500">•</span>
-                                    <span className="text-xs text-gray-500">{visitor.device}</span>
-                                    <span className="text-xs text-gray-500">•</span>
-                                    <span className="text-xs text-gray-500">{visitor.location}</span>
-                                  </div>
-                                  <span className="text-xs text-gray-500">{formatTimeAgo(visitor.lastSeen)}</span>
-                                </div>
-                                {visitor.url_params && Object.keys(visitor.url_params).length > 0 && (
-                                  <div className="mt-2 pt-2 border-t border-gray-100">
-                                    <div className="text-xs font-medium text-gray-600 mb-1">URL Parameters:</div>
-                                    <div className="flex flex-wrap gap-2">
-                                      {Object.entries(visitor.url_params).map(([key, value]) => (
-                                        <div key={key} className="inline-flex items-center gap-1 px-2 py-1 bg-gray-50 rounded text-xs">
-                                          <span className="font-medium text-gray-700">{key}:</span>
-                                          <span className="text-gray-600">{value}</span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
+                        <span className="text-xs text-gray-500">{formatTimeAgo(visitor.lastSeen)}</span>
+                      </div>
+                      {visitor.url_params && Object.keys(visitor.url_params).length > 0 && (
+                        <div className="pt-3 border-t border-gray-200">
+                          <div className="text-xs font-medium text-gray-600 mb-2">URL Parameters:</div>
+                          <div className="flex flex-wrap gap-2">
+                            {Object.entries(visitor.url_params).map(([key, value]) => (
+                              <div key={key} className="inline-flex items-center gap-1 px-2 py-1 bg-white rounded text-xs border border-gray-200">
+                                <span className="font-medium text-gray-700">{key}:</span>
+                                <span className="text-gray-600">{value}</span>
                               </div>
                             ))}
                           </div>
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
-                    No active affiliate sessions
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500 text-sm">
+                No active pages for this affiliate
+              </div>
+            )}
+          </div>
+        ))
+      ) : (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+          <p className="text-gray-500">
+            {viewMode === 'realtime' 
+              ? 'No active affiliate sessions' 
+              : 'No historical sessions found for the selected time range'}
+          </p>
         </div>
-      </div>
+      )}
 
 
       {/* Two Column Layout */}
