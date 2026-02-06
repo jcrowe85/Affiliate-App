@@ -87,9 +87,19 @@ export async function GET(request: NextRequest) {
       orderBy: {
         timestamp: 'desc',
       },
-      distinct: ['session_id'],
-      take: 50,
+      take: 500, // Get more to find most recent per session
     });
+    
+    // Group by session_id and get the most recent event for each session
+    const sessionEventMap = new Map<string, typeof activeSessions[0]>();
+    activeSessions.forEach(event => {
+      const sessionId = event.session.session_id;
+      if (!sessionEventMap.has(sessionId) || 
+          Number(event.timestamp) > Number(sessionEventMap.get(sessionId)!.timestamp)) {
+        sessionEventMap.set(sessionId, event);
+      }
+    });
+    const uniqueActiveSessions = Array.from(sessionEventMap.values()).slice(0, 50);
 
     // Debug: Log session count and affiliate IDs
     console.log('[Analytics Stats] Sessions found:', sessions.length);
@@ -242,10 +252,12 @@ export async function GET(request: NextRequest) {
       .slice(0, 10);
 
     // Format active visitors (only affiliate traffic)
-    const activeVisitors = activeSessions
+    const activeVisitors = uniqueActiveSessions
       .filter(event => event.session.affiliate_id)
       .map(event => {
         const session = event.session;
+        const eventData = event.event_data as any;
+        const urlParams = (eventData?.url_params || {}) as Record<string, string>;
         return {
           session_id: session.session_id,
           currentPage: session.pages_visited[session.pages_visited.length - 1] || '/',
@@ -258,6 +270,7 @@ export async function GET(request: NextRequest) {
                          (session.affiliate?.first_name && session.affiliate?.last_name 
                            ? `${session.affiliate.first_name} ${session.affiliate.last_name}` 
                            : `Affiliate #${session.affiliate_number || 'N/A'}`),
+          url_params: urlParams, // Add URL parameters
         };
       });
 
@@ -280,8 +293,8 @@ export async function GET(request: NextRequest) {
       }>;
     }>();
 
-    // Use activeSessions instead of all sessions for affiliate grouping
-    activeSessions.forEach(event => {
+    // Use uniqueActiveSessions instead of all sessions for affiliate grouping
+    uniqueActiveSessions.forEach(event => {
       const session = event.session;
       if (!session.affiliate_id) {
         return;
@@ -308,13 +321,18 @@ export async function GET(request: NextRequest) {
       existing.page_views += session.page_views;
       existing.avg_session_time += session.total_time || 0;
       
-      // Add active visitor info
+      // Get URL parameters from the event
+      const eventData = event.event_data as any;
+      const urlParams = (eventData?.url_params || {}) as Record<string, string>;
+      
+      // Add active visitor info with URL parameters
       existing.active_visitors.push({
         session_id: session.session_id,
         currentPage: session.pages_visited[session.pages_visited.length - 1] || '/',
         device: session.device_type || 'Unknown',
         location: session.location_country || 'Unknown',
         lastSeen: Number(session.updated_at.getTime()),
+        url_params: urlParams,
       });
       
       affiliateMap.set(key, existing);
@@ -322,7 +340,7 @@ export async function GET(request: NextRequest) {
 
     // Calculate metrics per affiliate (only for active sessions)
     const affiliates = Array.from(affiliateMap.values()).map(aff => {
-      const activeSessionsForAffiliate = activeSessions.filter(e => 
+      const activeSessionsForAffiliate = uniqueActiveSessions.filter(e => 
         e.session.affiliate_id === aff.affiliate_id
       );
       const sessionsWithTime = activeSessionsForAffiliate.filter(e => 

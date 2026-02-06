@@ -18,13 +18,18 @@
 
 <script>
 (function() {
+  console.log('🔵 Affiliate tracking script loaded');
+  
   // Configuration - Update this with your tracking API URL
   // IMPORTANT: Use the full URL WITHOUT trailing slash, e.g.:
   // 'https://ffa92a699509.ngrok-free.app/api/track'
   // NOT: 'https://https://...' (no double https://)
   // NOT: 'https://.../api/track/' (no trailing slash)
-  const TRACKING_API_URL = 'https://your-app-domain.com/api/track'; // TODO: Update with your app URL
+  const TRACKING_API_URL = 'https://affiliates.tryfleur.com/api/track';
   const SHOP_ID = '{{ shop.permanent_domain }}'; // Shopify liquid variable
+  
+  console.log('🔵 Affiliate tracking: TRACKING_API_URL:', TRACKING_API_URL);
+  console.log('🔵 Affiliate tracking: SHOP_ID:', SHOP_ID);
   
   // Normalize API URL (remove any accidental double https://)
   const normalizedApiUrl = TRACKING_API_URL.replace(/^https?:\/\/https?:\/\//, 'https://').replace(/\/+$/, '');
@@ -75,11 +80,14 @@
   
   // Check for ?ref= parameter (affiliate tracking)
   const refParam = getUrlParameter('ref');
+  console.log('🔵 Affiliate tracking: refParam from URL:', refParam);
   
   // Check if this is internal traffic first (ref=internal or ref=direct)
   if (refParam === 'internal' || refParam === 'direct') {
+    console.log('🔵 Affiliate tracking: Internal traffic detected, skipping');
     // Internal traffic - skip tracking
   } else if (refParam) {
+    console.log('🔵 Affiliate tracking: Affiliate ref detected:', refParam);
     // Found ?ref= parameter with affiliate number - track this click
     const affiliateNumber = refParam;
     
@@ -118,6 +126,9 @@
       sub4: sub4 || null,
     };
 
+    console.log('🔵 Affiliate tracking: Calling API:', apiUrl);
+    console.log('🔵 Affiliate tracking: Data:', { ref: affiliateNumber, shop: SHOP_ID });
+
     // LAST-TOUCH ATTRIBUTION: Always overwrite previous affiliate data
     // This ensures the most recent affiliate click wins, even if cookies/localStorage exist
     fetch(apiUrl, {
@@ -128,12 +139,17 @@
       body: JSON.stringify(trackingData),
     })
     .then(response => {
+      console.log('🔵 Affiliate tracking: API response status:', response.status);
       if (!response.ok) {
-        throw new Error(`API returned ${response.status}: ${response.statusText}`);
+        return response.text().then(text => {
+          console.error('🔴 Affiliate tracking: API error response:', text);
+          throw new Error(`API returned ${response.status}: ${response.statusText} - ${text}`);
+        });
       }
       return response.json();
     })
     .then(data => {
+      console.log('🔵 Affiliate tracking: API response data:', data);
       if (data.success && data.clickId && data.affiliateId) {
         // LAST-TOUCH ATTRIBUTION: Always overwrite previous affiliate data
         // This ensures the most recent affiliate click wins
@@ -487,6 +503,13 @@
         const pageViews = parseInt(getLocalStorage('analytics_page_views') || '1');
         const pagesVisited = JSON.parse(getLocalStorage('analytics_pages_visited') || JSON.stringify([window.location.pathname]));
         
+        // Capture URL parameters as key-value pairs
+        const urlParams: Record<string, string> = {};
+        const urlSearchParams = new URLSearchParams(window.location.search);
+        urlSearchParams.forEach((value, key) => {
+          urlParams[key] = value;
+        });
+        
         const analyticsData = {
           event: 'page_view',
           session_id: sessionId,
@@ -498,6 +521,7 @@
             path: window.location.pathname,
             url: window.location.href,
             title: document.title,
+            url_params: urlParams, // Add URL parameters
           },
           session: {
             start_time: sessionStart,

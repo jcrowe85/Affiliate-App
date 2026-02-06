@@ -61,6 +61,7 @@ interface ActiveVisitorInfo {
   device: string;
   location: string;
   lastSeen: number;
+  url_params?: Record<string, string>;
 }
 
 interface AffiliateData {
@@ -300,15 +301,30 @@ export default function Analytics() {
                           <div className="space-y-2">
                             <div className="text-xs font-medium text-gray-600 mb-2">Active Pages:</div>
                             {affiliate.active_visitors.map((visitor, vIdx) => (
-                              <div key={vIdx} className="flex items-center justify-between text-sm text-gray-700 bg-white rounded px-3 py-2 border border-gray-200">
-                                <div className="flex items-center gap-3">
-                                  <span className="font-medium">{visitor.currentPage}</span>
-                                  <span className="text-xs text-gray-500">•</span>
-                                  <span className="text-xs text-gray-500">{visitor.device}</span>
-                                  <span className="text-xs text-gray-500">•</span>
-                                  <span className="text-xs text-gray-500">{visitor.location}</span>
+                              <div key={vIdx} className="bg-white rounded px-3 py-2 border border-gray-200">
+                                <div className="flex items-center justify-between text-sm text-gray-700 mb-2">
+                                  <div className="flex items-center gap-3">
+                                    <span className="font-medium">{visitor.currentPage}</span>
+                                    <span className="text-xs text-gray-500">•</span>
+                                    <span className="text-xs text-gray-500">{visitor.device}</span>
+                                    <span className="text-xs text-gray-500">•</span>
+                                    <span className="text-xs text-gray-500">{visitor.location}</span>
+                                  </div>
+                                  <span className="text-xs text-gray-500">{formatTimeAgo(visitor.lastSeen)}</span>
                                 </div>
-                                <span className="text-xs text-gray-500">{formatTimeAgo(visitor.lastSeen)}</span>
+                                {visitor.url_params && Object.keys(visitor.url_params).length > 0 && (
+                                  <div className="mt-2 pt-2 border-t border-gray-100">
+                                    <div className="text-xs font-medium text-gray-600 mb-1">URL Parameters:</div>
+                                    <div className="flex flex-wrap gap-2">
+                                      {Object.entries(visitor.url_params).map(([key, value]) => (
+                                        <div key={key} className="inline-flex items-center gap-1 px-2 py-1 bg-gray-50 rounded text-xs">
+                                          <span className="font-medium text-gray-700">{key}:</span>
+                                          <span className="text-gray-600">{value}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             ))}
                           </div>

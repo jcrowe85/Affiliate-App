@@ -172,6 +172,7 @@ export async function POST(request: NextRequest) {
           referrer: page?.referrer || referrer?.url,
           event_data: {
             time_on_page: timeOnPage,
+            url_params: page?.url_params || {}, // Store URL parameters
           },
           timestamp: BigInt(timestamp),
         },
