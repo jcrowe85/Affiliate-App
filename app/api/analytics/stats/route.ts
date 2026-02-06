@@ -59,8 +59,24 @@ export async function GET(request: NextRequest) {
     });
 
     // Determine which sessions to show based on view mode
-    let sessionsList: typeof sessions;
-    let uniqueActiveSessions: Array<{ session: typeof sessions[0]; event: typeof sessions[0]['events'][0] | null }>;
+    type SessionWithAffiliate = Awaited<ReturnType<typeof prisma.visitorSession.findMany<{
+      include: {
+        affiliate: {
+          select: {
+            id: true;
+            affiliate_number: true;
+            name: true;
+            first_name: true;
+            last_name: true;
+          };
+        };
+      };
+    }>>>[0];
+    
+    type VisitorEvent = Awaited<ReturnType<typeof prisma.visitorEvent.findFirst>>;
+    
+    let sessionsList: SessionWithAffiliate[];
+    let uniqueActiveSessions: Array<{ session: SessionWithAffiliate; event: VisitorEvent | null }>;
     
     if (viewMode === 'realtime') {
       // Real-time mode: Only show sessions updated in last 30 minutes
