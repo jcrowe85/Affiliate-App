@@ -31,33 +31,6 @@ export async function GET(request: NextRequest) {
     const startTime = Date.now() - getTimeRangeMs(timeRange);
     const startTimeBigInt = BigInt(startTime);
 
-    // Get all sessions in time range (ONLY affiliate traffic)
-    const sessions = await prisma.visitorSession.findMany({
-      where: {
-        shopify_shop_id: shopifyShopId,
-        affiliate_id: { not: null }, // Only affiliate traffic
-        start_time: {
-          gte: startTimeBigInt,
-        },
-      },
-      include: {
-        events: {
-          orderBy: {
-            timestamp: 'desc',
-          },
-        },
-        affiliate: {
-          select: {
-            id: true,
-            affiliate_number: true,
-            name: true,
-            first_name: true,
-            last_name: true,
-          },
-        },
-      },
-    });
-
     // Determine which sessions to show based on view mode
     type SessionWithAffiliate = Awaited<ReturnType<typeof prisma.visitorSession.findMany<{
       include: {
@@ -201,6 +174,9 @@ export async function GET(request: NextRequest) {
         };
       });
     }
+
+    // Use sessionsList for all metrics calculations (based on viewMode)
+    const sessions = sessionsList;
 
     // Debug: Log session count and affiliate IDs
     console.log('[Analytics Stats] Sessions found:', sessions.length);
