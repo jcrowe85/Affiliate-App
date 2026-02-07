@@ -67,34 +67,58 @@ export async function getCurrentAdmin(): Promise<{
   name: string | null;
   shopify_shop_id: string;
 } | null> {
-  const cookieStore = await cookies();
-  const sessionToken = cookieStore.get('admin_session')?.value;
+  try {
+    const cookieStore = await cookies();
+    const sessionToken = cookieStore.get('admin_session')?.value;
 
-  if (!sessionToken) {
-    return null;
-  }
-
-  const session = await prisma.adminSession.findUnique({
-    where: { token: sessionToken },
-    include: {
-      admin_user: true,
-    },
-  });
-
-  if (!session || session.expires_at < new Date()) {
-    // Session expired
-    if (session) {
-      await prisma.adminSession.delete({ where: { id: session.id } });
+    if (!sessionToken || typeof sessionToken !== 'string' || sessionToken.trim() === '') {
+      return null;
     }
+
+    // Validate token format (should be hex string, 64 chars for 32 bytes)
+    if (sessionToken.length !== 64 || !/^[a-f0-9]+$/i.test(sessionToken)) {
+      console.warn('Invalid session token format:', sessionToken.substring(0, 10) + '...');
+      return null;
+    }
+
+    let session;
+    try {
+      session = await prisma.adminSession.findUnique({
+        where: { token: sessionToken },
+        include: {
+          admin_user: true,
+        },
+      });
+    } catch (prismaError: any) {
+      console.error('Prisma error in getCurrentAdmin:', {
+        message: prismaError.message,
+        code: prismaError.code,
+        meta: prismaError.meta,
+      });
+      throw prismaError;
+    }
+
+    if (!session || session.expires_at < new Date()) {
+      // Session expired
+      if (session) {
+        await prisma.adminSession.delete({ where: { id: session.id } }).catch(() => {
+          // Ignore deletion errors
+        });
+      }
+      return null;
+    }
+
+    return {
+      id: session.admin_user.id,
+      email: session.admin_user.email,
+      name: session.admin_user.name,
+      shopify_shop_id: session.admin_user.shopify_shop_id,
+    };
+  } catch (error: any) {
+    console.error('Error in getCurrentAdmin:', error);
+    // Return null on error to allow graceful degradation
     return null;
   }
-
-  return {
-    id: session.admin_user.id,
-    email: session.admin_user.email,
-    name: session.admin_user.name,
-    shopify_shop_id: session.admin_user.shopify_shop_id,
-  };
 }
 
 /**

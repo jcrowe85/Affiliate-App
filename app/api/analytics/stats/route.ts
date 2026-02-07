@@ -19,7 +19,17 @@ function getTimeRangeMs(timeRange: string): number {
  */
 export async function GET(request: NextRequest) {
   try {
-    const admin = await getCurrentAdmin();
+    let admin;
+    try {
+      admin = await getCurrentAdmin();
+    } catch (authError: any) {
+      console.error('Auth error in analytics stats:', authError);
+      return NextResponse.json(
+        { error: 'Authentication error: ' + (authError.message || 'Unknown error') },
+        { status: 500 }
+      );
+    }
+    
     if (!admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
