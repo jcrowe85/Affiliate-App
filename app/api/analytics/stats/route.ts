@@ -83,19 +83,21 @@ export async function GET(request: NextRequest) {
       const sessionIds = sessionsList.map(s => s.id);
       
       // Get all recent page_view events for these sessions, ordered by timestamp
-      const allRecentEvents = await prisma.visitorEvent.findMany({
-        where: {
-          session_id: { in: sessionIds },
-          event_type: 'page_view',
-          timestamp: {
-            gte: BigInt(Date.now() - 30 * 60 * 1000), // Only events from last 30 minutes
-          },
-        },
-        orderBy: {
-          timestamp: 'desc',
-        },
-        take: 1000, // Get enough to find most recent per session
-      });
+      const allRecentEvents = sessionIds.length > 0
+        ? await prisma.visitorEvent.findMany({
+            where: {
+              session_id: { in: sessionIds },
+              event_type: 'page_view',
+              timestamp: {
+                gte: BigInt(Date.now() - 30 * 60 * 1000), // Only events from last 30 minutes
+              },
+            },
+            orderBy: {
+              timestamp: 'desc',
+            },
+            take: 1000, // Get enough to find most recent per session
+          })
+        : [];
       
       // Create a map of session_id to most recent event (first one encountered is most recent due to ordering)
       const eventMap = new Map<string, typeof allRecentEvents[0]>();
@@ -143,19 +145,21 @@ export async function GET(request: NextRequest) {
       const sessionIds = sessionsList.map(s => s.id);
       
       // Get all page_view events for these sessions within the time range
-      const allHistoricalEvents = await prisma.visitorEvent.findMany({
-        where: {
-          session_id: { in: sessionIds },
-          event_type: 'page_view',
-          timestamp: {
-            gte: startTimeBigInt,
-          },
-        },
-        orderBy: {
-          timestamp: 'desc',
-        },
-        take: 5000, // Get enough to find most recent per session
-      });
+      const allHistoricalEvents = sessionIds.length > 0
+        ? await prisma.visitorEvent.findMany({
+            where: {
+              session_id: { in: sessionIds },
+              event_type: 'page_view',
+              timestamp: {
+                gte: startTimeBigInt,
+              },
+            },
+            orderBy: {
+              timestamp: 'desc',
+            },
+            take: 5000, // Get enough to find most recent per session
+          })
+        : [];
       
       // Create a map of session_id to most recent event
       const eventMap = new Map<string, typeof allHistoricalEvents[0]>();

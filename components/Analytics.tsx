@@ -103,7 +103,30 @@ export default function Analytics() {
         window.location.href = '/login';
         return;
       }
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to fetch analytics' }));
+        console.error('Analytics API error:', errorData);
+        setLoading(false);
+        return;
+      }
       const analyticsData = await response.json();
+      // Validate that the response has the expected structure
+      if (analyticsData.error) {
+        console.error('Analytics API returned error:', analyticsData.error);
+        setLoading(false);
+        return;
+      }
+      // Ensure metrics exist with default values if missing
+      if (!analyticsData.metrics) {
+        analyticsData.metrics = {
+          total_visitors: 0,
+          unique_visitors: 0,
+          sessions: 0,
+          bounce_rate: 0,
+          avg_session_time: 0,
+          pages_per_session: 0,
+        };
+      }
       setData(analyticsData);
       setLoading(false);
     } catch (error) {
@@ -259,31 +282,31 @@ export default function Analytics() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <div className="text-sm text-gray-600 mb-1">Total Visitors</div>
           <div className="text-2xl font-bold text-gray-900">
-            {data?.metrics.total_visitors.toLocaleString() || '0'}
+            {data?.metrics?.total_visitors?.toLocaleString() || '0'}
           </div>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <div className="text-sm text-gray-600 mb-1">Unique Visitors</div>
           <div className="text-2xl font-bold text-gray-900">
-            {data?.metrics.unique_visitors.toLocaleString() || '0'}
+            {data?.metrics?.unique_visitors?.toLocaleString() || '0'}
           </div>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <div className="text-sm text-gray-600 mb-1">Bounce Rate</div>
           <div className="text-2xl font-bold text-gray-900">
-            {data?.metrics.bounce_rate.toFixed(1)}%
+            {data?.metrics?.bounce_rate?.toFixed(1) || '0.0'}%
           </div>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <div className="text-sm text-gray-600 mb-1">Avg Session Time</div>
           <div className="text-2xl font-bold text-gray-900">
-            {data ? formatTime(data.metrics.avg_session_time) : '0s'}
+            {data?.metrics ? formatTime(data.metrics.avg_session_time || 0) : '0s'}
           </div>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <div className="text-sm text-gray-600 mb-1">Pages/Session</div>
           <div className="text-2xl font-bold text-gray-900">
-            {data?.metrics.pages_per_session.toFixed(1) || '0'}
+            {data?.metrics?.pages_per_session?.toFixed(1) || '0.0'}
           </div>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
