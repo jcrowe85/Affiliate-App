@@ -9,18 +9,17 @@ export const dynamic = 'force-dynamic';
  * Clients connect to this endpoint to receive live analytics data
  */
 export async function GET(request: NextRequest) {
+  let admin;
   try {
-    let admin;
-    try {
-      admin = await getCurrentAdmin();
-    } catch (authError: any) {
-      console.error('Auth error in analytics stream:', authError);
-      return new Response('Authentication error', { status: 500 });
-    }
-    
-    if (!admin) {
-      return new Response('Unauthorized', { status: 401 });
-    }
+    admin = await getCurrentAdmin();
+  } catch (authError: any) {
+    console.error('Auth error in analytics stream:', authError);
+    return new Response('Authentication error', { status: 500 });
+  }
+  
+  if (!admin) {
+    return new Response('Unauthorized', { status: 401 });
+  }
 
   const shopifyShopId = admin.shopify_shop_id;
   const encoder = new TextEncoder();
