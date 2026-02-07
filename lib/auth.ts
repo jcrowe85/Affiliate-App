@@ -116,6 +116,16 @@ export async function getCurrentAdmin(): Promise<{
     };
   } catch (error: any) {
     console.error('Error in getCurrentAdmin:', error);
+    
+    // Provide more helpful error messages for database connection issues
+    if (error.message?.includes("Can't reach database server")) {
+      console.error('Database connection error - possible causes:');
+      console.error('1. Neon database may be paused (wake it up in Neon dashboard)');
+      console.error('2. Check DATABASE_URL environment variable');
+      console.error('3. Verify network connectivity to Neon');
+      console.error('4. Ensure you are using the pooled connection string (ends with -pooler)');
+    }
+    
     // Return null on error to allow graceful degradation
     return null;
   }
