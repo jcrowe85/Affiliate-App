@@ -23,11 +23,7 @@ export async function GET(request: NextRequest) {
       include: {
         commission: {
           include: {
-            order_attribution: {
-              include: {
-                order: true,
-              },
-            },
+            order_attribution: true,
           },
         },
       },
@@ -46,7 +42,7 @@ export async function GET(request: NextRequest) {
       created_at: ff.created_at.toISOString(),
       commission: {
         id: ff.commission.id,
-        order_number: ff.commission.order_attribution.order?.shopify_order_id || 'N/A',
+        order_number: ff.commission.order_attribution?.shopify_order_number || ff.commission.order_attribution?.shopify_order_id || 'N/A',
         amount: ff.commission.amount.toString(),
         currency: ff.commission.currency,
         status: ff.commission.status,

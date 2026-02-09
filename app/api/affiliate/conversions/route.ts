@@ -21,11 +21,7 @@ export async function GET(request: NextRequest) {
         affiliate_id: affiliate.id,
       },
       include: {
-        order_attribution: {
-          include: {
-            order: true,
-          },
-        },
+        order_attribution: true,
       },
       orderBy: {
         created_at: 'desc',
@@ -35,7 +31,7 @@ export async function GET(request: NextRequest) {
 
     const formatted = commissions.map(c => ({
       id: c.id,
-      order_number: c.order_attribution.order?.shopify_order_id || 'N/A',
+      order_number: c.order_attribution?.shopify_order_number || c.order_attribution?.shopify_order_id || 'N/A',
       amount: c.amount.toString(),
       currency: c.currency,
       status: c.status,
