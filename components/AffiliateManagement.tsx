@@ -265,7 +265,10 @@ export default function AffiliateManagement() {
           : null,
         redirect_base_url: formData.redirect_base_url.trim() || null,
       };
-      if (formData.password) payload.password = formData.password;
+      // Only include password if it's provided and not empty (after trimming)
+      if (formData.password && formData.password.trim().length > 0) {
+        payload.password = formData.password.trim();
+      }
 
       const res = await fetch(`/api/admin/affiliates/${editingAffiliate.id}`, {
         method: 'PATCH',

@@ -92,8 +92,13 @@ export async function PATCH(
     if (webhook_parameter_mapping !== undefined) data.webhook_parameter_mapping = webhook_parameter_mapping || null;
     if (redirect_base_url !== undefined) data.redirect_base_url = redirect_base_url?.trim() || null;
 
-    if (password?.trim()) {
-      data.password_hash = await hashPassword(password);
+    // Only update password if a new password is provided (and it's not just whitespace)
+    if (password !== undefined && password !== null && typeof password === 'string' && password.trim().length > 0) {
+      const trimmedPassword = password.trim();
+      console.log('[Affiliate Update] Updating password for affiliate:', params.id);
+      data.password_hash = await hashPassword(trimmedPassword);
+    } else if (password !== undefined) {
+      console.log('[Affiliate Update] Password field provided but empty/whitespace, skipping password update');
     }
 
     if (email !== undefined) {

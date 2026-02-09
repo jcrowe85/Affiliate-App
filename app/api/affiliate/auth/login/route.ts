@@ -50,8 +50,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify password
-    const isValid = await verifyPassword(password, affiliate.password_hash);
+    // Verify password (trim to handle any whitespace issues)
+    const trimmedPassword = password.trim();
+    const isValid = await verifyPassword(trimmedPassword, affiliate.password_hash);
+    
+    if (!isValid) {
+      console.log('[Affiliate Login] Password verification failed for:', email.toLowerCase());
+    }
 
     if (!isValid) {
       return NextResponse.json(
