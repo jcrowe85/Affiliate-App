@@ -96,11 +96,15 @@ export default function Analytics() {
   const [viewMode, setViewMode] = useState<'realtime' | 'historical'>('realtime');
   const [refreshInterval, setRefreshInterval] = useState(10); // seconds
 
+  // Detect if we're in affiliate mode (check if we're on affiliate route)
+  const isAffiliateMode = typeof window !== 'undefined' && window.location.pathname.startsWith('/affiliate');
+  const apiEndpoint = isAffiliateMode ? '/api/affiliate/analytics' : '/api/analytics/stats';
+
   const fetchAnalytics = useCallback(async () => {
     try {
-      const response = await fetch(`/api/analytics/stats?timeRange=${timeRange}&viewMode=${viewMode}`);
+      const response = await fetch(`${apiEndpoint}?timeRange=${timeRange}&viewMode=${viewMode}`);
       if (response.status === 401) {
-        window.location.href = '/login';
+        window.location.href = isAffiliateMode ? '/affiliate/login' : '/login';
         return;
       }
       if (!response.ok) {
@@ -133,14 +137,25 @@ export default function Analytics() {
       console.error('Error fetching analytics:', error);
       setLoading(false);
     }
-  }, [timeRange, viewMode]);
+  }, [timeRange, viewMode, apiEndpoint, isAffiliateMode]);
 
   // Set up Server-Sent Events for real-time updates
   useEffect(() => {
     // Initial fetch
     fetchAnalytics();
 
-    // Set up SSE connection for real-time updates
+    // For affiliate mode, just use polling (no SSE)
+    if (isAffiliateMode) {
+      const interval = viewMode === 'realtime' 
+        ? setInterval(fetchAnalytics, refreshInterval * 1000)
+        : null;
+
+      return () => {
+        if (interval) clearInterval(interval);
+      };
+    }
+
+    // Admin mode: use SSE
     const eventSource = new EventSource('/api/analytics/stream');
     
     eventSource.onmessage = (event) => {
@@ -186,10 +201,10 @@ export default function Analytics() {
       : null;
 
     return () => {
-      eventSource.close();
+      if (eventSource) eventSource.close();
       if (interval) clearInterval(interval);
     };
-  }, [fetchAnalytics, refreshInterval, viewMode]);
+  }, [fetchAnalytics, refreshInterval, viewMode, isAffiliateMode]);
 
   const formatTime = (seconds: number) => {
     if (seconds < 60) return `${Math.round(seconds)}s`;

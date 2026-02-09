@@ -12,8 +12,8 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Always allow login page
-  if (pathname.startsWith('/login')) {
+  // Always allow login pages
+  if (pathname.startsWith('/login') || pathname.startsWith('/affiliate/login')) {
     return NextResponse.next();
   }
 

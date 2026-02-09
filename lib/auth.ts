@@ -167,3 +167,144 @@ export async function cleanExpiredSessions(): Promise<void> {
     },
   });
 }
+
+// ============================================
+// AFFILIATE AUTHENTICATION
+// ============================================
+
+/**
+ * Create affiliate session
+ */
+export async function createAffiliateSession(affiliateId: string): Promise<string> {
+  const token = generateSessionToken();
+  const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
+
+  await prisma.affiliateSession.create({
+    data: {
+      id: crypto.randomUUID(),
+      affiliate_id: affiliateId,
+      token,
+      expires_at: expiresAt,
+    },
+  });
+
+  return token;
+}
+
+/**
+ * Get current affiliate from session
+ * SECURITY: This function ensures affiliates can only access their own data
+ */
+export async function getCurrentAffiliate(): Promise<{
+  id: string;
+  email: string;
+  name: string;
+  affiliate_number: number | null;
+  shopify_shop_id: string;
+  status: string;
+} | null> {
+  try {
+    const cookieStore = await cookies();
+    const sessionToken = cookieStore.get('affiliate_session')?.value;
+
+    if (!sessionToken || typeof sessionToken !== 'string' || sessionToken.trim() === '') {
+      return null;
+    }
+
+    // Validate token format (should be hex string, 64 chars for 32 bytes)
+    if (sessionToken.length !== 64 || !/^[a-f0-9]+$/i.test(sessionToken)) {
+      console.warn('Invalid affiliate session token format:', sessionToken.substring(0, 10) + '...');
+      return null;
+    }
+
+    let session;
+    try {
+      session = await prisma.affiliateSession.findUnique({
+        where: { token: sessionToken },
+        include: {
+          affiliate: true,
+        },
+      });
+    } catch (prismaError: any) {
+      console.error('Prisma error in getCurrentAffiliate:', {
+        message: prismaError.message,
+        code: prismaError.code,
+        meta: prismaError.meta,
+      });
+      throw prismaError;
+    }
+
+    if (!session || session.expires_at < new Date()) {
+      // Session expired
+      if (session) {
+        await prisma.affiliateSession.delete({ where: { id: session.id } }).catch(() => {
+          // Ignore deletion errors
+        });
+      }
+      return null;
+    }
+
+    // SECURITY: Only allow active affiliates to access
+    if (session.affiliate.status !== 'active') {
+      console.warn(`Affiliate ${session.affiliate.id} attempted login but status is ${session.affiliate.status}`);
+      return null;
+    }
+
+    return {
+      id: session.affiliate.id,
+      email: session.affiliate.email,
+      name: session.affiliate.name,
+      affiliate_number: session.affiliate.affiliate_number,
+      shopify_shop_id: session.affiliate.shopify_shop_id,
+      status: session.affiliate.status,
+    };
+  } catch (error: any) {
+    console.error('Error in getCurrentAffiliate:', error);
+    return null;
+  }
+}
+
+/**
+ * Verify affiliate session token
+ */
+export async function verifyAffiliateSession(token: string): Promise<boolean> {
+  const session = await prisma.affiliateSession.findUnique({
+    where: { token },
+    include: {
+      affiliate: true,
+    },
+  });
+
+  if (!session || session.expires_at < new Date()) {
+    return false;
+  }
+
+  // Only allow active affiliates
+  if (session.affiliate.status !== 'active') {
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Delete affiliate session (logout)
+ */
+export async function deleteAffiliateSession(token: string): Promise<void> {
+  await prisma.affiliateSession.deleteMany({
+    where: { token },
+  });
+}
+
+/**
+ * Clean expired affiliate sessions
+ */
+export async function cleanExpiredAffiliateSessions(): Promise<void> {
+  await prisma.affiliateSession.deleteMany({
+    where: {
+      expires_at: {
+        lt: new Date(),
+      },
+    },
+  });
+}

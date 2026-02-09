@@ -99,6 +99,7 @@ model Affiliate {
   affiliate_offers AffiliateOffer[]
   webhook_logs     AffiliateWebhookLog[]
   visitor_sessions VisitorSession[]
+  sessions         AffiliateSession[]
 
   @@unique([shopify_shop_id, affiliate_number])
   @@unique([shopify_shop_id, merchant_id])
@@ -394,6 +395,19 @@ model AdminSession {
   @@index([admin_user_id])
 }
 
+model AffiliateSession {
+  id           String   @id @default(cuid())
+  affiliate_id String
+  token        String   @unique
+  expires_at   DateTime
+  created_at   DateTime @default(now())
+
+  affiliate Affiliate @relation(fields: [affiliate_id], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([affiliate_id])
+}
+
 // Visitor Analytics Models
 model VisitorSession {
   id               String   @id @default(cuid())
@@ -425,8 +439,8 @@ model VisitorSession {
   created_at       DateTime @default(now())
   updated_at       DateTime @updatedAt
 
-  events VisitorEvent[]
-  affiliate Affiliate? @relation(fields: [affiliate_id], references: [id], onDelete: SetNull)
+  events    VisitorEvent[]
+  affiliate Affiliate?     @relation(fields: [affiliate_id], references: [id], onDelete: SetNull)
 
   @@unique([session_id])
   @@index([shopify_shop_id, start_time])
