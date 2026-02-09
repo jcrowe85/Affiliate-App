@@ -52,10 +52,20 @@ export async function POST(request: NextRequest) {
 
     // Verify password (trim to handle any whitespace issues)
     const trimmedPassword = password.trim();
+    console.log('[Affiliate Login] Attempting login for:', email.toLowerCase());
+    console.log('[Affiliate Login] Password length:', trimmedPassword.length);
+    console.log('[Affiliate Login] Hash exists:', !!affiliate.password_hash);
+    console.log('[Affiliate Login] Hash length:', affiliate.password_hash?.length || 0);
+    
     const isValid = await verifyPassword(trimmedPassword, affiliate.password_hash);
+    
+    console.log('[Affiliate Login] Password verification result:', isValid);
     
     if (!isValid) {
       console.log('[Affiliate Login] Password verification failed for:', email.toLowerCase());
+      // Try to verify with the raw password (in case trimming is the issue)
+      const rawIsValid = await verifyPassword(password, affiliate.password_hash);
+      console.log('[Affiliate Login] Raw password verification result:', rawIsValid);
     }
 
     if (!isValid) {

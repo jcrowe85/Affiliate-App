@@ -236,13 +236,33 @@ export default function AffiliateManagement() {
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingAffiliate) return;
+    
+    // ALERT for debugging - remove after fixing
+    alert(`DEBUG: Form submitted!\nPassword: ${formData.password ? 'YES (' + formData.password.length + ' chars)' : 'NO'}\nConfirm: ${formData.confirm_password ? 'YES (' + formData.confirm_password.length + ' chars)' : 'NO'}`);
+    
+    console.log('[Affiliate Form] ========== handleUpdate CALLED ==========');
+    console.log('[Affiliate Form] editingAffiliate:', editingAffiliate?.id);
+    console.log('[Affiliate Form] formData.password:', formData.password ? `"${formData.password}" (length: ${formData.password.length})` : 'empty');
+    console.log('[Affiliate Form] formData.confirm_password:', formData.confirm_password ? `"${formData.confirm_password}" (length: ${formData.confirm_password.length})` : 'empty');
+    console.log('[Affiliate Form] Full formData:', JSON.stringify({ ...formData, password: formData.password ? '***' : '', confirm_password: formData.confirm_password ? '***' : '' }));
+    
+    if (!editingAffiliate) {
+      console.error('[Affiliate Form] ❌ No editingAffiliate, returning');
+      alert('ERROR: No affiliate selected for editing');
+      return;
+    }
+    
     if (formData.password && formData.password !== formData.confirm_password) {
+      console.error('[Affiliate Form] ❌ Password mismatch detected');
+      console.error('[Affiliate Form] Password:', formData.password);
+      console.error('[Affiliate Form] Confirm:', formData.confirm_password);
       setError('Password and confirm password do not match');
       return;
     }
+    
     setError('');
     try {
+      console.log('[Affiliate Form] Building payload...');
       const payload: Record<string, unknown> = {
         first_name: formData.first_name.trim(),
         last_name: formData.last_name.trim(),
@@ -267,20 +287,40 @@ export default function AffiliateManagement() {
       };
       // Only include password if it's provided and not empty (after trimming)
       if (formData.password && formData.password.trim().length > 0) {
-        payload.password = formData.password.trim();
+        const trimmedPassword = formData.password.trim();
+        console.log('[Affiliate Form] ✅ Including password in update. Length:', trimmedPassword.length);
+        console.log('[Affiliate Form] Password preview:', trimmedPassword.substring(0, 3) + '***');
+        payload.password = trimmedPassword;
+      } else {
+        console.log('[Affiliate Form] ⚠️ Password not included in update');
+        console.log('[Affiliate Form] Password field value:', JSON.stringify(formData.password));
+        console.log('[Affiliate Form] Password trimmed length:', formData.password?.trim().length || 0);
       }
 
+      console.log('[Affiliate Form] 📤 Sending update payload');
+      console.log('[Affiliate Form] Payload keys:', Object.keys(payload));
+      console.log('[Affiliate Form] Has password field:', 'password' in payload);
+      if ('password' in payload) {
+        console.log('[Affiliate Form] Password in payload length:', (payload.password as string).length);
+      }
+      
       const res = await fetch(`/api/admin/affiliates/${editingAffiliate.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+      
+      console.log('[Affiliate Form] 📥 Response status:', res.status);
       const data = await res.json();
+      console.log('[Affiliate Form] Response data:', data);
+      
       if (res.ok) {
+        console.log('[Affiliate Form] ✅ Update successful');
         await fetchAffiliates();
         setShowForm(false);
         resetForm();
       } else {
+        console.error('[Affiliate Form] ❌ Update failed:', data.error);
         setError(data.error || 'Failed to update affiliate');
       }
     } catch (err) {
@@ -699,7 +739,14 @@ export default function AffiliateManagement() {
                       <input
                         type="password"
                         value={formData.password}
-                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                        onChange={(e) => {
+                          const newPassword = e.target.value;
+                          console.log('[Affiliate Form] Password field changed, length:', newPassword.length);
+                          setFormData({ ...formData, password: newPassword });
+                        }}
+                        onBlur={(e) => {
+                          console.log('[Affiliate Form] Password field blurred, final value length:', e.target.value.length);
+                        }}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                       />
                     </div>
@@ -708,7 +755,14 @@ export default function AffiliateManagement() {
                       <input
                         type="password"
                         value={formData.confirm_password}
-                        onChange={(e) => setFormData({ ...formData, confirm_password: e.target.value })}
+                        onChange={(e) => {
+                          const newConfirm = e.target.value;
+                          console.log('[Affiliate Form] Confirm password field changed, length:', newConfirm.length);
+                          setFormData({ ...formData, confirm_password: newConfirm });
+                        }}
+                        onBlur={(e) => {
+                          console.log('[Affiliate Form] Confirm password field blurred, final value length:', e.target.value.length);
+                        }}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                       />
                     </div>

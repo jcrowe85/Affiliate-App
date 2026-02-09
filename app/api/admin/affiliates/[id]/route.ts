@@ -95,10 +95,14 @@ export async function PATCH(
     // Only update password if a new password is provided (and it's not just whitespace)
     if (password !== undefined && password !== null && typeof password === 'string' && password.trim().length > 0) {
       const trimmedPassword = password.trim();
-      console.log('[Affiliate Update] Updating password for affiliate:', params.id);
-      data.password_hash = await hashPassword(trimmedPassword);
+      console.log('[Affiliate Update] Updating password for affiliate:', params.id, 'Email:', affiliate.email);
+      console.log('[Affiliate Update] Password length:', trimmedPassword.length);
+      const hashedPassword = await hashPassword(trimmedPassword);
+      console.log('[Affiliate Update] Password hash generated, length:', hashedPassword.length);
+      data.password_hash = hashedPassword;
     } else if (password !== undefined) {
       console.log('[Affiliate Update] Password field provided but empty/whitespace, skipping password update');
+      console.log('[Affiliate Update] Password value:', JSON.stringify(password), 'Type:', typeof password);
     }
 
     if (email !== undefined) {
@@ -181,6 +185,17 @@ export async function PATCH(
         offer: true,
       },
     });
+    
+    // Verify password was updated if it was in the data
+    if (data.password_hash) {
+      const verifyAffiliate = await prisma.affiliate.findUnique({
+        where: { id: params.id },
+        select: { password_hash: true, email: true },
+      });
+      console.log('[Affiliate Update] Password update verified. Hash exists:', !!verifyAffiliate?.password_hash);
+      console.log('[Affiliate Update] Hash length:', verifyAffiliate?.password_hash?.length || 0);
+      console.log('[Affiliate Update] Email:', verifyAffiliate?.email);
+    }
 
     return NextResponse.json({
       success: true,
