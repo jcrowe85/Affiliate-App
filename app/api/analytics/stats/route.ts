@@ -62,14 +62,14 @@ export async function GET(request: NextRequest) {
     let uniqueActiveSessions: Array<{ session: SessionWithAffiliate; event: VisitorEvent | null }>;
     
     if (viewMode === 'realtime') {
-      // Real-time mode: Only show sessions updated in last 30 minutes
-      const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+      // Real-time mode: Only show sessions updated in last 5 minutes
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
       sessionsList = await prisma.visitorSession.findMany({
         where: {
           shopify_shop_id: shopifyShopId,
           affiliate_id: { not: null }, // Only affiliate traffic
           updated_at: {
-            gte: thirtyMinutesAgo,
+            gte: fiveMinutesAgo,
           },
         },
         include: {
@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
               session_id: { in: sessionIds },
               event_type: 'page_view',
               timestamp: {
-                gte: BigInt(Date.now() - 30 * 60 * 1000), // Only events from last 30 minutes
+                gte: BigInt(Date.now() - 5 * 60 * 1000), // Only events from last 5 minutes
               },
             },
             orderBy: {

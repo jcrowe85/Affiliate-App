@@ -271,7 +271,7 @@ export default function Analytics() {
           </div>
           <span className="text-xs text-gray-500">
             {viewMode === 'realtime' 
-              ? 'Showing active sessions (last 30 minutes)' 
+              ? 'Showing active sessions (last 5 minutes)' 
               : `Showing all sessions (${timeRange === '1h' ? 'last hour' : timeRange === '24h' ? 'last 24 hours' : timeRange === '7d' ? 'last 7 days' : 'last 30 days'})`}
           </span>
         </div>
@@ -333,7 +333,7 @@ export default function Analytics() {
                   </h3>
                   <p className="text-sm text-gray-500 mt-1">
                     {viewMode === 'realtime' 
-                      ? 'Active sessions (updated in last 30 minutes)' 
+                      ? 'Active sessions (updated in last 5 minutes)' 
                       : `Historical sessions (${timeRange === '1h' ? 'last hour' : timeRange === '24h' ? 'last 24 hours' : timeRange === '7d' ? 'last 7 days' : 'last 30 days'})`}
                   </p>
                 </div>

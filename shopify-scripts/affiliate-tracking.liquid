@@ -474,6 +474,45 @@
       return sessionId;
     }
 
+    // Clean up stale analytics sessions to prevent UI consumption
+    function cleanupStaleSessions() {
+      const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+      const lastActivity = parseInt(getLocalStorage('analytics_last_activity') || '0');
+      const now = Date.now();
+      
+      // If session is stale (inactive for more than timeout), clean it up
+      if (lastActivity > 0 && (now - lastActivity > SESSION_TIMEOUT)) {
+        console.log('🔵 Cleaning up stale analytics session');
+        try {
+          // Remove stale session data
+          localStorage.removeItem('analytics_session_id');
+          localStorage.removeItem('analytics_session_start');
+          localStorage.removeItem('analytics_page_views');
+          localStorage.removeItem('analytics_pages_visited');
+          localStorage.removeItem('analytics_last_activity');
+        } catch (e) {
+          console.warn('Error cleaning up stale session:', e);
+        }
+      }
+    }
+
+    // Set up periodic timer to check for stale sessions (every 5 minutes)
+    // This prevents stale sessions from consuming UI resources
+    let staleSessionTimer = null;
+    function startStaleSessionTimer() {
+      // Clean up immediately on load
+      cleanupStaleSessions();
+      
+      // Then check every 5 minutes
+      if (staleSessionTimer) {
+        clearInterval(staleSessionTimer);
+      }
+      staleSessionTimer = setInterval(cleanupStaleSessions, 5 * 60 * 1000); // 5 minutes
+    }
+    
+    // Start the timer when analytics is initialized
+    startStaleSessionTimer();
+
     // Track pageview for analytics (ONLY for affiliate traffic)
     function trackPageView() {
       // Try to get affiliate info from current variables or cookies/localStorage
@@ -662,6 +701,12 @@
     // Track time on page before unload - only if affiliate data exists
     let pageStartTime = Date.now();
     window.addEventListener('beforeunload', () => {
+      // Clean up stale session timer to prevent memory leaks
+      if (staleSessionTimer) {
+        clearInterval(staleSessionTimer);
+        staleSessionTimer = null;
+      }
+      
       const storedAffiliateId = getCookie('affiliate_id') || getLocalStorage('affiliate_id');
       if (!storedAffiliateId) {
         return; // No affiliate data, skip
