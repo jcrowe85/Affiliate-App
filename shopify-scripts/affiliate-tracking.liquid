@@ -78,6 +78,9 @@
   let currentAffiliateId = null;
   let currentAffiliateNumber = null;
   
+  // Cache session ID to prevent regeneration on every call
+  let cachedSessionId = null;
+  
   // Check for ?ref= parameter (affiliate tracking)
   const refParam = getUrlParameter('ref');
   console.log('🔵 Affiliate tracking: refParam from URL:', refParam);
@@ -446,6 +449,21 @@
 
     // Generate or retrieve session ID (new session every 30 minutes of inactivity)
     function getOrCreateSessionId() {
+      // Return cached session ID if available (prevents regeneration on rapid calls)
+      if (cachedSessionId) {
+        const lastActivity = parseInt(getLocalStorage('analytics_last_activity') || '0');
+        const now = Date.now();
+        const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+        
+        // Only invalidate cache if session actually expired
+        if (now - lastActivity <= SESSION_TIMEOUT) {
+          return cachedSessionId;
+        } else {
+          // Session expired, clear cache
+          cachedSessionId = null;
+        }
+      }
+      
       const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
       const lastActivity = parseInt(getLocalStorage('analytics_last_activity') || '0');
       const now = Date.now();
@@ -459,6 +477,7 @@
         setLocalStorage('analytics_session_start', now.toString());
         setLocalStorage('analytics_page_views', '1');
         setLocalStorage('analytics_pages_visited', JSON.stringify([window.location.pathname]));
+        cachedSessionId = sessionId; // Cache the new session ID
       } else {
         // Update existing session
         const pageViews = parseInt(getLocalStorage('analytics_page_views') || '0') + 1;
@@ -468,6 +487,7 @@
         }
         setLocalStorage('analytics_page_views', pageViews.toString());
         setLocalStorage('analytics_pages_visited', JSON.stringify(pagesVisited));
+        cachedSessionId = sessionId; // Cache the existing session ID
       }
       
       setLocalStorage('analytics_last_activity', now.toString());
@@ -490,6 +510,7 @@
           localStorage.removeItem('analytics_page_views');
           localStorage.removeItem('analytics_pages_visited');
           localStorage.removeItem('analytics_last_activity');
+          cachedSessionId = null; // Clear cached session ID
         } catch (e) {
           console.warn('Error cleaning up stale session:', e);
         }

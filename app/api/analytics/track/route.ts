@@ -103,59 +103,26 @@ export async function POST(request: NextRequest) {
       const pageViews = sessionData?.page_views || 1;
       const timeOnPage = sessionData?.time_on_page || 0;
 
-      // Find or create session by session_id (client-generated ID)
-      let visitorSession = await prisma.visitorSession.findFirst({
-        where: { 
-          session_id: session_id,
-          shopify_shop_id: shopifyShopId,
-        },
-      });
-
       // Extract URL params from page data
       const urlParams = page?.url_params || {};
       
-      if (!visitorSession) {
-        // Create new session - store URL params from initial visit
-        console.log('[Analytics Track] Creating new session:', session_id);
-        visitorSession = await prisma.visitorSession.create({
-          data: {
-            session_id,
-            visitor_id,
-            shopify_shop_id: shopifyShopId,
-            affiliate_id: finalAffiliateId || null,
-            affiliate_number: affiliate_number ? parseInt(String(affiliate_number), 10) : null,
-            entry_page: entryPage,
-            start_time: BigInt(sessionStartTime),
-            page_views: pageViews,
-            pages_visited: pagesVisited,
-            device_type: device?.type,
-            user_agent: device?.userAgent,
-            screen_width: device?.screenWidth,
-            screen_height: device?.screenHeight,
-            language: device?.language,
-            timezone: device?.timezone,
-            referrer_type: referrer?.type,
-            referrer_url: referrer?.url,
-            referrer_domain: referrer?.domain,
-            is_bounce: pageViews === 1,
-            url_params: Object.keys(urlParams).length > 0 ? urlParams : null, // Store URL params in session
-          },
-        });
-        console.log('[Analytics Track] Session created:', visitorSession.id);
-      } else {
+      // Find existing session first to get current state for merging
+      let visitorSession = await prisma.visitorSession.findUnique({
+        where: { session_id: session_id },
+      });
+      
+      if (visitorSession) {
+        // Update existing session - merge data properly
         console.log('[Analytics Track] Updating existing session:', visitorSession.id);
-        // Update existing session
         const updatedPagesVisited = Array.from(
           new Set([...visitorSession.pages_visited, ...pagesVisited])
         );
         const updatedPageViews = Math.max(visitorSession.page_views, pageViews);
         
-        // Merge URL params: keep existing ones, add new ones if they don't exist
-        // Only update if new URL params are provided (don't overwrite with empty object)
         const existingUrlParams = (visitorSession.url_params as Record<string, string>) || {};
         const mergedUrlParams = Object.keys(urlParams).length > 0 
-          ? { ...existingUrlParams, ...urlParams } // Merge if new params exist
-          : existingUrlParams; // Keep existing if no new params
+          ? { ...existingUrlParams, ...urlParams }
+          : existingUrlParams;
 
         visitorSession = await prisma.visitorSession.update({
           where: { id: visitorSession.id },
@@ -169,6 +136,74 @@ export async function POST(request: NextRequest) {
             updated_at: new Date(),
           },
         });
+      } else {
+        // Create new session - use upsert to handle race conditions
+        // If another request creates it between findUnique and create, upsert will update instead
+        try {
+          console.log('[Analytics Track] Creating new session:', session_id);
+          visitorSession = await prisma.visitorSession.create({
+            data: {
+              session_id,
+              visitor_id,
+              shopify_shop_id: shopifyShopId,
+              affiliate_id: finalAffiliateId || null,
+              affiliate_number: affiliate_number ? parseInt(String(affiliate_number), 10) : null,
+              entry_page: entryPage,
+              start_time: BigInt(sessionStartTime),
+              page_views: pageViews,
+              pages_visited: pagesVisited,
+              device_type: device?.type,
+              user_agent: device?.userAgent,
+              screen_width: device?.screenWidth,
+              screen_height: device?.screenHeight,
+              language: device?.language,
+              timezone: device?.timezone,
+              referrer_type: referrer?.type,
+              referrer_url: referrer?.url,
+              referrer_domain: referrer?.domain,
+              is_bounce: pageViews === 1,
+              url_params: Object.keys(urlParams).length > 0 ? urlParams : null,
+            },
+          });
+          console.log('[Analytics Track] Session created:', visitorSession.id);
+        } catch (error: any) {
+          // Race condition: another request created the session, so find and update it
+          if (error.code === 'P2002') { // Unique constraint violation
+            console.log('[Analytics Track] Race condition detected, finding existing session');
+            visitorSession = await prisma.visitorSession.findUnique({
+              where: { session_id: session_id },
+            });
+            
+            if (visitorSession) {
+              // Update the session that was just created by another request
+              const updatedPagesVisited = Array.from(
+                new Set([...visitorSession.pages_visited, ...pagesVisited])
+              );
+              const updatedPageViews = Math.max(visitorSession.page_views, pageViews);
+              const existingUrlParams = (visitorSession.url_params as Record<string, string>) || {};
+              const mergedUrlParams = Object.keys(urlParams).length > 0 
+                ? { ...existingUrlParams, ...urlParams }
+                : existingUrlParams;
+
+              visitorSession = await prisma.visitorSession.update({
+                where: { id: visitorSession.id },
+                data: {
+                  ...(finalAffiliateId && { affiliate_id: finalAffiliateId }),
+                  ...(affiliate_number && { affiliate_number: parseInt(String(affiliate_number), 10) }),
+                  page_views: updatedPageViews,
+                  pages_visited: updatedPagesVisited,
+                  is_bounce: updatedPageViews === 1,
+                  url_params: Object.keys(mergedUrlParams).length > 0 ? mergedUrlParams : null,
+                  updated_at: new Date(),
+                },
+              });
+            } else {
+              throw error; // Re-throw if we can't find it
+            }
+          } else {
+            throw error; // Re-throw other errors
+          }
+        }
       }
 
       // Create page view event
