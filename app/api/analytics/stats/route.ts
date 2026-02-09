@@ -198,11 +198,13 @@ export async function GET(request: NextRequest) {
     console.log('[Analytics Stats] Sample affiliate_ids:', sessions.slice(0, 5).map(s => s.affiliate_id));
 
     // Calculate metrics
-    const totalVisitors = sessions.length;
+    // Note: "total_visitors" in metrics actually means total sessions (for backward compatibility)
+    // "unique_visitors" is the actual unique visitor count
+    const totalSessions = sessions.length;
     const uniqueVisitors = new Set(sessions.map(s => s.visitor_id)).size;
     const totalPageViews = sessions.reduce((sum, s) => sum + s.page_views, 0);
     const bouncedSessions = sessions.filter(s => s.is_bounce).length;
-    const bounceRate = totalVisitors > 0 ? (bouncedSessions / totalVisitors) * 100 : 0;
+    const bounceRate = totalSessions > 0 ? (bouncedSessions / totalSessions) * 100 : 0;
     
     const totalSessionTime = sessions
       .filter(s => s.total_time)
@@ -211,7 +213,7 @@ export async function GET(request: NextRequest) {
     const avgSessionTime = sessionsWithTime > 0 ? totalSessionTime / sessionsWithTime : 0;
     
     const totalPages = sessions.reduce((sum, s) => sum + s.pages_visited.length, 0);
-    const pagesPerSession = totalVisitors > 0 ? totalPages / totalVisitors : 0;
+    const pagesPerSession = totalSessions > 0 ? totalPages / totalSessions : 0;
 
     // Get top pages
     const pageViewsMap = new Map<string, { views: number; bounces: number }>();
@@ -471,9 +473,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       metrics: {
-        total_visitors: totalVisitors,
+        total_visitors: totalSessions, // Actually total sessions (kept for backward compatibility)
         unique_visitors: uniqueVisitors,
-        sessions: totalVisitors,
+        sessions: totalSessions,
         bounce_rate: bounceRate,
         avg_session_time: avgSessionTime,
         pages_per_session: pagesPerSession,
