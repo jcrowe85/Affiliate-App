@@ -226,17 +226,44 @@ export default function Analytics() {
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-4">
-            <label className="text-sm font-medium text-gray-700">Time Range:</label>
-            <select
-              value={timeRange}
-              onChange={(e) => setTimeRange(e.target.value)}
-              className="border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="1h">Last Hour</option>
-              <option value="24h">Last 24 Hours</option>
-              <option value="7d">Last 7 Days</option>
-              <option value="30d">Last 30 Days</option>
-            </select>
+            <label className="text-sm font-medium text-gray-700">View Mode:</label>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setViewMode('realtime')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  viewMode === 'realtime'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Real-Time
+              </button>
+              <button
+                onClick={() => setViewMode('historical')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  viewMode === 'historical'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Historical
+              </button>
+            </div>
+            {viewMode === 'historical' && (
+              <>
+                <label className="text-sm font-medium text-gray-700 ml-4">Time Range:</label>
+                <select
+                  value={timeRange}
+                  onChange={(e) => setTimeRange(e.target.value)}
+                  className="border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="1h">Last Hour</option>
+                  <option value="24h">Last 24 Hours</option>
+                  <option value="7d">Last 7 Days</option>
+                  <option value="30d">Last 30 Days</option>
+                </select>
+              </>
+            )}
           </div>
           <button
             onClick={fetchAnalytics}
@@ -246,33 +273,10 @@ export default function Analytics() {
           </button>
         </div>
         <div className="flex items-center gap-4">
-          <label className="text-sm font-medium text-gray-700">View Mode:</label>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setViewMode('realtime')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                viewMode === 'realtime'
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Real-Time
-            </button>
-            <button
-              onClick={() => setViewMode('historical')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                viewMode === 'historical'
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Historical
-            </button>
-          </div>
-          <span className="text-xs text-gray-500">
+          <span className="text-sm text-gray-600">
             {viewMode === 'realtime' 
-              ? 'Showing active sessions (last 5 minutes)' 
-              : `Showing all sessions (${timeRange === '1h' ? 'last hour' : timeRange === '24h' ? 'last 24 hours' : timeRange === '7d' ? 'last 7 days' : 'last 30 days'})`}
+              ? '📊 Showing visitors currently active (updated in last 5 minutes)' 
+              : `📊 Showing all sessions from ${timeRange === '1h' ? 'the last hour' : timeRange === '24h' ? 'the last 24 hours' : timeRange === '7d' ? 'the last 7 days' : 'the last 30 days'}`}
           </span>
         </div>
       </div>
@@ -333,8 +337,8 @@ export default function Analytics() {
                   </h3>
                   <p className="text-sm text-gray-500 mt-1">
                     {viewMode === 'realtime' 
-                      ? 'Active sessions (updated in last 5 minutes)' 
-                      : `Historical sessions (${timeRange === '1h' ? 'last hour' : timeRange === '24h' ? 'last 24 hours' : timeRange === '7d' ? 'last 7 days' : 'last 30 days'})`}
+                      ? '👁️ Currently active visitors (updated in last 5 minutes)' 
+                      : `📈 Historical data (${timeRange === '1h' ? 'last hour' : timeRange === '24h' ? 'last 24 hours' : timeRange === '7d' ? 'last 7 days' : 'last 30 days'})`}
                   </p>
                 </div>
               </div>
@@ -409,8 +413,8 @@ export default function Analytics() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
           <p className="text-gray-500">
             {viewMode === 'realtime' 
-              ? 'No active affiliate sessions' 
-              : 'No historical sessions found for the selected time range'}
+              ? 'No visitors currently active (no activity in last 5 minutes)' 
+              : `No historical sessions found for ${timeRange === '1h' ? 'the last hour' : timeRange === '24h' ? 'the last 24 hours' : timeRange === '7d' ? 'the last 7 days' : 'the last 30 days'}`}
           </p>
         </div>
       )}
