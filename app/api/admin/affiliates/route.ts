@@ -26,13 +26,6 @@ export async function GET(request: NextRequest) {
             offer: true,
           },
         },
-        commissions: {
-          select: {
-            amount: true,
-            currency: true,
-            status: true,
-          },
-        },
         _count: {
           select: {
             links: true,
@@ -47,16 +40,60 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    // Get commission aggregates for all affiliates in one query to avoid loading all commission records
+    const affiliateIds = affiliates.map(a => a.id);
+    const commissionAggregates = affiliateIds.length > 0
+      ? await prisma.commission.groupBy({
+          by: ['affiliate_id', 'status', 'currency'],
+          where: {
+            affiliate_id: { in: affiliateIds },
+            shopify_shop_id: admin.shopify_shop_id,
+          },
+          _sum: {
+            amount: true,
+          },
+          _count: {
+            id: true,
+          },
+        })
+      : [];
+
+    // Group aggregates by affiliate_id
+    const aggregatesByAffiliate = new Map<string, { 
+      revenue: number; 
+      currency: string; 
+      pendingCount: number;
+    }>();
+    
+    commissionAggregates.forEach(agg => {
+      const existing = aggregatesByAffiliate.get(agg.affiliate_id) || { 
+        revenue: 0, 
+        currency: 'USD', 
+        pendingCount: 0 
+      };
+      const amount = parseFloat(agg._sum.amount?.toString() || '0');
+      
+      if (agg.status === 'paid' || agg.status === 'approved') {
+        existing.revenue += amount;
+      }
+      if (agg.status === 'pending') {
+        existing.pendingCount += agg._count.id;
+      }
+      if (!existing.currency && agg.currency) {
+        existing.currency = agg.currency;
+      }
+      
+      aggregatesByAffiliate.set(agg.affiliate_id, existing);
+    });
+
     return NextResponse.json({
       affiliates: affiliates.map(a => {
-        // Calculate revenue (sum of all commission amounts)
-        const revenue = a.commissions
-          .filter(c => c.status === 'paid' || c.status === 'approved')
-          .reduce((sum, c) => sum + parseFloat(String(c.amount)), 0);
+        const aggregates = aggregatesByAffiliate.get(a.id) || { 
+          revenue: 0, 
+          currency: 'USD', 
+          pendingCount: 0 
+        };
         
-        // Get currency from first commission or default to USD
-        const currency = a.commissions[0]?.currency || 'USD';
-
         // Calculate total orders
         const totalOrders = a._count.orders;
 
@@ -64,9 +101,6 @@ export async function GET(request: NextRequest) {
         // Note: OrderAttribution doesn't store order total, so we'll use commission amounts as proxy
         // For a more accurate AOV, we'd need to fetch order data from Shopify or store it in OrderAttribution
         const aov = 0; // Placeholder - would need order total data
-
-        // Count pending conversions (commissions with status 'pending')
-        const pendingConversions = a.commissions.filter(c => c.status === 'pending').length;
 
         // Get offer name
         const primaryOffer = a.offer?.name || '—';
@@ -108,10 +142,10 @@ export async function GET(request: NextRequest) {
             clicks: a._count.clicks,
             orders: totalOrders,
             commissions: a._count.commissions,
-            revenue,
-            currency,
+            revenue: aggregates.revenue,
+            currency: aggregates.currency,
             aov,
-            pending_conversions: pendingConversions,
+            pending_conversions: aggregates.pendingCount,
           },
         };
       }),
