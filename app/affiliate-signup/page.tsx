@@ -11,7 +11,7 @@ import {
   FaHandshake,
   FaCheck,
   FaArrowRight,
-  FaMail,
+  FaEnvelope,
   FaLock,
   FaUser,
   FaBuilding,
@@ -307,7 +307,7 @@ export default function AffiliateSignupPage() {
                     <div>
                       <label className="block text-sm font-medium text-white/90 mb-2">Email Address *</label>
                       <div className="relative">
-                        <FaMail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/60" size={16} />
+                        <FaEnvelope className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/60" size={16} />
                         <input
                           type="email"
                           required
@@ -321,7 +321,7 @@ export default function AffiliateSignupPage() {
                     <div>
                       <label className="block text-sm font-medium text-white/90 mb-2">PayPal Email (Optional)</label>
                       <div className="relative">
-                        <FaMail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/60" size={16} />
+                        <FaEnvelope className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/60" size={16} />
                         <input
                           type="email"
                           value={formData.paypal_email}
