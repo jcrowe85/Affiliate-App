@@ -26,7 +26,6 @@ export async function GET(request: NextRequest) {
             offer: true,
           },
         },
-        orders: true,
         commissions: {
           select: {
             amount: true,
@@ -119,8 +118,13 @@ export async function GET(request: NextRequest) {
     });
   } catch (error: any) {
     console.error('Error fetching affiliates:', error);
+    console.error('Error stack:', error.stack);
+    console.error('Error details:', JSON.stringify(error, null, 2));
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch affiliates' },
+      { 
+        error: error.message || 'Failed to fetch affiliates',
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      },
       { status: 500 }
     );
   }

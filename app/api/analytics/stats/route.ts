@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
 
     // Get active visitors (sessions with activity in last 5 minutes)
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-    const activeSessions = await prisma.visitorEvent.findMany({
+    const recentEvents = await prisma.visitorEvent.findMany({
       where: {
         shopify_shop_id: shopifyShopId,
         timestamp: {
@@ -54,9 +54,18 @@ export async function GET(request: NextRequest) {
       orderBy: {
         timestamp: 'desc',
       },
-      distinct: ['visitor_session_id'],
-      take: 50,
+      take: 1000, // Get more events to ensure we have unique sessions
     });
+
+    // Get unique sessions by visitor_session_id
+    const uniqueSessionIds = new Set<string>();
+    const activeSessions: typeof recentEvents = [];
+    for (const event of recentEvents) {
+      if (!uniqueSessionIds.has(event.visitor_session_id) && activeSessions.length < 50) {
+        uniqueSessionIds.add(event.visitor_session_id);
+        activeSessions.push(event);
+      }
+    }
 
     // Calculate metrics
     const totalVisitors = sessions.length;

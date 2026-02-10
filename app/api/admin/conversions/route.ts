@@ -59,13 +59,11 @@ export async function GET(request: NextRequest) {
 
     // Search by order number, customer email, or customer name (through order_attribution)
     if (search) {
-      where.order_attribution = {
-        OR: [
-          { shopify_order_number: { contains: search, mode: 'insensitive' } },
-          { customer_email: { contains: search, mode: 'insensitive' } },
-          { customer_name: { contains: search, mode: 'insensitive' } },
-        ],
-      };
+      where.OR = [
+        { order_attribution: { shopify_order_number: { contains: search, mode: 'insensitive' } } },
+        { order_attribution: { customer_email: { contains: search, mode: 'insensitive' } } },
+        { order_attribution: { customer_name: { contains: search, mode: 'insensitive' } } },
+      ];
     }
 
     const commissions = await prisma.commission.findMany({
@@ -110,11 +108,11 @@ export async function GET(request: NextRequest) {
       return {
         id: commission.id,
         shopify_order_id: commission.shopify_order_id,
-        shopify_order_number: commission.order_attribution.shopify_order_number,
-        customer_email: commission.order_attribution.customer_email || '',
-        customer_name: commission.order_attribution.customer_name || '',
-        order_total: commission.order_attribution.order_total?.toString() || '0',
-        order_currency: commission.order_attribution.order_currency || 'USD',
+        shopify_order_number: commission.order_attribution?.shopify_order_number || '',
+        customer_email: commission.order_attribution?.customer_email || '',
+        customer_name: commission.order_attribution?.customer_name || '',
+        order_total: commission.order_attribution?.order_total?.toString() || '0',
+        order_currency: commission.order_attribution?.order_currency || 'USD',
         affiliate_id: commission.affiliate_id,
         affiliate_name: commission.affiliate.first_name && commission.affiliate.last_name
           ? `${commission.affiliate.first_name} ${commission.affiliate.last_name}`.trim()
@@ -127,7 +125,7 @@ export async function GET(request: NextRequest) {
         commission_amount: commission.amount.toString(),
         commission_currency: commission.currency,
         commission_status: commission.status,
-        attribution_type: commission.order_attribution.attribution_type,
+        attribution_type: commission.order_attribution?.attribution_type || 'link',
         created_at: commission.created_at.toISOString(),
         eligible_date: commission.eligible_date.toISOString(),
         is_subscription: isSubscription,
@@ -139,8 +137,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ conversions });
   } catch (error: any) {
     console.error('Error fetching conversions:', error);
+    console.error('Error stack:', error.stack);
+    console.error('Error details:', JSON.stringify(error, null, 2));
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch conversions' },
+      { 
+        error: error.message || 'Failed to fetch conversions',
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      },
       { status: 500 }
     );
   }

@@ -78,6 +78,21 @@ export default function Analytics() {
         return;
       }
       const analyticsData = await response.json();
+      
+      // Check if response is an error
+      if (!response.ok || analyticsData.error) {
+        console.error('Analytics API error:', analyticsData.error || 'Unknown error');
+        setLoading(false);
+        return;
+      }
+      
+      // Validate data structure
+      if (!analyticsData.metrics) {
+        console.error('Invalid analytics data structure:', analyticsData);
+        setLoading(false);
+        return;
+      }
+      
       setData(analyticsData);
       setLoading(false);
     } catch (error) {
