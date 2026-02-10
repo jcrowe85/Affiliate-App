@@ -82,8 +82,8 @@ export async function GET(request: NextRequest) {
       // Get unique sessions - handle both old and new schema
       const uniqueSessionIds = new Set<string>();
       for (const event of recentEvents) {
-        // Try visitor_session_id first (new schema), fallback to session.id (old schema)
-        const sessionId = (event as any).visitor_session_id || event.session?.id;
+        // visitor_session_id is a field on VisitorEvent, session.id is from the relation
+        const sessionId = event.visitor_session_id || event.session?.id;
         if (sessionId && !uniqueSessionIds.has(sessionId) && activeSessions.length < 50) {
           uniqueSessionIds.add(sessionId);
           activeSessions.push(event);
