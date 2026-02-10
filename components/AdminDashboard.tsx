@@ -505,47 +505,6 @@ export default function AdminDashboard() {
     router.push('/login');
   };
 
-  const handleTestPayout = async () => {
-    const testEmail = 'jcrowe120485@gmail.com';
-    
-    if (!confirm(`Create a test payout for ${testEmail}?\n\nThis will:\n1. Find or create eligible commissions for this affiliate\n2. Process a PayPal payout\n\nContinue?`)) {
-      return;
-    }
-
-    setActionLoading('test-payout');
-    try {
-      const res = await fetch('/api/admin/payouts/test', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: testEmail,
-        }),
-      });
-
-      const data = await res.json();
-      
-      if (res.ok && data.success) {
-        await fetchDashboardData(); // Refresh data
-      } else {
-        let errorMessage = `Test Payout Failed: ${data.error || 'Failed to create test payout'}`;
-        
-        if (data.error_reason) {
-          errorMessage += `\n\nReason: ${data.error_reason}`;
-        }
-        
-        if (data.message) {
-          errorMessage += `\n\n${data.message}`;
-        }
-        
-        alert(errorMessage);
-      }
-    } catch (err: any) {
-      console.error('Error creating test payout:', err);
-      alert(`Test Payout Failed: Network error - ${err.message || 'Failed to connect to server'}`);
-    } finally {
-      setActionLoading(null);
-    }
-  };
 
   const handlePayPayout = async () => {
     if (!selectedPayout) return;
@@ -1232,29 +1191,6 @@ export default function AdminDashboard() {
           {/* Upcoming Payouts Tab */}
           {activeTab === 'payouts' && (
           <div className="space-y-6">
-            {/* Test Payout Button */}
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold text-yellow-900">Test Payout</h3>
-                  <p className="text-xs text-yellow-700 mt-1">Create a test payout for jcrowe120485@gmail.com</p>
-                </div>
-                <button
-                  onClick={handleTestPayout}
-                  disabled={actionLoading === 'test-payout'}
-                  className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors flex items-center gap-2"
-                >
-                  {actionLoading === 'test-payout' ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                      <span>Creating Test Payout...</span>
-                    </>
-                  ) : (
-                    'Create Test Payout'
-                  )}
-                </button>
-              </div>
-            </div>
 
             {loading ? (
               <div className="bg-white rounded-xl shadow-lg p-12 text-center border border-gray-200">
