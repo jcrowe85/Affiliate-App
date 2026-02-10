@@ -27,15 +27,14 @@ export async function GET(request: NextRequest) {
     const shopifyShopId = admin.shopify_shop_id;
     const searchParams = request.nextUrl.searchParams;
     const timeRange = searchParams.get('timeRange') || '24h';
-    const startTime = Date.now() - getTimeRangeMs(timeRange);
-    const startTimeBigInt = BigInt(startTime);
+    const startTime = new Date(Date.now() - getTimeRangeMs(timeRange));
 
     // Get all sessions in time range
     const sessions = await prisma.visitorSession.findMany({
       where: {
         shopify_shop_id: shopifyShopId,
         start_time: {
-          gte: startTimeBigInt,
+          gte: startTime,
         },
       },
       include: {
@@ -48,7 +47,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Get active visitors (sessions with activity in last 5 minutes)
-    const fiveMinutesAgo = BigInt(Date.now() - 5 * 60 * 1000);
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
     const activeSessions = await prisma.visitorEvent.findMany({
       where: {
         shopify_shop_id: shopifyShopId,

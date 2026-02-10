@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
             visitor_id,
             shopify_shop_id: shopifyShopId,
             entry_page: entryPage,
-            start_time: BigInt(sessionStartTime),
+            start_time: new Date(sessionStartTime),
             page_views: pageViews,
             pages_visited: pagesVisited,
             device_type: device?.type,
@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
           event_data: {
             time_on_page: timeOnPage,
           },
-          timestamp: BigInt(timestamp),
+          timestamp: new Date(timestamp),
         },
       });
       console.log('[Analytics Track] Event created:', event.id);
@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
           where: { id: visitorSession.id },
           data: {
             exit_page: exitPage,
-            end_time: BigInt(endTime),
+            end_time: new Date(endTime),
             total_time: timeOnPage
               ? Math.floor(timeOnPage / 1000)
               : visitorSession.total_time,
@@ -167,7 +167,7 @@ export async function POST(request: NextRequest) {
             page_url: page?.url || '',
             page_path: exitPage,
             event_data: event_data || {},
-            timestamp: BigInt(timestamp),
+            timestamp: new Date(timestamp),
           },
         });
       }
@@ -190,7 +190,7 @@ export async function POST(request: NextRequest) {
             page_url: page?.url || '',
             page_path: page?.path || '/',
             event_data: event_data || {},
-            timestamp: BigInt(timestamp),
+            timestamp: new Date(timestamp),
           },
         });
       }

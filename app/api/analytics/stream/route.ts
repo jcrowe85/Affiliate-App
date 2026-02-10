@@ -37,8 +37,8 @@ export async function GET(request: NextRequest) {
       // Function to fetch and send analytics data
       const fetchAndSendAnalytics = async () => {
         try {
-          const fiveMinutesAgo = BigInt(Date.now() - 5 * 60 * 1000);
-          const oneDayAgo = BigInt(Date.now() - 24 * 60 * 60 * 1000);
+          const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+          const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
           // Get active visitors
           const activeEvents = await prisma.visitorEvent.findMany({
