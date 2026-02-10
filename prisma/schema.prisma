@@ -1,0 +1,373 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Affiliate {
+  id                          String    @id @default(cuid())
+  affiliate_number            Int?      @unique
+  name                        String
+  first_name                  String?
+  last_name                   String?
+  company                     String?
+  email                       String    @unique
+  paypal_email                String?
+  address_line1               String?
+  address_line2               String?
+  city                        String?
+  state                       String?
+  zip                         String?
+  phone                       String?
+  source                      String?
+  status                      String    @default("active")
+  payout_method               String?
+  payout_identifier           String?
+  payout_terms_days           Int       @default(30)
+  merchant_id                 String?
+  offer_id                    String?
+  password_hash               String?
+  webhook_url                 String?
+  webhook_parameter_mapping   Json?
+  redirect_base_url           String?
+  redirect_parameters_enabled Boolean   @default(false)
+  last_login                  DateTime?
+  shopify_shop_id             String
+  created_at                  DateTime  @default(now())
+  updated_at                  DateTime  @updatedAt
+
+  links                     AffiliateLink[]
+  clicks                    Click[]
+  orders                    OrderAttribution[]
+  commissions               Commission[]
+  subscription_attributions SubscriptionAttribution[]
+  fraud_flags               FraudFlag[]
+  sessions                  AffiliateSession[]
+  offer                     Offer?                    @relation(fields: [offer_id], references: [id], onDelete: SetNull)
+  affiliate_offers          AffiliateOffer[]
+  PayoutRun                 PayoutRun[]
+
+  @@index([shopify_shop_id, status])
+  @@index([email])
+}
+
+model AffiliateLink {
+  id              String   @id @default(cuid())
+  affiliate_id    String
+  destination_url String
+  campaign_name   String?
+  coupon_code     String?
+  shopify_shop_id String
+  created_at      DateTime @default(now())
+
+  affiliate Affiliate @relation(fields: [affiliate_id], references: [id], onDelete: Cascade)
+  clicks    Click[]
+
+  @@index([affiliate_id])
+  @@index([shopify_shop_id])
+  @@index([coupon_code])
+}
+
+model Click {
+  id              String   @id @default(cuid())
+  affiliate_id    String
+  link_id         String?
+  landing_url     String
+  ip_hash         String
+  user_agent_hash String
+  shopify_shop_id String
+  created_at      DateTime @default(now())
+
+  affiliate          Affiliate          @relation(fields: [affiliate_id], references: [id], onDelete: Cascade)
+  link               AffiliateLink?     @relation(fields: [link_id], references: [id], onDelete: SetNull)
+  order_attributions OrderAttribution[]
+
+  @@index([affiliate_id, created_at])
+  @@index([shopify_shop_id, created_at])
+}
+
+model OrderAttribution {
+  id                   String   @id @default(cuid())
+  shopify_order_id     String   @unique
+  shopify_order_number String
+  affiliate_id         String
+  click_id             String?
+  attribution_type     String
+  shopify_shop_id      String
+  created_at           DateTime @default(now())
+
+  affiliate   Affiliate    @relation(fields: [affiliate_id], references: [id], onDelete: Cascade)
+  click       Click?       @relation(fields: [click_id], references: [id], onDelete: SetNull)
+  commissions Commission[]
+
+  @@index([shopify_order_id])
+  @@index([affiliate_id])
+  @@index([shopify_shop_id])
+}
+
+model CommissionRule {
+  id               String   @id @default(cuid())
+  name             String
+  rule_type        String
+  applies_to       String
+  value            Decimal  @db.Decimal(10, 2)
+  max_payments     Int?
+  max_months       Int?
+  selling_plan_ids String?
+  active           Boolean  @default(true)
+  shopify_shop_id  String
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  @@index([shopify_shop_id, active])
+}
+
+model Commission {
+  id                   String   @id @default(cuid())
+  affiliate_id         String
+  shopify_order_id     String
+  order_attribution_id String
+  amount               Decimal  @db.Decimal(10, 2)
+  currency             String   @default("USD")
+  status               String   @default("pending")
+  eligible_date        DateTime
+  rule_snapshot        Json
+  shopify_shop_id      String
+  created_at           DateTime @default(now())
+  updated_at           DateTime @updatedAt
+
+  affiliate              Affiliate             @relation(fields: [affiliate_id], references: [id], onDelete: Cascade)
+  order_attribution      OrderAttribution      @relation(fields: [order_attribution_id], references: [id], onDelete: Cascade)
+  payout_run_commissions PayoutRunCommission[]
+  fraud_flags            FraudFlag[]
+  postback_logs          PostbackLog[]
+
+  @@index([affiliate_id, status])
+  @@index([shopify_order_id])
+  @@index([status, eligible_date])
+  @@index([shopify_shop_id, status])
+}
+
+model SubscriptionAttribution {
+  id                String   @id @default(cuid())
+  original_order_id String
+  affiliate_id      String
+  selling_plan_id   String
+  interval_months   Int
+  max_payments      Int?
+  payments_made     Int      @default(0)
+  active            Boolean  @default(true)
+  shopify_shop_id   String
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  affiliate Affiliate @relation(fields: [affiliate_id], references: [id], onDelete: Cascade)
+
+  @@unique([original_order_id, selling_plan_id])
+  @@index([affiliate_id])
+  @@index([shopify_shop_id, active])
+}
+
+model PayoutRun {
+  id               String   @id @default(cuid())
+  affiliate_id     String?
+  period_start     DateTime
+  period_end       DateTime
+  status           String   @default("draft")
+  payout_reference String?
+  shopify_shop_id  String
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  affiliate   Affiliate?            @relation(fields: [affiliate_id], references: [id], onDelete: Cascade)
+  commissions PayoutRunCommission[]
+
+  @@index([shopify_shop_id, status])
+  @@index([affiliate_id])
+}
+
+model PayoutRunCommission {
+  id            String   @id @default(cuid())
+  payout_run_id String
+  commission_id String   @unique
+  created_at    DateTime @default(now())
+
+  payout_run PayoutRun  @relation(fields: [payout_run_id], references: [id], onDelete: Cascade)
+  commission Commission @relation(fields: [commission_id], references: [id], onDelete: Cascade)
+}
+
+model PostbackTemplate {
+  id              String   @id @default(cuid())
+  name            String
+  base_url        String
+  param_mappings  Json
+  trigger_event   String
+  active          Boolean  @default(true)
+  shopify_shop_id String
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  postback_logs PostbackLog[]
+
+  @@index([shopify_shop_id, active, trigger_event])
+}
+
+model PostbackLog {
+  id                   String   @id @default(cuid())
+  commission_id        String
+  postback_template_id String
+  status               String
+  response_code        Int?
+  response_body        String?
+  attempts             Int      @default(1)
+  last_attempt_at      DateTime @default(now())
+  shopify_shop_id      String
+  created_at           DateTime @default(now())
+
+  commission        Commission       @relation(fields: [commission_id], references: [id], onDelete: Cascade)
+  postback_template PostbackTemplate @relation(fields: [postback_template_id], references: [id], onDelete: Cascade)
+
+  @@index([commission_id])
+  @@index([status, last_attempt_at])
+}
+
+model FraudFlag {
+  id              String   @id @default(cuid())
+  commission_id   String
+  affiliate_id    String
+  flag_type       String
+  score           Int      @default(0)
+  reason          String
+  resolved        Boolean  @default(false)
+  shopify_shop_id String
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  commission Commission @relation(fields: [commission_id], references: [id], onDelete: Cascade)
+  affiliate  Affiliate  @relation(fields: [affiliate_id], references: [id], onDelete: Cascade)
+
+  @@index([commission_id])
+  @@index([affiliate_id, resolved])
+  @@index([shopify_shop_id, resolved])
+}
+
+model ShopifySession {
+  id                      String    @id @unique
+  shop                    String
+  state                   String?
+  is_online               Boolean   @default(false)
+  scope                   String?
+  expires                 DateTime?
+  access_token            String?
+  storefront_access_token String?
+
+  @@index([shop])
+}
+
+model AdminUser {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  password_hash   String
+  name            String?
+  role            String    @default("admin")
+  shopify_shop_id String
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  last_login      DateTime?
+
+  sessions AdminSession[]
+
+  @@index([email])
+  @@index([shopify_shop_id])
+}
+
+model AdminSession {
+  id            String   @id @default(cuid())
+  admin_user_id String
+  token         String   @unique
+  expires_at    DateTime
+  created_at    DateTime @default(now())
+
+  admin_user AdminUser @relation(fields: [admin_user_id], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([admin_user_id])
+}
+
+model AffiliateSession {
+  id           String   @id @default(cuid())
+  affiliate_id String
+  token        String   @unique
+  expires_at   DateTime
+  created_at   DateTime @default(now())
+
+  affiliate Affiliate @relation(fields: [affiliate_id], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([affiliate_id])
+}
+
+model Offer {
+  id                                   String   @id @default(cuid())
+  offer_number                         Int?     @unique
+  name                                 String
+  commission_type                      String
+  amount                               Decimal  @db.Decimal(10, 2)
+  currency                             String   @default("USD")
+  commission_terms                     String?
+  attribution_window_days              Int      @default(90)
+  auto_approve_affiliates              Boolean  @default(false)
+  selling_subscriptions                String?
+  subscription_max_payments            Int?
+  subscription_rebill_commission_type  String?
+  subscription_rebill_commission_value Decimal? @db.Decimal(10, 2)
+  make_private                         Boolean  @default(false)
+  hide_referral_links                  Boolean  @default(false)
+  hide_coupon_promotion                Boolean  @default(false)
+  enable_variable_commission           Boolean  @default(false)
+  shopify_shop_id                      String
+  created_at                           DateTime @default(now())
+  updated_at                           DateTime @updatedAt
+
+  affiliates       Affiliate[]
+  affiliate_offers AffiliateOffer[]
+
+  @@index([shopify_shop_id])
+}
+
+model AffiliateOffer {
+  id           String   @id @default(cuid())
+  affiliate_id String
+  offer_id     String
+  created_at   DateTime @default(now())
+
+  affiliate Affiliate @relation(fields: [affiliate_id], references: [id], onDelete: Cascade)
+  offer     Offer     @relation(fields: [offer_id], references: [id], onDelete: Cascade)
+
+  @@unique([affiliate_id, offer_id])
+}
+
+model VisitorSession {
+  id              String   @id @default(cuid())
+  visitor_id      String
+  session_id      String
+  affiliate_id    String?
+  start_time      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+  referrer_url    String?
+  referrer_domain String?
+  landing_page    String?
+  shopify_shop_id String
+
+  @@index([visitor_id])
+  @@index([session_id])
+  @@index([affiliate_id])
+  @@index([shopify_shop_id, start_time])
+  @@index([shopify_shop_id, updated_at])
+}
