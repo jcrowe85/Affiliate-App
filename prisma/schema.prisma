@@ -395,11 +395,47 @@ model VisitorSession {
   referrer_url    String?
   referrer_domain String?
   landing_page    String?
+  entry_page      String?
+  exit_page       String?
+  page_views      Int      @default(1)
+  pages_visited   String[] @default([])
+  is_bounce       Boolean  @default(false)
+  total_time      Int?
+  end_time        DateTime?
+  device_type     String?
+  user_agent      String?
+  screen_width    Int?
+  screen_height   Int?
+  language        String?
+  timezone        String?
+  referrer_type   String?
+  location_country String?
   shopify_shop_id String
+
+  events          VisitorEvent[]
 
   @@index([visitor_id])
   @@index([session_id])
   @@index([affiliate_id])
   @@index([shopify_shop_id, start_time])
   @@index([shopify_shop_id, updated_at])
+}
+
+model VisitorEvent {
+  id              String   @id @default(cuid())
+  visitor_session_id String
+  visitor_id      String
+  event_type      String
+  shopify_shop_id String
+  page_url        String?
+  page_path       String?
+  page_title      String?
+  referrer         String?
+  timestamp       DateTime @default(now())
+  event_data      Json?
+
+  session         VisitorSession @relation(fields: [visitor_session_id], references: [id], onDelete: Cascade)
+
+  @@index([visitor_session_id])
+  @@index([shopify_shop_id, timestamp])
 }

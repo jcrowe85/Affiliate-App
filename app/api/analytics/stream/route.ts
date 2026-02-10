@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
             orderBy: {
               timestamp: 'desc',
             },
-            distinct: ['session_id'],
+            distinct: ['visitor_session_id'],
             take: 50,
           });
 

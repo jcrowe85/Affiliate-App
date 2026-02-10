@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
       // Create page view event
       const event = await prisma.visitorEvent.create({
         data: {
-          session_id: visitorSession.id,
+          visitor_session_id: visitorSession.id,
           visitor_id,
           event_type: 'page_view',
           shopify_shop_id: shopifyShopId,

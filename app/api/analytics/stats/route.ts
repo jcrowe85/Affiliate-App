@@ -37,13 +37,6 @@ export async function GET(request: NextRequest) {
           gte: startTime,
         },
       },
-      include: {
-        events: {
-          orderBy: {
-            timestamp: 'desc',
-          },
-        },
-      },
     });
 
     // Get active visitors (sessions with activity in last 5 minutes)
@@ -61,7 +54,7 @@ export async function GET(request: NextRequest) {
       orderBy: {
         timestamp: 'desc',
       },
-      distinct: ['session_id'],
+      distinct: ['visitor_session_id'],
       take: 50,
     });
 
