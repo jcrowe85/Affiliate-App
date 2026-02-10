@@ -285,16 +285,10 @@ export default function AffiliateManagement() {
       const data = await res.json();
       
       if (res.ok) {
-          } catch (testErr) {
-            console.error('[Affiliate Form] Error testing password:', testErr);
-          }
-        }
-        
         await fetchAffiliates();
         setShowForm(false);
         resetForm();
       } else {
-        console.error('[Affiliate Form] ❌ Update failed:', data.error);
         setError(data.error || 'Failed to update affiliate');
       }
     } catch (err) {
