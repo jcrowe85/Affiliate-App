@@ -37,6 +37,11 @@ export async function GET(request: NextRequest) {
             payout_identifier: true,
           },
         },
+        order_attribution: {
+          select: {
+            shopify_order_number: true,
+          },
+        },
       },
       orderBy: {
         eligible_date: 'asc',
@@ -66,7 +71,9 @@ export async function GET(request: NextRequest) {
         id: commission.id,
         amount: commission.amount.toString(),
         order_id: commission.shopify_order_id,
-        eligible_date: commission.eligible_date,
+        order_number: commission.order_attribution?.shopify_order_number || commission.shopify_order_id,
+        eligible_date: commission.eligible_date.toISOString(),
+        created_at: commission.created_at.toISOString(),
       });
 
       return acc;

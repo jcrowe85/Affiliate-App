@@ -86,7 +86,9 @@ interface PayoutObligation {
     id: string;
     amount: string;
     order_id: string;
+    order_number?: string;
     eligible_date: string;
+    created_at?: string;
   }>;
 }
 
@@ -104,6 +106,9 @@ export default function AdminDashboard() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedPayout, setSelectedPayout] = useState<PayoutObligation | null>(null);
+  const [payoutReference, setPayoutReference] = useState('');
 
   const fetchDashboardData = useCallback(async () => {
     try {
@@ -256,6 +261,39 @@ export default function AdminDashboard() {
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     router.push('/login');
+  };
+
+  const handlePayPayout = async () => {
+    if (!selectedPayout) return;
+
+    setActionLoading(selectedPayout.affiliate_id);
+    try {
+      const commissionIds = selectedPayout.commissions.map(c => c.id);
+      const res = await fetch('/api/admin/payouts/pay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          affiliate_id: selectedPayout.affiliate_id,
+          commission_ids: commissionIds,
+          payout_reference: payoutReference.trim() || null,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setShowPaymentModal(false);
+        setSelectedPayout(null);
+        setPayoutReference('');
+        await fetchDashboardData(); // Refresh data
+      } else {
+        alert(`Error: ${data.error}`);
+      }
+    } catch (err) {
+      console.error('Error processing payout:', err);
+      alert('Failed to process payout');
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const formatCurrency = (amount: string, currency: string = 'USD') => {
@@ -914,13 +952,27 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                   <div className="px-6 py-4 bg-white">
-                    <div className="text-sm font-semibold text-gray-700 mb-3">
-                      Commissions:
+                    <div className="flex justify-between items-center mb-3">
+                      <div className="text-sm font-semibold text-gray-700">
+                        Commissions ({payout.commission_count}):
+                      </div>
+                      <button
+                        onClick={() => {
+                          setSelectedPayout(payout);
+                          setShowPaymentModal(true);
+                        }}
+                        disabled={actionLoading === payout.affiliate_id}
+                        className="px-6 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium shadow-sm hover:shadow transition-all"
+                      >
+                        {actionLoading === payout.affiliate_id ? 'Processing...' : 'Pay'}
+                      </button>
                     </div>
                     <div className="space-y-2">
                       {payout.commissions.slice(0, 5).map((comm) => (
                         <div key={comm.id} className="flex justify-between items-center text-sm py-2 px-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                          <span className="font-medium text-gray-700">Order #{comm.order_id.split('/').pop()}</span>
+                          <span className="font-medium text-gray-700">
+                            Order #{comm.order_number || comm.order_id.split('/').pop()}
+                          </span>
                           <span className="font-bold text-green-700">{formatCurrency(comm.amount, payout.currency)}</span>
                         </div>
                       ))}
@@ -933,6 +985,115 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               ))
+            )}
+
+            {/* Payment Confirmation Modal */}
+            {showPaymentModal && selectedPayout && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+                  <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-green-50 to-white">
+                    <h3 className="text-2xl font-bold text-gray-900">Confirm Payout</h3>
+                    <p className="text-sm text-gray-600 mt-1">Review transaction history before processing payment</p>
+                  </div>
+                  
+                  <div className="px-6 py-4 overflow-y-auto flex-1">
+                    <div className="mb-6">
+                      <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <div className="text-sm text-gray-600">Affiliate</div>
+                            <div className="font-semibold text-gray-900">{selectedPayout.affiliate_name}</div>
+                            <div className="text-sm text-gray-500">{selectedPayout.affiliate_email}</div>
+                          </div>
+                          <div>
+                            <div className="text-sm text-gray-600">Total Amount</div>
+                            <div className="text-2xl font-bold text-green-600">
+                              {formatCurrency(selectedPayout.total_amount, selectedPayout.currency)}
+                            </div>
+                            <div className="text-sm text-gray-500">{selectedPayout.commission_count} commission(s)</div>
+                          </div>
+                        </div>
+                        {selectedPayout.payout_method && (
+                          <div className="mt-3 pt-3 border-t border-gray-200">
+                            <div className="text-sm text-gray-600">Payout Method</div>
+                            <div className="font-medium text-gray-900">
+                              {selectedPayout.payout_method}
+                              {selectedPayout.payout_identifier && (
+                                <span className="ml-2 text-sm text-gray-600">({selectedPayout.payout_identifier})</span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Payout Reference (Optional)
+                        </label>
+                        <input
+                          type="text"
+                          value={payoutReference}
+                          onChange={(e) => setPayoutReference(e.target.value)}
+                          placeholder="e.g., Payment ID, Transaction #, etc."
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="text-lg font-semibold text-gray-900 mb-3">Transaction History</h4>
+                      <div className="border border-gray-200 rounded-lg overflow-hidden">
+                        <div className="max-h-96 overflow-y-auto">
+                          <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50 sticky top-0">
+                              <tr>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order #</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Eligible Date</th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                              {selectedPayout.commissions.map((comm) => (
+                                <tr key={comm.id} className="hover:bg-gray-50">
+                                  <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                                    {comm.order_number || comm.order_id.split('/').pop()}
+                                  </td>
+                                  <td className="px-4 py-3 text-sm font-bold text-green-700">
+                                    {formatCurrency(comm.amount, selectedPayout.currency)}
+                                  </td>
+                                  <td className="px-4 py-3 text-sm text-gray-500">
+                                    {formatDate(comm.eligible_date)}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
+                    <button
+                      onClick={() => {
+                        setShowPaymentModal(false);
+                        setSelectedPayout(null);
+                        setPayoutReference('');
+                      }}
+                      className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handlePayPayout}
+                      disabled={actionLoading === selectedPayout.affiliate_id}
+                      className="px-6 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-all"
+                    >
+                      {actionLoading === selectedPayout.affiliate_id ? 'Processing...' : 'Confirm & Pay'}
+                    </button>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         )}
