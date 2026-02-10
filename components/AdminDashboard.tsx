@@ -164,8 +164,7 @@ export default function AdminDashboard() {
       });
       const data = await res.json();
       if (res.ok) {
-        await fetchDashboardData(); // Refresh data
-        alert(`Commission validated! Moved from pending to eligible.`);
+        await fetchDashboardData(); // Refresh data - status will update automatically
       } else {
         alert(`Error: ${data.error}`);
       }
