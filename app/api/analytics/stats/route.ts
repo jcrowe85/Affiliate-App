@@ -19,17 +19,7 @@ function getTimeRangeMs(timeRange: string): number {
  */
 export async function GET(request: NextRequest) {
   try {
-    let admin;
-    try {
-      admin = await getCurrentAdmin();
-    } catch (authError: any) {
-      console.error('Auth error in analytics stats:', authError);
-      return NextResponse.json(
-        { error: 'Authentication error: ' + (authError.message || 'Unknown error') },
-        { status: 500 }
-      );
-    }
-    
+    const admin = await getCurrentAdmin();
     if (!admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -37,175 +27,51 @@ export async function GET(request: NextRequest) {
     const shopifyShopId = admin.shopify_shop_id;
     const searchParams = request.nextUrl.searchParams;
     const timeRange = searchParams.get('timeRange') || '24h';
-    const viewMode = searchParams.get('viewMode') || 'realtime'; // 'realtime' or 'historical'
     const startTime = Date.now() - getTimeRangeMs(timeRange);
     const startTimeBigInt = BigInt(startTime);
 
-    // Determine which sessions to show based on view mode
-    type SessionWithAffiliate = Awaited<ReturnType<typeof prisma.visitorSession.findMany<{
+    // Get all sessions in time range
+    const sessions = await prisma.visitorSession.findMany({
+      where: {
+        shopify_shop_id: shopifyShopId,
+        start_time: {
+          gte: startTimeBigInt,
+        },
+      },
       include: {
-        affiliate: {
-          select: {
-            id: true;
-            affiliate_number: true;
-            name: true;
-            first_name: true;
-            last_name: true;
-          };
-        };
-      };
-    }>>>[0];
-    
-    type VisitorEvent = Awaited<ReturnType<typeof prisma.visitorEvent.findFirst>>;
-    
-    let sessionsList: SessionWithAffiliate[];
-    let uniqueActiveSessions: Array<{ session: SessionWithAffiliate; event: VisitorEvent | null }>;
-    
-    if (viewMode === 'realtime') {
-      // Real-time mode: Only show currently active sessions (updated in last 5 minutes)
-      // Time range is ignored in real-time mode - it always shows all active visitors
-      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-      sessionsList = await prisma.visitorSession.findMany({
-        where: {
-          shopify_shop_id: shopifyShopId,
-          affiliate_id: { not: null }, // Only affiliate traffic
-          updated_at: {
-            gte: fiveMinutesAgo, // Only show currently active sessions
+        events: {
+          orderBy: {
+            timestamp: 'desc',
           },
         },
-        include: {
-          affiliate: {
-            select: {
-              id: true,
-              affiliate_number: true,
-              name: true,
-              first_name: true,
-              last_name: true,
-            },
-          },
-        },
-        orderBy: {
-          updated_at: 'desc',
-        },
-        take: 50,
-      });
-      
-      // Get the most recent event for each active session to capture URL parameters and current page
-      const sessionIds = sessionsList.map(s => s.id);
-      
-      // Get all recent page_view events for these sessions, ordered by timestamp
-      const allRecentEvents = sessionIds.length > 0
-        ? await prisma.visitorEvent.findMany({
-            where: {
-              session_id: { in: sessionIds },
-              event_type: 'page_view',
-              timestamp: {
-                gte: BigInt(Date.now() - 5 * 60 * 1000), // Only events from last 5 minutes
-              },
-            },
-            orderBy: {
-              timestamp: 'desc',
-            },
-            take: 1000, // Get enough to find most recent per session
-          })
-        : [];
-      
-      // Create a map of session_id to most recent event (first one encountered is most recent due to ordering)
-      const eventMap = new Map<string, typeof allRecentEvents[0]>();
-      allRecentEvents.forEach(event => {
-        if (!eventMap.has(event.session_id)) {
-          eventMap.set(event.session_id, event);
-        }
-      });
-      
-      // Combine sessions with their most recent events
-      uniqueActiveSessions = sessionsList.map(session => {
-        const recentEvent = eventMap.get(session.id);
-        return {
-          session: session,
-          event: recentEvent || null,
-        };
-      });
-    } else {
-      // Historical mode: Show all sessions within time range
-      sessionsList = await prisma.visitorSession.findMany({
-        where: {
-          shopify_shop_id: shopifyShopId,
-          affiliate_id: { not: null }, // Only affiliate traffic
-          start_time: {
-            gte: startTimeBigInt,
-          },
-        },
-        include: {
-          affiliate: {
-            select: {
-              id: true,
-              affiliate_number: true,
-              name: true,
-              first_name: true,
-              last_name: true,
-            },
-          },
-        },
-        orderBy: {
-          start_time: 'desc',
-        },
-      });
-      
-      // Get the most recent event for each historical session
-      const sessionIds = sessionsList.map(s => s.id);
-      
-      // Get all page_view events for these sessions within the time range
-      const allHistoricalEvents = sessionIds.length > 0
-        ? await prisma.visitorEvent.findMany({
-            where: {
-              session_id: { in: sessionIds },
-              event_type: 'page_view',
-              timestamp: {
-                gte: startTimeBigInt,
-              },
-            },
-            orderBy: {
-              timestamp: 'desc',
-            },
-            take: 5000, // Get enough to find most recent per session
-          })
-        : [];
-      
-      // Create a map of session_id to most recent event
-      const eventMap = new Map<string, typeof allHistoricalEvents[0]>();
-      allHistoricalEvents.forEach(event => {
-        if (!eventMap.has(event.session_id)) {
-          eventMap.set(event.session_id, event);
-        }
-      });
-      
-      // Combine sessions with their most recent events
-      uniqueActiveSessions = sessionsList.map(session => {
-        const recentEvent = eventMap.get(session.id);
-        return {
-          session: session,
-          event: recentEvent || null,
-        };
-      });
-    }
+      },
+    });
 
-    // Use sessionsList for all metrics calculations (based on viewMode)
-    const sessions = sessionsList;
-
-    // Debug: Log session count and affiliate IDs
-    console.log('[Analytics Stats] Sessions found:', sessions.length);
-    console.log('[Analytics Stats] Sessions with affiliate_id:', sessions.filter(s => s.affiliate_id).length);
-    console.log('[Analytics Stats] Sample affiliate_ids:', sessions.slice(0, 5).map(s => s.affiliate_id));
+    // Get active visitors (sessions with activity in last 5 minutes)
+    const fiveMinutesAgo = BigInt(Date.now() - 5 * 60 * 1000);
+    const activeSessions = await prisma.visitorEvent.findMany({
+      where: {
+        shopify_shop_id: shopifyShopId,
+        timestamp: {
+          gte: fiveMinutesAgo,
+        },
+      },
+      include: {
+        session: true,
+      },
+      orderBy: {
+        timestamp: 'desc',
+      },
+      distinct: ['session_id'],
+      take: 50,
+    });
 
     // Calculate metrics
-    // Note: "total_visitors" in metrics actually means total sessions (for backward compatibility)
-    // "unique_visitors" is the actual unique visitor count
-    const totalSessions = sessions.length;
+    const totalVisitors = sessions.length;
     const uniqueVisitors = new Set(sessions.map(s => s.visitor_id)).size;
     const totalPageViews = sessions.reduce((sum, s) => sum + s.page_views, 0);
     const bouncedSessions = sessions.filter(s => s.is_bounce).length;
-    const bounceRate = totalSessions > 0 ? (bouncedSessions / totalSessions) * 100 : 0;
+    const bounceRate = totalVisitors > 0 ? (bouncedSessions / totalVisitors) * 100 : 0;
     
     const totalSessionTime = sessions
       .filter(s => s.total_time)
@@ -214,7 +80,7 @@ export async function GET(request: NextRequest) {
     const avgSessionTime = sessionsWithTime > 0 ? totalSessionTime / sessionsWithTime : 0;
     
     const totalPages = sessions.reduce((sum, s) => sum + s.pages_visited.length, 0);
-    const pagesPerSession = totalSessions > 0 ? totalPages / totalSessions : 0;
+    const pagesPerSession = totalVisitors > 0 ? totalPages / totalVisitors : 0;
 
     // Get top pages
     const pageViewsMap = new Map<string, { views: number; bounces: number }>();
@@ -345,138 +211,23 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => b.visitors - a.visitors)
       .slice(0, 10);
 
-    // Format active visitors (only affiliate traffic)
-    // Use the most recent event's page_path as the current page (always up-to-date)
-    const activeVisitors = uniqueActiveSessions
-      .filter(item => item.session.affiliate_id)
-      .map(item => {
-        const session = item.session;
-        const event = item.event;
-        // Get URL parameters: prefer event's URL params, fall back to session's persistent URL params
-        const eventData = event?.event_data as any;
-        const eventUrlParams = (eventData?.url_params || {}) as Record<string, string>;
-        const sessionUrlParams = (session.url_params as Record<string, string>) || {};
-        // Merge: event params take precedence, but session params persist if event doesn't have them
-        const urlParams = { ...sessionUrlParams, ...eventUrlParams };
-        // Use the most recent event's page_path, or fall back to last page in pages_visited
-        const currentPage = event?.page_path || session.pages_visited[session.pages_visited.length - 1] || '/';
-        return {
-          session_id: session.session_id,
-          currentPage: currentPage,
-          device: session.device_type || 'Unknown',
-          location: session.location_country || 'Unknown',
-          lastSeen: Number(session.updated_at.getTime()),
-          affiliate_id: session.affiliate_id,
-          affiliate_number: session.affiliate_number,
-          affiliate_name: session.affiliate?.name || 
-                         (session.affiliate?.first_name && session.affiliate?.last_name 
-                           ? `${session.affiliate.first_name} ${session.affiliate.last_name}` 
-                           : `Affiliate #${session.affiliate_number || 'N/A'}`),
-          url_params: urlParams, // Add URL parameters
-        };
-      });
-
-    // Group ACTIVE sessions by affiliate (sessions updated in last 30 minutes)
-    const affiliateMap = new Map<string, {
-      affiliate_id: string;
-      affiliate_number: number | null;
-      affiliate_name: string;
-      sessions: number;
-      visitors: Set<string>;
-      page_views: number;
-      bounce_rate: number;
-      avg_session_time: number;
-      active_visitors: Array<{
-        session_id: string;
-        currentPage: string;
-        device: string;
-        location: string;
-        lastSeen: number;
-        url_params: Record<string, string>;
-      }>;
-    }>();
-
-    console.log(`[Analytics Stats] Processing ${uniqueActiveSessions.length} sessions for affiliate grouping`);
-    
-    // Use uniqueActiveSessions instead of all sessions for affiliate grouping
-    uniqueActiveSessions.forEach(item => {
-      const session = item.session;
-      const event = item.event;
-      if (!session.affiliate_id) {
-        return;
-      }
-      
-      const key = session.affiliate_id;
-      const existing = affiliateMap.get(key) || {
-        affiliate_id: session.affiliate_id,
-        affiliate_number: session.affiliate_number,
-        affiliate_name: session.affiliate?.name || 
-                       (session.affiliate?.first_name && session.affiliate?.last_name 
-                         ? `${session.affiliate.first_name} ${session.affiliate.last_name}` 
-                         : `Affiliate #${session.affiliate_number || 'N/A'}`),
-        sessions: 0,
-        visitors: new Set<string>(),
-        page_views: 0,
-        bounce_rate: 0,
-        avg_session_time: 0,
-        active_visitors: [],
-      };
-
-      existing.sessions++;
-      existing.visitors.add(session.visitor_id);
-      existing.page_views += session.page_views;
-      existing.avg_session_time += session.total_time || 0;
-      
-      // Get URL parameters: prefer event's URL params, fall back to session's persistent URL params
-      const eventData = event?.event_data as any;
-      const eventUrlParams = (eventData?.url_params || {}) as Record<string, string>;
-      const sessionUrlParams = (session.url_params as Record<string, string>) || {};
-      // Merge: event params take precedence, but session params persist if event doesn't have them
-      const urlParams = { ...sessionUrlParams, ...eventUrlParams };
-      
-      // Add active visitor info with URL parameters
-      // Use the most recent event's page_path as the current page (always up-to-date)
-      const currentPage = event?.page_path || session.pages_visited[session.pages_visited.length - 1] || '/';
-      existing.active_visitors.push({
+    // Format active visitors
+    const activeVisitors = activeSessions.map(event => {
+      const session = event.session;
+      return {
         session_id: session.session_id,
-        currentPage: currentPage,
+        currentPage: session.pages_visited[session.pages_visited.length - 1] || '/',
         device: session.device_type || 'Unknown',
         location: session.location_country || 'Unknown',
         lastSeen: Number(session.updated_at.getTime()),
-        url_params: urlParams,
-      });
-      
-      affiliateMap.set(key, existing);
-    });
-
-    // Calculate metrics per affiliate (only for active sessions)
-    console.log(`[Analytics Stats] Found ${affiliateMap.size} unique affiliates with active sessions`);
-    const affiliates = Array.from(affiliateMap.values()).map(aff => {
-      const activeSessionsForAffiliate = uniqueActiveSessions.filter(item => 
-        item.session.affiliate_id === aff.affiliate_id
-      );
-      const sessionsWithTime = activeSessionsForAffiliate.filter(item => 
-        item.session.total_time
-      ).length;
-      const bouncedSessions = activeSessionsForAffiliate.filter(item => 
-        item.session.is_bounce
-      ).length;
-      
-      return {
-        ...aff,
-        visitors: aff.visitors.size,
-        bounce_rate: aff.sessions > 0 ? (bouncedSessions / aff.sessions) * 100 : 0,
-        avg_session_time: sessionsWithTime > 0 
-          ? aff.avg_session_time / sessionsWithTime 
-          : 0,
       };
-    }).sort((a, b) => b.sessions - a.sessions);
+    });
 
     return NextResponse.json({
       metrics: {
-        total_visitors: totalSessions, // Actually total sessions (kept for backward compatibility)
+        total_visitors: totalVisitors,
         unique_visitors: uniqueVisitors,
-        sessions: totalSessions,
+        sessions: totalVisitors,
         bounce_rate: bounceRate,
         avg_session_time: avgSessionTime,
         pages_per_session: pagesPerSession,
@@ -489,8 +240,6 @@ export async function GET(request: NextRequest) {
       devices,
       browsers,
       geography,
-      affiliates, // New: affiliate-organized data
-      viewMode, // Include view mode in response
     });
   } catch (error: any) {
     console.error('Analytics stats error:', error);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import AffiliateManagement from '@/components/AffiliateManagement';
 import OffersManagement from '@/components/OffersManagement';
@@ -92,7 +92,248 @@ interface PayoutObligation {
   }>;
 }
 
+interface PaidPayout {
+  id: string;
+  affiliate_id: string;
+  affiliate_name: string;
+  affiliate_email: string;
+  paypal_email: string | null;
+  total_amount: string;
+  currency: string;
+  commission_count: number;
+  payout_reference: string | null;
+  paypal_batch_id: string | null;
+  paypal_status: string | null;
+  payout_method: string;
+  created_at: string;
+  commissions: Array<{
+    id: string;
+    order_number: string;
+    amount: string;
+    currency: string;
+    created_at: string;
+  }>;
+}
+
 type Tab = 'overview' | 'pending' | 'fraud' | 'payouts' | 'performance' | 'affiliates' | 'offers' | 'payout-runs' | 'pixel-test' | 'conversions' | 'webhooks' | 'analytics';
+type ReportSubTab = 'performance' | 'payouts';
+
+// Payout Reports Section Component
+function PayoutReportsSectionComponent({
+  reportData,
+  setReportData,
+  filters,
+  setFilters,
+  affiliates,
+  formatCurrency,
+  formatDate,
+}: {
+  reportData: any;
+  setReportData: (data: any) => void;
+  filters: { start_date: string; end_date: string; affiliate_id: string };
+  setFilters: (filters: any) => void;
+  affiliates: Array<{ id: string; name: string; email: string }>;
+  formatCurrency: (amount: string, currency?: string) => string;
+  formatDate: (dateString: string) => string;
+}) {
+  const [loading, setLoading] = useState(false);
+
+  const handleGenerateReport = async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (filters.start_date) params.append('start_date', filters.start_date);
+      if (filters.end_date) params.append('end_date', filters.end_date);
+      if (filters.affiliate_id) params.append('affiliate_id', filters.affiliate_id);
+
+      const res = await fetch(`/api/admin/payouts/reports?${params.toString()}`);
+      const data = await res.json();
+      setReportData(data);
+    } catch (err) {
+      console.error('Error generating report:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExportCSV = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (filters.start_date) params.append('start_date', filters.start_date);
+      if (filters.end_date) params.append('end_date', filters.end_date);
+      if (filters.affiliate_id) params.append('affiliate_id', filters.affiliate_id);
+      params.append('format', 'csv');
+
+      const res = await fetch(`/api/admin/payouts/reports?${params.toString()}`);
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `payout-report-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error('Error exporting CSV:', err);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Filters */}
+      <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">Payout Reports</h2>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+            <input
+              type="date"
+              value={filters.start_date}
+              onChange={(e) => setFilters({ ...filters, start_date: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
+            <input
+              type="date"
+              value={filters.end_date}
+              onChange={(e) => setFilters({ ...filters, end_date: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Affiliate</label>
+            <select
+              value={filters.affiliate_id}
+              onChange={(e) => setFilters({ ...filters, affiliate_id: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">All Affiliates</option>
+              {affiliates.map(aff => (
+                <option key={aff.id} value={aff.id}>{aff.name} ({aff.email})</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-end gap-2">
+            <button
+              onClick={handleGenerateReport}
+              disabled={loading}
+              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+            >
+              {loading ? 'Generating...' : 'Generate Report'}
+            </button>
+            <button
+              onClick={handleExportCSV}
+              disabled={loading}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              title="Export CSV"
+            >
+              📥 CSV
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Report Summary */}
+      {reportData?.summary && (
+        <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Summary</h3>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="bg-blue-50 rounded-lg p-4">
+              <div className="text-sm text-gray-600">Total Payouts</div>
+              <div className="text-2xl font-bold text-blue-700">{reportData.summary.total_payouts}</div>
+            </div>
+            <div className="bg-green-50 rounded-lg p-4">
+              <div className="text-sm text-gray-600">Total Amount</div>
+              <div className="text-2xl font-bold text-green-700">
+                {formatCurrency(reportData.summary.total_amount, reportData.summary.currency)}
+              </div>
+            </div>
+            <div className="bg-purple-50 rounded-lg p-4">
+              <div className="text-sm text-gray-600">Total Commissions</div>
+              <div className="text-2xl font-bold text-purple-700">{reportData.summary.total_commissions}</div>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-4">
+              <div className="text-sm text-gray-600">Date Range</div>
+              <div className="text-sm font-medium text-gray-700">
+                {reportData.summary.date_range.start ? formatDate(reportData.summary.date_range.start) : 'All time'} - {reportData.summary.date_range.end ? formatDate(reportData.summary.date_range.end) : 'Today'}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Report Details */}
+      {reportData?.payouts && reportData.payouts.length > 0 && (
+        <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
+          <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
+            <h3 className="text-lg font-semibold text-gray-900">Payout Details</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Affiliate</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Commissions</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">PayPal Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reference</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {reportData.payouts.map((payout: any) => (
+                  <tr key={payout.payout_id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {formatDate(payout.payout_date)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">{payout.affiliate_name}</div>
+                      <div className="text-sm text-gray-500">{payout.affiliate_email}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-green-700">
+                      {formatCurrency(payout.total_amount, payout.currency)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {payout.commission_count}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {payout.paypal_batch_id ? (
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          payout.paypal_status === 'SUCCESS' ? 'bg-green-100 text-green-800' :
+                          payout.paypal_status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-red-100 text-red-800'
+                        }`}>
+                          {payout.paypal_status || 'PENDING'}
+                        </span>
+                      ) : (
+                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                          Manual
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {payout.payout_reference || payout.paypal_batch_id || '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {reportData && (!reportData.payouts || reportData.payouts.length === 0) && (
+        <div className="bg-white rounded-xl shadow-lg p-12 text-center border border-gray-200">
+          <p className="text-lg font-medium text-gray-900">No payouts found</p>
+          <p className="text-sm text-gray-500">Try adjusting your filters</p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -102,6 +343,15 @@ export default function AdminDashboard() {
   const [fraudFlags, setFraudFlags] = useState<FraudFlag[]>([]);
   const [affiliatePerformance, setAffiliatePerformance] = useState<AffiliatePerformance[]>([]);
   const [payoutObligations, setPayoutObligations] = useState<PayoutObligation[]>([]);
+  const [paidPayouts, setPaidPayouts] = useState<PaidPayout[]>([]);
+  const [reportSubTab, setReportSubTab] = useState<ReportSubTab>('performance');
+  const [reportData, setReportData] = useState<any>(null);
+  const [reportFilters, setReportFilters] = useState({
+    start_date: '',
+    end_date: '',
+    affiliate_id: '',
+  });
+  const [affiliates, setAffiliates] = useState<Array<{ id: string; name: string; email: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -109,6 +359,8 @@ export default function AdminDashboard() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPayout, setSelectedPayout] = useState<PayoutObligation | null>(null);
   const [payoutReference, setPayoutReference] = useState('');
+  const [processingPayment, setProcessingPayment] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState<{ message: string; details?: any } | null>(null);
 
   const fetchDashboardData = useCallback(async () => {
     try {
@@ -134,6 +386,11 @@ export default function AdminDashboard() {
         const payoutsRes = await fetch('/api/admin/payouts/upcoming');
         const payoutsData = await payoutsRes.json();
         setPayoutObligations(payoutsData.payouts || []);
+        
+        // Also fetch paid payouts for history section
+        const paidRes = await fetch('/api/admin/payouts/paid?limit=10');
+        const paidData = await paidRes.json();
+        setPaidPayouts(paidData.payouts || []);
       } else if (activeTab === 'performance' || activeTab === 'overview') {
         const perfRes = await fetch('/api/admin/affiliates/performance');
         const perfData = await perfRes.json();
@@ -170,12 +427,9 @@ export default function AdminDashboard() {
       const data = await res.json();
       if (res.ok) {
         await fetchDashboardData(); // Refresh data - status will update automatically
-      } else {
-        alert(`Error: ${data.error}`);
       }
     } catch (err) {
       console.error('Error validating commission:', err);
-      alert('Failed to validate commission');
     } finally {
       setActionLoading(null);
     }
@@ -192,12 +446,9 @@ export default function AdminDashboard() {
       const data = await res.json();
       if (res.ok) {
         await fetchDashboardData(); // Refresh data
-      } else {
-        alert(`Error: ${data.error}`);
       }
     } catch (err) {
       console.error('Error approving commission:', err);
-      alert('Failed to approve commission');
     } finally {
       setActionLoading(null);
     }
@@ -214,13 +465,9 @@ export default function AdminDashboard() {
       });
       if (res.ok) {
         await fetchDashboardData(); // Refresh data
-      } else {
-        const data = await res.json();
-        alert(`Error: ${data.error}`);
       }
     } catch (err) {
       console.error('Error rejecting commission:', err);
-      alert('Failed to reject commission');
     } finally {
       setActionLoading(null);
     }
@@ -236,13 +483,9 @@ export default function AdminDashboard() {
       });
       if (res.ok) {
         await fetchDashboardData(); // Refresh data
-      } else {
-        const data = await res.json();
-        alert(`Error: ${data.error}`);
       }
     } catch (err) {
       console.error('Error resolving fraud flag:', err);
-      alert('Failed to resolve fraud flag');
     } finally {
       setActionLoading(null);
     }
@@ -254,7 +497,6 @@ export default function AdminDashboard() {
       window.open(url, '_blank');
     } catch (err) {
       console.error('Error exporting:', err);
-      alert('Failed to export commissions');
     }
   };
 
@@ -263,10 +505,54 @@ export default function AdminDashboard() {
     router.push('/login');
   };
 
+  const handleTestPayout = async () => {
+    const testEmail = 'jcrowe120485@gmail.com';
+    
+    if (!confirm(`Create a test payout for ${testEmail}?\n\nThis will:\n1. Find or create eligible commissions for this affiliate\n2. Process a PayPal payout\n\nContinue?`)) {
+      return;
+    }
+
+    setActionLoading('test-payout');
+    try {
+      const res = await fetch('/api/admin/payouts/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: testEmail,
+        }),
+      });
+
+      const data = await res.json();
+      
+      if (res.ok && data.success) {
+        await fetchDashboardData(); // Refresh data
+      } else {
+        let errorMessage = `Test Payout Failed: ${data.error || 'Failed to create test payout'}`;
+        
+        if (data.error_reason) {
+          errorMessage += `\n\nReason: ${data.error_reason}`;
+        }
+        
+        if (data.message) {
+          errorMessage += `\n\n${data.message}`;
+        }
+        
+        alert(errorMessage);
+      }
+    } catch (err: any) {
+      console.error('Error creating test payout:', err);
+      alert(`Test Payout Failed: Network error - ${err.message || 'Failed to connect to server'}`);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handlePayPayout = async () => {
     if (!selectedPayout) return;
 
     setActionLoading(selectedPayout.affiliate_id);
+    setProcessingPayment(true);
+    
     try {
       const commissionIds = selectedPayout.commissions.map(c => c.id);
       const res = await fetch('/api/admin/payouts/pay', {
@@ -280,19 +566,49 @@ export default function AdminDashboard() {
       });
 
       const data = await res.json();
-      if (res.ok) {
-        setShowPaymentModal(false);
-        setSelectedPayout(null);
-        setPayoutReference('');
-        await fetchDashboardData(); // Refresh data
+      
+      if (res.ok && data.success) {
+        // Show success message
+        const successMessage = data.paypal_batch_id 
+          ? `Payment sent successfully!\n\nPayPal Batch ID: ${data.paypal_batch_id}\nStatus: ${data.paypal_status || 'PENDING'}\nAmount: ${data.total_amount} ${data.currency}\nCommissions: ${data.paid_count || selectedPayout.commissions.length}`
+          : `Payout processed successfully!\n\nAmount: ${data.total_amount} ${data.currency}\nCommissions: ${data.paid_count || selectedPayout.commissions.length}`;
+        
+        setPaymentSuccess({
+          message: successMessage,
+          details: data,
+        });
+        
+        // Refresh data
+        await fetchDashboardData();
+        
+        // Close modal after 3 seconds
+        setTimeout(() => {
+          setShowPaymentModal(false);
+          setSelectedPayout(null);
+          setPayoutReference('');
+          setPaymentSuccess(null);
+        }, 3000);
       } else {
-        alert(`Error: ${data.error}`);
+        // Show detailed error message
+        let errorMessage = `Payment Failed: ${data.error || 'Failed to process payout'}`;
+        
+        // Show the specific error reason if available
+        if (data.error_reason) {
+          errorMessage += `\n\nReason: ${data.error_reason}`;
+        }
+        
+        if (data.message) {
+          errorMessage += `\n\n${data.message}`;
+        }
+        
+        alert(errorMessage);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error processing payout:', err);
-      alert('Failed to process payout');
+      alert(`Payment Failed: Network error - ${err.message || 'Failed to connect to server'}`);
     } finally {
       setActionLoading(null);
+      setProcessingPayment(false);
     }
   };
 
@@ -516,7 +832,7 @@ export default function AdminDashboard() {
               {activeTab === 'pending' && 'Pending Approvals'}
               {activeTab === 'fraud' && 'Fraud Queue'}
               {activeTab === 'payouts' && 'Upcoming Payouts'}
-              {activeTab === 'performance' && 'Performance Reports'}
+              {activeTab === 'performance' && 'Reports'}
               {activeTab === 'affiliates' && 'Affiliates'}
               {activeTab === 'offers' && 'Offers'}
               {activeTab === 'conversions' && 'Conversions'}
@@ -529,9 +845,9 @@ export default function AdminDashboard() {
         </div>
 
         <div className="p-4 sm:p-6">
-        {/* Overview Tab */}
-        {activeTab === 'overview' && (
-          <div className="space-y-8">
+          {/* Overview Tab */}
+          {activeTab === 'overview' && (
+            <div className="space-y-8">
             {/* Performance Graph */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
               <div className="mb-6">
@@ -736,10 +1052,10 @@ export default function AdminDashboard() {
               </div>
             </div>
           </div>
-        )}
+          )}
 
-        {/* Pending Approvals Tab */}
-        {activeTab === 'pending' && (
+          {/* Pending Approvals Tab */}
+          {activeTab === 'pending' && (
           <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
             <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex justify-between items-center">
               <div>
@@ -836,10 +1152,10 @@ export default function AdminDashboard() {
               </div>
             )}
           </div>
-        )}
+          )}
 
-        {/* Fraud Queue Tab */}
-        {activeTab === 'fraud' && (
+          {/* Fraud Queue Tab */}
+          {activeTab === 'fraud' && (
           <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
             <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-red-50 to-white">
               <h2 className="text-2xl font-bold text-gray-900">Fraud Queue</h2>
@@ -911,11 +1227,35 @@ export default function AdminDashboard() {
               </div>
             )}
           </div>
-        )}
+          )}
 
-        {/* Upcoming Payouts Tab */}
-        {activeTab === 'payouts' && (
+          {/* Upcoming Payouts Tab */}
+          {activeTab === 'payouts' && (
           <div className="space-y-6">
+            {/* Test Payout Button */}
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-yellow-900">Test Payout</h3>
+                  <p className="text-xs text-yellow-700 mt-1">Create a test payout for jcrowe120485@gmail.com</p>
+                </div>
+                <button
+                  onClick={handleTestPayout}
+                  disabled={actionLoading === 'test-payout'}
+                  className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors flex items-center gap-2"
+                >
+                  {actionLoading === 'test-payout' ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                      <span>Creating Test Payout...</span>
+                    </>
+                  ) : (
+                    'Create Test Payout'
+                  )}
+                </button>
+              </div>
+            </div>
+
             {loading ? (
               <div className="bg-white rounded-xl shadow-lg p-12 text-center border border-gray-200">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-green-600 mb-4"></div>
@@ -985,6 +1325,69 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               ))
+            )}
+
+            {/* Recent Paid Payouts Section */}
+            {paidPayouts.length > 0 && (
+              <div className="mt-8">
+                <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
+                  <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-white">
+                    <h2 className="text-2xl font-bold text-gray-900">Recent Paid Payouts</h2>
+                    <p className="text-sm text-gray-600 mt-1">Payment history for completed payouts</p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Affiliate</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Commissions</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PayPal Status</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reference</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {paidPayouts.map((payout) => (
+                          <tr key={payout.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {formatDate(payout.created_at)}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm font-medium text-gray-900">{payout.affiliate_name}</div>
+                              <div className="text-sm text-gray-500">{payout.affiliate_email}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-green-700">
+                              {formatCurrency(payout.total_amount, payout.currency)}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {payout.commission_count}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              {payout.paypal_batch_id ? (
+                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                  payout.paypal_status === 'SUCCESS' ? 'bg-green-100 text-green-800' :
+                                  payout.paypal_status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                                  'bg-red-100 text-red-800'
+                                }`}>
+                                  {payout.paypal_status || 'PENDING'}
+                                </span>
+                              ) : (
+                                <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                  Manual
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {payout.payout_reference || payout.paypal_batch_id || '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
             )}
 
             {/* Payment Confirmation Modal */}
@@ -1079,32 +1482,115 @@ export default function AdminDashboard() {
                         setShowPaymentModal(false);
                         setSelectedPayout(null);
                         setPayoutReference('');
+                        setProcessingPayment(false);
+                        setPaymentSuccess(null);
                       }}
-                      className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                      disabled={processingPayment || !!paymentSuccess}
+                      className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Cancel
+                      {paymentSuccess ? 'Close' : 'Cancel'}
                     </button>
                     <button
                       onClick={handlePayPayout}
-                      disabled={actionLoading === selectedPayout.affiliate_id}
-                      className="px-6 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-all"
+                      disabled={processingPayment || actionLoading === selectedPayout.affiliate_id}
+                      className="px-6 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-all flex items-center gap-2"
                     >
-                      {actionLoading === selectedPayout.affiliate_id ? 'Processing...' : 'Confirm & Pay'}
+                      {processingPayment ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                          <span>Sending Payment to PayPal...</span>
+                        </>
+                      ) : (
+                        'Confirm & Pay'
+                      )}
                     </button>
                   </div>
+                  
+                  {processingPayment && !paymentSuccess && (
+                    <div className="px-6 py-3 bg-blue-50 border-t border-blue-200">
+                      <div className="flex items-center gap-2 text-blue-700">
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent"></div>
+                        <span className="text-sm font-medium">Processing payment through PayPal...</span>
+                      </div>
+                      <p className="text-xs text-blue-600 mt-1 ml-6">Please wait, this may take a few seconds.</p>
+                    </div>
+                  )}
+                  
+                  {paymentSuccess && (
+                    <div className="px-6 py-4 bg-green-50 border-t border-green-200">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0">
+                          <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="text-sm font-semibold text-green-900 mb-1">Payment Successful!</h4>
+                          <div className="text-sm text-green-800 whitespace-pre-line">
+                            {paymentSuccess.message}
+                          </div>
+                          {paymentSuccess.details?.paypal_batch_id && (
+                            <p className="text-xs text-green-700 mt-2">
+                              Check PayPal Dashboard to verify the transaction.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
           </div>
-        )}
+          )}
 
-        {/* Affiliate Performance Tab */}
-        {activeTab === 'performance' && (
-          <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
-            <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-white">
-              <h2 className="text-2xl font-bold text-gray-900">Affiliate Performance Ranking</h2>
-              <p className="text-sm text-gray-500 mt-1">Top performing affiliates by total commission earned</p>
+          {/* Reports Tab (Performance & Payout Reports) */}
+          {activeTab === 'performance' && (
+          <div className="space-y-6">
+            {/* Sub-tab Navigation */}
+            <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-4">
+              <div className="flex gap-2 border-b border-gray-200 pb-4">
+                <button
+                  onClick={() => setReportSubTab('performance')}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    reportSubTab === 'performance'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Performance Ranking
+                </button>
+                <button
+                  onClick={() => {
+                    setReportSubTab('payouts');
+                    // Fetch affiliates for filter dropdown when switching to payout reports
+                    if (affiliates.length === 0) {
+                      fetch('/api/admin/affiliates')
+                        .then(res => res.json())
+                        .then(data => {
+                          setAffiliates(data.affiliates || []);
+                        })
+                        .catch(err => console.error('Error fetching affiliates:', err));
+                    }
+                  }}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    reportSubTab === 'payouts'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Payout Reports
+                </button>
+              </div>
             </div>
+
+            {/* Performance Ranking Sub-tab */}
+            {reportSubTab === 'performance' && (
+              <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
+                <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-white">
+                  <h2 className="text-2xl font-bold text-gray-900">Affiliate Performance Ranking</h2>
+                  <p className="text-sm text-gray-500 mt-1">Top performing affiliates by total commission earned</p>
+                </div>
             {loading ? (
               <div className="p-12 text-center">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-blue-600 mb-4"></div>
@@ -1160,42 +1646,57 @@ export default function AdminDashboard() {
                 </table>
               </div>
             )}
+              </div>
+            )}
+
+            {/* Payout Reports Sub-tab */}
+            {reportSubTab === 'payouts' && (
+              <PayoutReportsSectionComponent
+                reportData={reportData}
+                setReportData={setReportData}
+                filters={reportFilters}
+                setFilters={setReportFilters}
+                affiliates={affiliates}
+                formatCurrency={formatCurrency}
+                formatDate={formatDate}
+              />
+            )}
           </div>
-        )}
+          )}
 
-        {/* Affiliates Tab */}
-        {activeTab === 'affiliates' && (
-          <AffiliateManagement />
-        )}
+          {/* Affiliates Tab */}
+          {activeTab === 'affiliates' && (
+            <AffiliateManagement />
+          )}
 
-        {activeTab === 'offers' && (
-          <OffersManagement />
-        )}
+          {activeTab === 'offers' && (
+            <OffersManagement />
+          )}
 
-        {/* Payout Runs Tab */}
-        {activeTab === 'payout-runs' && (
-          <PayoutRuns />
-        )}
+          {/* Payout Runs Tab */}
+          {activeTab === 'payout-runs' && (
+            <PayoutRuns />
+          )}
 
-        {/* Conversions Tab */}
-        {activeTab === 'conversions' && (
-          <Conversions />
-        )}
+          {/* Conversions Tab */}
+          {activeTab === 'conversions' && (
+            <Conversions />
+          )}
 
-        {/* Pixel Test Tab */}
-        {activeTab === 'pixel-test' && (
-          <PixelTest />
-        )}
+          {/* Pixel Test Tab */}
+          {activeTab === 'pixel-test' && (
+            <PixelTest />
+          )}
 
-        {/* Webhooks Tab */}
-        {activeTab === 'webhooks' && (
-          <WebhookManager />
-        )}
+          {/* Webhooks Tab */}
+          {activeTab === 'webhooks' && (
+            <WebhookManager />
+          )}
 
-        {/* Analytics Tab */}
-        {activeTab === 'analytics' && (
-          <Analytics />
-        )}
+          {/* Analytics Tab */}
+          {activeTab === 'analytics' && (
+            <Analytics />
+          )}
         </div>
       </main>
     </div>

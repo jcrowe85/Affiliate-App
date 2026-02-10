@@ -178,9 +178,6 @@ export async function PATCH(
 
     // If recalculate_eligible_dates is true and payout_terms_days is being updated, recalculate eligible dates
     if (recalculate_eligible_dates && payout_terms_days !== undefined && payout_terms_days !== affiliate.payout_terms_days) {
-      console.log(`[Affiliate Update] Recalculating eligible dates for affiliate ${params.id}`);
-      console.log(`[Affiliate Update] Old payout terms: ${affiliate.payout_terms_days}, New: ${payout_terms_days}`);
-      
       // Get all commissions that need eligible date recalculation
       // Only recalculate for pending, eligible, and approved commissions (not paid or reversed)
       const commissionsToUpdate = await prisma.commission.findMany({
@@ -197,12 +194,8 @@ export async function PATCH(
         },
       });
 
-      console.log(`[Affiliate Update] Found ${commissionsToUpdate.length} commissions to recalculate`);
-
       // Recalculate eligible_date for each commission: created_at + new payout_terms_days
-      let updatedCount = 0;
       for (const commission of commissionsToUpdate) {
-        const oldEligibleDate = commission.eligible_date;
         const newEligibleDate = new Date(commission.created_at);
         newEligibleDate.setDate(newEligibleDate.getDate() + payout_terms_days);
 
@@ -212,12 +205,7 @@ export async function PATCH(
             eligible_date: newEligibleDate,
           },
         });
-
-        updatedCount++;
-        console.log(`[Affiliate Update] Commission ${commission.id}: ${oldEligibleDate.toISOString()} -> ${newEligibleDate.toISOString()}`);
       }
-
-      console.log(`[Affiliate Update] Successfully recalculated ${updatedCount} commission eligible dates`);
     }
 
     // Check if there's any data to update

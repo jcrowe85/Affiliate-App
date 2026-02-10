@@ -46,6 +46,18 @@ export function middleware(request: NextRequest) {
     }
   }
 
+  // Protect affiliate routes (everything under /affiliate except login)
+  if (pathname.startsWith('/affiliate') && !pathname.startsWith('/affiliate/login')) {
+    const sessionToken = request.cookies.get('affiliate_session')?.value;
+
+    // If no session, redirect to affiliate login
+    if (!sessionToken) {
+      const loginUrl = new URL('/affiliate/login', request.url);
+      loginUrl.searchParams.set('redirect', pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+  }
+
   return NextResponse.next();
 }
 

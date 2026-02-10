@@ -21,6 +21,7 @@
     "test:shopify-api": "node scripts/test-shopify-api-credentials.js"
   },
   "dependencies": {
+    "@paypal/payouts-sdk": "^1.1.1",
     "@prisma/client": "^5.19.1",
     "@shopify/polaris": "^13.1.0",
     "@shopify/polaris-icons": "^8.0.0",

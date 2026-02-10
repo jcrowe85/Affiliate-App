@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 
 interface AnalyticsMetrics {
   total_visitors: number;
@@ -17,9 +17,6 @@ interface ActiveVisitor {
   device: string;
   location: string;
   lastSeen: number;
-  affiliate_id?: string;
-  affiliate_number?: number | null;
-  affiliate_name?: string;
 }
 
 interface PageData {
@@ -55,27 +52,6 @@ interface GeographyData {
   percentage: number;
 }
 
-interface ActiveVisitorInfo {
-  session_id: string;
-  currentPage: string;
-  device: string;
-  location: string;
-  lastSeen: number;
-  url_params?: Record<string, string>;
-}
-
-interface AffiliateData {
-  affiliate_id: string;
-  affiliate_number: number | null;
-  affiliate_name: string;
-  sessions: number;
-  visitors: number;
-  page_views: number;
-  bounce_rate: number;
-  avg_session_time: number;
-  active_visitors?: ActiveVisitorInfo[];
-}
-
 interface AnalyticsData {
   metrics: AnalyticsMetrics;
   activeVisitors: ActiveVisitor[];
@@ -86,89 +62,49 @@ interface AnalyticsData {
   devices: DeviceData[];
   browsers: BrowserData[];
   geography: GeographyData[];
-  affiliates: AffiliateData[];
 }
 
 export default function Analytics() {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState('24h');
-  const [viewMode, setViewMode] = useState<'realtime' | 'historical'>('realtime');
   const [refreshInterval, setRefreshInterval] = useState(10); // seconds
-
-  // Detect if we're in affiliate mode (check if we're on affiliate route)
-  const isAffiliateMode = typeof window !== 'undefined' && window.location.pathname.startsWith('/affiliate');
-  const apiEndpoint = isAffiliateMode ? '/api/affiliate/analytics' : '/api/analytics/stats';
 
   const fetchAnalytics = useCallback(async () => {
     try {
-      const response = await fetch(`${apiEndpoint}?timeRange=${timeRange}&viewMode=${viewMode}`);
+      const response = await fetch(`/api/analytics/stats?timeRange=${timeRange}`);
       if (response.status === 401) {
-        window.location.href = isAffiliateMode ? '/affiliate/login' : '/login';
-        return;
-      }
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Failed to fetch analytics' }));
-        console.error('Analytics API error:', errorData);
-        setLoading(false);
+        window.location.href = '/login';
         return;
       }
       const analyticsData = await response.json();
-      // Validate that the response has the expected structure
-      if (analyticsData.error) {
-        console.error('Analytics API returned error:', analyticsData.error);
-        setLoading(false);
-        return;
-      }
-      // Ensure metrics exist with default values if missing
-      if (!analyticsData.metrics) {
-        analyticsData.metrics = {
-          total_visitors: 0,
-          unique_visitors: 0,
-          sessions: 0,
-          bounce_rate: 0,
-          avg_session_time: 0,
-          pages_per_session: 0,
-        };
-      }
       setData(analyticsData);
       setLoading(false);
     } catch (error) {
       console.error('Error fetching analytics:', error);
       setLoading(false);
     }
-  }, [timeRange, viewMode, apiEndpoint, isAffiliateMode]);
+  }, [timeRange]);
 
   // Set up Server-Sent Events for real-time updates
   useEffect(() => {
     // Initial fetch
     fetchAnalytics();
 
-    // For affiliate mode, just use polling (no SSE)
-    if (isAffiliateMode) {
-      const interval = viewMode === 'realtime' 
-        ? setInterval(fetchAnalytics, refreshInterval * 1000)
-        : null;
-
-      return () => {
-        if (interval) clearInterval(interval);
-      };
-    }
-
-    // Admin mode: use SSE
+    // Set up SSE connection for real-time updates
     const eventSource = new EventSource('/api/analytics/stream');
     
     eventSource.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
         if (message.type === 'update' && message.data) {
-          // Only update in real-time mode (SSE doesn't make sense for historical)
-          if (viewMode === 'realtime' && message.data.affiliates) {
+          // Update active visitors in real-time
+          if (message.data.activeVisitors) {
             setData(prevData => {
               if (!prevData) return prevData;
               return {
                 ...prevData,
-                affiliates: message.data.affiliates,
+                activeVisitors: message.data.activeVisitors,
                 metrics: {
                   ...prevData.metrics,
                   ...message.data.metrics,
@@ -195,16 +131,13 @@ export default function Analytics() {
     };
 
     // Fallback polling for time range changes (SSE only updates active visitors)
-    // Only poll in real-time mode
-    const interval = viewMode === 'realtime' 
-      ? setInterval(fetchAnalytics, refreshInterval * 1000)
-      : null;
+    const interval = setInterval(fetchAnalytics, refreshInterval * 1000);
 
     return () => {
-      if (eventSource) eventSource.close();
-      if (interval) clearInterval(interval);
+      eventSource.close();
+      clearInterval(interval);
     };
-  }, [fetchAnalytics, refreshInterval, viewMode, isAffiliateMode]);
+  }, [fetchAnalytics, refreshInterval]);
 
   const formatTime = (seconds: number) => {
     if (seconds < 60) return `${Math.round(seconds)}s`;
@@ -238,62 +171,26 @@ export default function Analytics() {
   return (
     <div className="space-y-6">
       {/* Controls */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-4">
-            <label className="text-sm font-medium text-gray-700">View Mode:</label>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setViewMode('realtime')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  viewMode === 'realtime'
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                Real-Time
-              </button>
-              <button
-                onClick={() => setViewMode('historical')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  viewMode === 'historical'
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                Historical
-              </button>
-            </div>
-            {viewMode === 'historical' && (
-              <>
-                <label className="text-sm font-medium text-gray-700 ml-4">Time Range:</label>
-                <select
-                  value={timeRange}
-                  onChange={(e) => setTimeRange(e.target.value)}
-                  className="border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="1h">Last Hour</option>
-                  <option value="24h">Last 24 Hours</option>
-                  <option value="7d">Last 7 Days</option>
-                  <option value="30d">Last 30 Days</option>
-                </select>
-              </>
-            )}
-          </div>
-          <button
-            onClick={fetchAnalytics}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium"
-          >
-            Refresh
-          </button>
-        </div>
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-600">
-            {viewMode === 'realtime' 
-              ? '📊 Showing visitors currently active (updated in last 5 minutes)' 
-              : `📊 Showing all sessions from ${timeRange === '1h' ? 'the last hour' : timeRange === '24h' ? 'the last 24 hours' : timeRange === '7d' ? 'the last 7 days' : 'the last 30 days'}`}
-          </span>
+          <label className="text-sm font-medium text-gray-700">Time Range:</label>
+          <select
+            value={timeRange}
+            onChange={(e) => setTimeRange(e.target.value)}
+            className="border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="1h">Last Hour</option>
+            <option value="24h">Last 24 Hours</option>
+            <option value="7d">Last 7 Days</option>
+            <option value="30d">Last 30 Days</option>
+          </select>
         </div>
+        <button
+          onClick={fetchAnalytics}
+          className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium"
+        >
+          Refresh
+        </button>
       </div>
 
       {/* Key Metrics */}
@@ -301,139 +198,66 @@ export default function Analytics() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <div className="text-sm text-gray-600 mb-1">Total Visitors</div>
           <div className="text-2xl font-bold text-gray-900">
-            {data?.metrics?.total_visitors?.toLocaleString() || '0'}
+            {data?.metrics.total_visitors.toLocaleString() || '0'}
           </div>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <div className="text-sm text-gray-600 mb-1">Unique Visitors</div>
           <div className="text-2xl font-bold text-gray-900">
-            {data?.metrics?.unique_visitors?.toLocaleString() || '0'}
+            {data?.metrics.unique_visitors.toLocaleString() || '0'}
           </div>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <div className="text-sm text-gray-600 mb-1">Bounce Rate</div>
           <div className="text-2xl font-bold text-gray-900">
-            {data?.metrics?.bounce_rate?.toFixed(1) || '0.0'}%
+            {data?.metrics.bounce_rate.toFixed(1)}%
           </div>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <div className="text-sm text-gray-600 mb-1">Avg Session Time</div>
           <div className="text-2xl font-bold text-gray-900">
-            {data?.metrics ? formatTime(data.metrics.avg_session_time || 0) : '0s'}
+            {data ? formatTime(data.metrics.avg_session_time) : '0s'}
           </div>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <div className="text-sm text-gray-600 mb-1">Pages/Session</div>
           <div className="text-2xl font-bold text-gray-900">
-            {data?.metrics?.pages_per_session?.toFixed(1) || '0.0'}
+            {data?.metrics.pages_per_session.toFixed(1) || '0'}
           </div>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <div className="text-sm text-gray-600 mb-1">Active Now</div>
           <div className="text-2xl font-bold text-indigo-600">
-            {data?.affiliates?.reduce((sum, aff) => sum + (aff.active_visitors?.length || 0), 0) || 0}
+            {data?.activeVisitors.length || 0}
           </div>
         </div>
       </div>
 
-      {/* Affiliate Sessions - Individual Sections */}
-      {data?.affiliates && data.affiliates.length > 0 ? (
-        data.affiliates.map((affiliate, idx) => (
-          <div key={idx} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            {/* Affiliate Header */}
-            <div className="mb-6 pb-4 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-xl font-semibold text-gray-900">
-                    {affiliate.affiliate_name}
-                    {affiliate.affiliate_number && (
-                      <span className="ml-2 text-base font-normal text-gray-500">#{affiliate.affiliate_number}</span>
-                    )}
-                  </h3>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {viewMode === 'realtime' 
-                      ? '👁️ Currently active visitors (updated in last 5 minutes)' 
-                      : `📈 Historical data (${timeRange === '1h' ? 'last hour' : timeRange === '24h' ? 'last 24 hours' : timeRange === '7d' ? 'last 7 days' : 'last 30 days'})`}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Metrics Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-              <div className="bg-gray-50 rounded-lg p-4">
-                <div className="text-xs font-medium text-gray-600 mb-1">Sessions</div>
-                <div className="text-2xl font-bold text-gray-900">{affiliate.sessions}</div>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-4">
-                <div className="text-xs font-medium text-gray-600 mb-1">Visitors</div>
-                <div className="text-2xl font-bold text-gray-900">{affiliate.visitors}</div>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-4">
-                <div className="text-xs font-medium text-gray-600 mb-1">Page Views</div>
-                <div className="text-2xl font-bold text-gray-900">{affiliate.page_views}</div>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-4">
-                <div className="text-xs font-medium text-gray-600 mb-1">Bounce Rate</div>
-                <div className="text-2xl font-bold text-gray-900">{affiliate.bounce_rate.toFixed(1)}%</div>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-4">
-                <div className="text-xs font-medium text-gray-600 mb-1">Avg Session</div>
-                <div className="text-2xl font-bold text-gray-900">{formatTime(affiliate.avg_session_time)}</div>
-              </div>
-            </div>
-
-            {/* Active Pages */}
-            {affiliate.active_visitors && affiliate.active_visitors.length > 0 ? (
-              <div>
-                <h4 className="text-sm font-semibold text-gray-700 mb-3">Active Pages ({affiliate.active_visitors.length})</h4>
-                <div className="space-y-3">
-                  {affiliate.active_visitors.map((visitor, vIdx) => (
-                    <div key={vIdx} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-3">
-                          <span className="font-medium text-gray-900">{visitor.currentPage}</span>
-                          <span className="text-xs text-gray-500">•</span>
-                          <span className="text-xs text-gray-500">{visitor.device}</span>
-                          <span className="text-xs text-gray-500">•</span>
-                          <span className="text-xs text-gray-500">{visitor.location}</span>
-                        </div>
-                        <span className="text-xs text-gray-500">{formatTimeAgo(visitor.lastSeen)}</span>
-                      </div>
-                      {visitor.url_params && Object.keys(visitor.url_params).length > 0 && (
-                        <div className="pt-3 border-t border-gray-200">
-                          <div className="text-xs font-medium text-gray-600 mb-2">URL Parameters:</div>
-                          <div className="flex flex-wrap gap-2">
-                            {Object.entries(visitor.url_params).map(([key, value]) => (
-                              <div key={key} className="inline-flex items-center gap-1 px-2 py-1 bg-white rounded text-xs border border-gray-200">
-                                <span className="font-medium text-gray-700">{key}:</span>
-                                <span className="text-gray-600">{value}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500 text-sm">
-                No active pages for this affiliate
-              </div>
-            )}
-          </div>
-        ))
-      ) : (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-          <p className="text-gray-500">
-            {viewMode === 'realtime' 
-              ? 'No visitors currently active (no activity in last 5 minutes)' 
-              : `No historical sessions found for ${timeRange === '1h' ? 'the last hour' : timeRange === '24h' ? 'the last 24 hours' : timeRange === '7d' ? 'the last 7 days' : 'the last 30 days'}`}
-          </p>
+      {/* Active Visitors */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900">Active Visitors</h3>
         </div>
-      )}
-
+        <div className="divide-y divide-gray-200">
+          {data?.activeVisitors.length ? (
+            data.activeVisitors.map((visitor, idx) => (
+              <div key={idx} className="px-6 py-4 hover:bg-gray-50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-medium text-gray-900">{visitor.currentPage}</div>
+                    <div className="text-sm text-gray-500 mt-1">
+                      {visitor.device} • {visitor.location}
+                    </div>
+                  </div>
+                  <div className="text-sm text-gray-500">{formatTimeAgo(visitor.lastSeen)}</div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="px-6 py-8 text-center text-gray-500">No active visitors</div>
+          )}
+        </div>
+      </div>
 
       {/* Two Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

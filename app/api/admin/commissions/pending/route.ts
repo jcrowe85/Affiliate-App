@@ -2,12 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getCurrentAdmin } from '@/lib/auth';
 
-// Mark route as dynamic to prevent static analysis during build
 export const dynamic = 'force-dynamic';
 
-/**
- * Get pending commission approvals
- */
 export async function GET(request: NextRequest) {
   try {
     const admin = await getCurrentAdmin();
@@ -15,16 +11,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const searchParams = request.nextUrl.searchParams;
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '20');
-    const skip = (page - 1) * limit;
-
-    // Get both pending (needs validation) and eligible (needs approval) commissions
+    // Fetch commissions with status 'pending' or 'eligible' for admin review
     const commissions = await prisma.commission.findMany({
       where: {
         shopify_shop_id: admin.shopify_shop_id,
-        status: { in: ['pending', 'eligible'] }, // Both pending validation and eligible for approval
+        status: { in: ['pending', 'eligible'] },
       },
       include: {
         affiliate: {
@@ -43,33 +34,30 @@ export async function GET(request: NextRequest) {
           where: {
             resolved: false,
           },
+          select: {
+            id: true,
+            flag_type: true,
+            score: true,
+            reason: true,
+          },
         },
       },
       orderBy: {
-        eligible_date: 'asc',
-      },
-      skip,
-      take: limit,
-    });
-
-    const total = await prisma.commission.count({
-      where: {
-        shopify_shop_id: admin.shopify_shop_id,
-        status: { in: ['pending', 'eligible'] },
+        created_at: 'desc',
       },
     });
 
     return NextResponse.json({
       commissions: commissions.map(c => ({
         id: c.id,
-        status: c.status, // Include status to distinguish pending vs eligible
+        status: c.status,
         affiliate_name: c.affiliate.name,
         affiliate_email: c.affiliate.email,
-        order_number: c.order_attribution.shopify_order_number,
+        order_number: c.order_attribution?.shopify_order_number || c.shopify_order_id,
         amount: c.amount.toString(),
         currency: c.currency,
-        eligible_date: c.eligible_date,
-        created_at: c.created_at,
+        eligible_date: c.eligible_date.toISOString(),
+        created_at: c.created_at.toISOString(),
         has_fraud_flags: c.fraud_flags.length > 0,
         fraud_flags: c.fraud_flags.map(f => ({
           type: f.flag_type,
@@ -77,12 +65,6 @@ export async function GET(request: NextRequest) {
           reason: f.reason,
         })),
       })),
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
     });
   } catch (error: any) {
     console.error('Error fetching pending commissions:', error);

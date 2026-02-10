@@ -2,12 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getCurrentAdmin } from '@/lib/auth';
 
-// Mark route as dynamic to prevent static analysis during build
 export const dynamic = 'force-dynamic';
 
-/**
- * Get upcoming payout obligations (grouped by affiliate)
- */
 export async function GET(request: NextRequest) {
   try {
     const admin = await getCurrentAdmin();
@@ -21,9 +17,6 @@ export async function GET(request: NextRequest) {
     // Get eligible/approved commissions (ready for payout)
     // Also include pending commissions that are past their eligible_date (they should be validated)
     const now = date ? new Date(date) : new Date();
-    
-    console.log(`[Upcoming Payouts] Fetching commissions ready for payout (eligible_date <= ${now.toISOString()})`);
-    
     const eligibleCommissions = await prisma.commission.findMany({
       where: {
         shopify_shop_id: admin.shopify_shop_id,
@@ -40,6 +33,7 @@ export async function GET(request: NextRequest) {
             email: true,
             payout_method: true,
             payout_identifier: true,
+            paypal_email: true, // Include paypal_email for display
           },
         },
         order_attribution: {
@@ -53,17 +47,6 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    console.log(`[Upcoming Payouts] Found ${eligibleCommissions.length} commissions ready for payout`);
-    if (eligibleCommissions.length > 0) {
-      console.log(`[Upcoming Payouts] Sample commission:`, {
-        id: eligibleCommissions[0].id,
-        affiliate_id: eligibleCommissions[0].affiliate_id,
-        status: eligibleCommissions[0].status,
-        eligible_date: eligibleCommissions[0].eligible_date.toISOString(),
-        amount: eligibleCommissions[0].amount.toString(),
-      });
-    }
-
     // Group by affiliate
     const payoutByAffiliate = eligibleCommissions.reduce((acc, commission) => {
       const affiliateId = commission.affiliate_id;
@@ -72,8 +55,8 @@ export async function GET(request: NextRequest) {
           affiliate_id: affiliateId,
           affiliate_name: commission.affiliate.name,
           affiliate_email: commission.affiliate.email,
-          payout_method: commission.affiliate.payout_method,
-          payout_identifier: commission.affiliate.payout_identifier,
+          payout_method: commission.affiliate.payout_method || (commission.affiliate.paypal_email ? 'PayPal' : 'Manual'),
+          payout_identifier: commission.affiliate.payout_identifier || commission.affiliate.paypal_email || null,
           total_amount: 0,
           currency: commission.currency,
           commission_count: 0,
