@@ -316,6 +316,32 @@ export default function AffiliateManagement() {
       
       if (res.ok) {
         console.log('[Affiliate Form] ✅ Update successful');
+        
+        // Test the password immediately after update
+        if (formData.password && formData.password.trim().length > 0) {
+          console.log('[Affiliate Form] Testing password after update...');
+          try {
+            const testRes = await fetch('/api/admin/affiliates/' + editingAffiliate.id + '/test-password', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                affiliateId: editingAffiliate.id,
+                testPassword: formData.password.trim(),
+              }),
+            });
+            const testData = await testRes.json();
+            console.log('[Affiliate Form] Password test result:', testData);
+            if (!testData.verification_result) {
+              console.error('[Affiliate Form] ⚠️ WARNING: Password verification failed after update!');
+              alert('⚠️ Password was updated but verification test failed. Please check server logs.');
+            } else {
+              console.log('[Affiliate Form] ✅ Password verification test passed!');
+            }
+          } catch (testErr) {
+            console.error('[Affiliate Form] Error testing password:', testErr);
+          }
+        }
+        
         await fetchAffiliates();
         setShowForm(false);
         resetForm();
