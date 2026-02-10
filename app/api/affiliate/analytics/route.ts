@@ -104,16 +104,153 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => b.views - a.views)
       .slice(0, 10);
 
+    // Get entry pages (first page in each session)
+    const entryPagesMap = new Map<string, number>();
+    sessionsList.forEach(session => {
+      if (session.pages_visited.length > 0) {
+        const entryPage = session.pages_visited[0];
+        entryPagesMap.set(entryPage, (entryPagesMap.get(entryPage) || 0) + 1);
+      }
+    });
+
+    const entryPages = Array.from(entryPagesMap.entries())
+      .map(([path, entries]) => ({
+        path,
+        url: path,
+        entries,
+      }))
+      .sort((a, b) => b.entries - a.entries)
+      .slice(0, 10);
+
+    // Get exit pages (last page in each session)
+    const exitPagesMap = new Map<string, number>();
+    sessionsList.forEach(session => {
+      if (session.pages_visited.length > 0) {
+        const exitPage = session.pages_visited[session.pages_visited.length - 1];
+        exitPagesMap.set(exitPage, (exitPagesMap.get(exitPage) || 0) + 1);
+      }
+    });
+
+    const exitPages = Array.from(exitPagesMap.entries())
+      .map(([path, exits]) => ({
+        path,
+        url: path,
+        exits,
+      }))
+      .sort((a, b) => b.exits - a.exits)
+      .slice(0, 10);
+
+    // Get traffic sources (from referrer or URL params)
+    const trafficSourcesMap = new Map<string, number>();
+    sessionsList.forEach(session => {
+      let source = 'Direct';
+      if (session.referrer_domain) {
+        source = session.referrer_domain;
+      } else if (session.referrer_url) {
+        try {
+          source = new URL(session.referrer_url).hostname;
+        } catch {
+          source = 'Direct';
+        }
+      }
+      trafficSourcesMap.set(source, (trafficSourcesMap.get(source) || 0) + 1);
+    });
+
+    const totalTraffic = Array.from(trafficSourcesMap.values()).reduce((a, b) => a + b, 0);
+    const trafficSources = Array.from(trafficSourcesMap.entries())
+      .map(([source, visitors]) => ({
+        source,
+        visitors,
+        percentage: totalTraffic > 0 ? (visitors / totalTraffic) * 100 : 0,
+      }))
+      .sort((a, b) => b.visitors - a.visitors);
+
+    // Get devices
+    const devicesMap = new Map<string, number>();
+    sessionsList.forEach(session => {
+      const device = session.device_type || 'Unknown';
+      devicesMap.set(device, (devicesMap.get(device) || 0) + 1);
+    });
+
+    const totalDevices = Array.from(devicesMap.values()).reduce((a, b) => a + b, 0);
+    const devices = Array.from(devicesMap.entries())
+      .map(([type, count]) => ({
+        type,
+        count,
+        percentage: totalDevices > 0 ? (count / totalDevices) * 100 : 0,
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    // Get browsers (from user agent)
+    const browsersMap = new Map<string, number>();
+    sessionsList.forEach(session => {
+      if (session.user_agent) {
+        let browser = 'Unknown';
+        if (session.user_agent.includes('Chrome')) browser = 'Chrome';
+        else if (session.user_agent.includes('Safari') && !session.user_agent.includes('Chrome')) browser = 'Safari';
+        else if (session.user_agent.includes('Firefox')) browser = 'Firefox';
+        else if (session.user_agent.includes('Edge')) browser = 'Edge';
+        else if (session.user_agent.includes('Opera')) browser = 'Opera';
+        
+        browsersMap.set(browser, (browsersMap.get(browser) || 0) + 1);
+      }
+    });
+
+    const totalBrowsers = Array.from(browsersMap.values()).reduce((a, b) => a + b, 0);
+    const browsers = Array.from(browsersMap.entries())
+      .map(([name, count]) => ({
+        name,
+        count,
+        percentage: totalBrowsers > 0 ? (count / totalBrowsers) * 100 : 0,
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    // Get geography
+    const geographyMap = new Map<string, number>();
+    sessionsList.forEach(session => {
+      const country = session.location_country || 'Unknown';
+      geographyMap.set(country, (geographyMap.get(country) || 0) + 1);
+    });
+
+    const totalGeo = Array.from(geographyMap.values()).reduce((a, b) => a + b, 0);
+    const geography = Array.from(geographyMap.entries())
+      .map(([country, visitors]) => ({
+        country,
+        visitors,
+        percentage: totalGeo > 0 ? (visitors / totalGeo) * 100 : 0,
+      }))
+      .sort((a, b) => b.visitors - a.visitors)
+      .slice(0, 10);
+
     // Format active visitors
     const activeVisitors = sessionsList
       .filter(s => viewMode === 'realtime' || (Date.now() - Number(s.updated_at.getTime()) < 5 * 60 * 1000))
-      .map(session => ({
-        session_id: session.session_id,
-        currentPage: session.pages_visited[session.pages_visited.length - 1] || '/',
-        device: session.device_type || 'Unknown',
-        location: session.location_country || 'Unknown',
-        lastSeen: Number(session.updated_at.getTime()),
-      }));
+      .map(session => {
+        const urlParams = (session.url_params as Record<string, string>) || {};
+        return {
+          session_id: session.session_id,
+          currentPage: session.pages_visited[session.pages_visited.length - 1] || '/',
+          device: session.device_type || 'Unknown',
+          location: session.location_country || 'Unknown',
+          lastSeen: Number(session.updated_at.getTime()),
+          url_params: urlParams,
+        };
+      });
+
+    // Format as affiliates array (single affiliate for affiliate view)
+    const affiliateName = affiliate.name || `Affiliate #${affiliate.affiliate_number || 'N/A'}`;
+
+    const affiliates = [{
+      affiliate_id: affiliate.id,
+      affiliate_number: affiliate.affiliate_number,
+      affiliate_name: affiliateName,
+      sessions: totalVisitors,
+      visitors: uniqueVisitors,
+      page_views: totalPageViews,
+      bounce_rate: bounceRate,
+      avg_session_time: avgSessionTime,
+      active_visitors: activeVisitors,
+    }];
 
     return NextResponse.json({
       metrics: {
@@ -126,6 +263,13 @@ export async function GET(request: NextRequest) {
       },
       activeVisitors,
       topPages,
+      entryPages,
+      exitPages,
+      trafficSources,
+      devices,
+      browsers,
+      geography,
+      affiliates,
       viewMode,
     });
   } catch (error: any) {
