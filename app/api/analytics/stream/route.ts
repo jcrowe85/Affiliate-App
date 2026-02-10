@@ -40,23 +40,62 @@ export async function GET(request: NextRequest) {
           const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
           const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-          // Get active visitors
-          const activeEvents = await prisma.visitorEvent.findMany({
-            where: {
-              shopify_shop_id: shopifyShopId,
-              timestamp: {
-                gte: fiveMinutesAgo,
+          // Get active visitors - handle case where VisitorEvent table might not exist yet
+          let activeEvents: any[] = [];
+          try {
+            const recentEvents = await prisma.visitorEvent.findMany({
+              where: {
+                shopify_shop_id: shopifyShopId,
+                timestamp: {
+                  gte: fiveMinutesAgo,
+                },
               },
-            },
-            include: {
-              session: true,
-            },
-            orderBy: {
-              timestamp: 'desc',
-            },
-            distinct: ['visitor_session_id'],
-            take: 50,
-          });
+              include: {
+                session: {
+                  select: {
+                    id: true,
+                    session_id: true,
+                    visitor_id: true,
+                    updated_at: true,
+                    pages_visited: true,
+                    device_type: true,
+                    location_country: true,
+                  },
+                },
+              },
+              orderBy: {
+                timestamp: 'desc',
+              },
+              take: 1000,
+            });
+
+            // Deduplicate by visitor_session_id (or session.id if visitor_session_id doesn't exist)
+            const uniqueSessionIds = new Set<string>();
+            for (const event of recentEvents) {
+              // Try visitor_session_id first (new schema), fallback to session.id (old schema)
+              const sessionId = (event as any).visitor_session_id || event.session?.id;
+              if (sessionId && !uniqueSessionIds.has(sessionId) && activeEvents.length < 50) {
+                uniqueSessionIds.add(sessionId);
+                activeEvents.push(event);
+              }
+            }
+          } catch (error: any) {
+            // If VisitorEvent table doesn't exist, use recent sessions instead
+            if (error.message?.includes('does not exist') || error.message?.includes('VisitorEvent')) {
+              const recentSessionsForActive = await prisma.visitorSession.findMany({
+                where: {
+                  shopify_shop_id: shopifyShopId,
+                  updated_at: {
+                    gte: fiveMinutesAgo,
+                  },
+                },
+                take: 50,
+              });
+              activeEvents = recentSessionsForActive.map(s => ({ session: s }));
+            } else {
+              throw error;
+            }
+          }
 
           // Get recent sessions for metrics
           const recentSessions = await prisma.visitorSession.findMany({
