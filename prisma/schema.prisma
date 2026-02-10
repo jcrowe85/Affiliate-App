@@ -270,6 +270,8 @@ model ShopifySession {
   expires                 DateTime?
   access_token            String?
   storefront_access_token String?
+  created_at              DateTime  @default(now())
+  updated_at              DateTime  @updatedAt
 
   @@index([shop])
 }
