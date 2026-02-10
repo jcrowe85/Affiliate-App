@@ -187,6 +187,9 @@ export default function AffiliateManagement() {
     setFormData(defaultForm);
     setEditingAffiliate(null);
     setError('');
+    setShowNetTermsModal(false);
+    setPendingPayoutTermsDays(null);
+    setOriginalPayoutTermsDays(30);
   };
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -248,6 +251,14 @@ export default function AffiliateManagement() {
       setError('Password and confirm password do not match');
       return;
     }
+
+    // Check if payout_terms_days has changed and we haven't already handled the modal
+    if (formData.payout_terms_days !== originalPayoutTermsDays && !recalculateEligibleDates && pendingPayoutTermsDays === null) {
+      // Show modal to ask user how to apply the change
+      setPendingPayoutTermsDays(formData.payout_terms_days);
+      setShowNetTermsModal(true);
+      return; // Don't proceed with update yet
+    }
     
     setError('');
     try {
@@ -294,6 +305,7 @@ export default function AffiliateManagement() {
         resetForm();
         setShowNetTermsModal(false);
         setPendingPayoutTermsDays(null);
+        setOriginalPayoutTermsDays(formData.payout_terms_days);
       } else {
         console.error('Update failed:', {
           status: res.status,
@@ -310,22 +322,16 @@ export default function AffiliateManagement() {
   };
 
   const handleNetTermsModalChoice = (recalculate: boolean) => {
-    if (pendingPayoutTermsDays !== null) {
-      setFormData({ ...formData, payout_terms_days: pendingPayoutTermsDays });
-    }
     setShowNetTermsModal(false);
     const wasPending = pendingPayoutTermsDays;
     setPendingPayoutTermsDays(null);
     
-    // If recalculate is true, submit immediately with that flag
-    if (recalculate && editingAffiliate && wasPending !== null) {
-      // Create a synthetic event and call handleUpdate with recalculate flag
-      const syntheticEvent = {
-        preventDefault: () => {},
-      } as React.FormEvent;
-      handleUpdate(syntheticEvent, true);
-    }
-    // If false, the form data is updated and user can click Save normally
+    // Create a synthetic event and call handleUpdate with the recalculate flag
+    // This will proceed with the update
+    const syntheticEvent = {
+      preventDefault: () => {},
+    } as React.FormEvent;
+    handleUpdate(syntheticEvent, recalculate);
   };
 
   const handleDelete = async (id: string) => {
@@ -810,16 +816,7 @@ export default function AffiliateManagement() {
                       type="number"
                       min={1}
                       value={formData.payout_terms_days}
-                      onChange={(e) => {
-                        const newValue = parseInt(e.target.value, 10) || 30;
-                        // If editing an existing affiliate and payout terms changed, show modal
-                        if (editingAffiliate && newValue !== originalPayoutTermsDays) {
-                          setPendingPayoutTermsDays(newValue);
-                          setShowNetTermsModal(true);
-                        } else {
-                          setFormData({ ...formData, payout_terms_days: newValue });
-                        }
-                      }}
+                      onChange={(e) => setFormData({ ...formData, payout_terms_days: parseInt(e.target.value, 10) || 30 })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     />
                   </div>
