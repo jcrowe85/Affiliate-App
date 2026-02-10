@@ -18,11 +18,11 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const date = searchParams.get('date'); // Optional: specific date to check
 
-    // Get eligible commissions (ready for payout)
+    // Get eligible/approved commissions (ready for payout)
     const eligibleCommissions = await prisma.commission.findMany({
       where: {
         shopify_shop_id: admin.shopify_shop_id,
-        status: 'eligible',
+        status: { in: ['eligible', 'approved'] }, // Include both eligible and approved commissions
         eligible_date: {
           lte: date ? new Date(date) : new Date(), // Eligible now or by specific date
         },
