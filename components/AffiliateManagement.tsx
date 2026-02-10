@@ -152,6 +152,9 @@ export default function AffiliateManagement() {
   const [error, setError] = useState('');
   const [copiedAffiliateId, setCopiedAffiliateId] = useState<string | null>(null);
   const [draggedWebhookParam, setDraggedWebhookParam] = useState<string | null>(null);
+  const [showNetTermsModal, setShowNetTermsModal] = useState(false);
+  const [pendingPayoutTermsDays, setPendingPayoutTermsDays] = useState<number | null>(null);
+  const [originalPayoutTermsDays, setOriginalPayoutTermsDays] = useState<number>(30);
 
   useEffect(() => {
     fetchAffiliates();
@@ -234,7 +237,7 @@ export default function AffiliateManagement() {
     }
   };
 
-  const handleUpdate = async (e: React.FormEvent) => {
+  const handleUpdate = async (e: React.FormEvent, recalculateEligibleDates: boolean = false) => {
     e.preventDefault();
     
     if (!editingAffiliate) {
@@ -269,6 +272,7 @@ export default function AffiliateManagement() {
           ? formData.webhook_parameter_mapping 
           : null,
         redirect_base_url: formData.redirect_base_url.trim() || null,
+        recalculate_eligible_dates: recalculateEligibleDates,
       };
       // Only include password if it's provided and not empty (after trimming)
       if (formData.password && formData.password.trim().length > 0) {
@@ -288,6 +292,8 @@ export default function AffiliateManagement() {
         await fetchAffiliates();
         setShowForm(false);
         resetForm();
+        setShowNetTermsModal(false);
+        setPendingPayoutTermsDays(null);
       } else {
         console.error('Update failed:', {
           status: res.status,
@@ -301,6 +307,25 @@ export default function AffiliateManagement() {
       console.error('Update error:', err);
       setError(err.message || 'Failed to update affiliate. Please check your connection.');
     }
+  };
+
+  const handleNetTermsModalChoice = (recalculate: boolean) => {
+    if (pendingPayoutTermsDays !== null) {
+      setFormData({ ...formData, payout_terms_days: pendingPayoutTermsDays });
+    }
+    setShowNetTermsModal(false);
+    const wasPending = pendingPayoutTermsDays;
+    setPendingPayoutTermsDays(null);
+    
+    // If recalculate is true, submit immediately with that flag
+    if (recalculate && editingAffiliate && wasPending !== null) {
+      // Create a synthetic event and call handleUpdate with recalculate flag
+      const syntheticEvent = {
+        preventDefault: () => {},
+      } as React.FormEvent;
+      handleUpdate(syntheticEvent, true);
+    }
+    // If false, the form data is updated and user can click Save normally
   };
 
   const handleDelete = async (id: string) => {
@@ -319,6 +344,8 @@ export default function AffiliateManagement() {
 
   const startEdit = (affiliate: Affiliate) => {
     setEditingAffiliate(affiliate);
+    const payoutTerms = affiliate.payout_terms_days || 30;
+    setOriginalPayoutTermsDays(payoutTerms);
     setFormData({
       first_name: affiliate.first_name || '',
       last_name: affiliate.last_name || '',
@@ -337,7 +364,7 @@ export default function AffiliateManagement() {
       confirm_password: '',
       merchant_id: affiliate.merchant_id || '',
       status: affiliate.status,
-      payout_terms_days: affiliate.payout_terms_days,
+      payout_terms_days: payoutTerms,
       webhook_url: affiliate.webhook_url || '',
       webhook_parameter_mapping: (() => {
         const mapping = affiliate.webhook_parameter_mapping;
@@ -525,7 +552,13 @@ export default function AffiliateManagement() {
           </h3>
           </div>
           <form
-            onSubmit={editingAffiliate ? handleUpdate : handleCreate}
+            onSubmit={(e) => {
+              if (editingAffiliate) {
+                handleUpdate(e, false); // Default to false (future only) unless modal choice was made
+              } else {
+                handleCreate(e);
+              }
+            }}
             className="p-6 space-y-6"
           >
             {error && (
@@ -777,7 +810,16 @@ export default function AffiliateManagement() {
                       type="number"
                       min={1}
                       value={formData.payout_terms_days}
-                      onChange={(e) => setFormData({ ...formData, payout_terms_days: parseInt(e.target.value, 10) || 30 })}
+                      onChange={(e) => {
+                        const newValue = parseInt(e.target.value, 10) || 30;
+                        // If editing an existing affiliate and payout terms changed, show modal
+                        if (editingAffiliate && newValue !== originalPayoutTermsDays) {
+                          setPendingPayoutTermsDays(newValue);
+                          setShowNetTermsModal(true);
+                        } else {
+                          setFormData({ ...formData, payout_terms_days: newValue });
+                        }
+                      }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     />
                   </div>
@@ -1902,6 +1944,46 @@ export default function AffiliateManagement() {
           </div>
         )}
       </div>
+
+      {/* Net Terms Change Modal */}
+      {showNetTermsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
+            <div className="px-6 py-5 border-b border-gray-200">
+              <h3 className="text-xl font-bold text-gray-900">Apply New Net Payment Terms?</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                You've changed the payout terms from <strong>Net-{originalPayoutTermsDays}</strong> to <strong>Net-{pendingPayoutTermsDays}</strong>
+              </p>
+            </div>
+            
+            <div className="px-6 py-4">
+              <p className="text-sm text-gray-700 mb-4">
+                How would you like to apply this change?
+              </p>
+              
+              <div className="space-y-3">
+                <button
+                  onClick={() => handleNetTermsModalChoice(false)}
+                  className="w-full px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium transition-colors shadow-sm"
+                >
+                  Apply to Future Conversions Only
+                </button>
+                
+                <button
+                  onClick={() => handleNetTermsModalChoice(true)}
+                  className="w-full px-6 py-3 bg-gray-400 text-white rounded-lg hover:bg-gray-500 font-medium transition-colors"
+                >
+                  Apply to Existing Conversions (Retroactive)
+                </button>
+              </div>
+              
+              <p className="text-xs text-gray-500 mt-4 text-center">
+                Retroactive changes will recalculate eligible dates for all pending, eligible, and approved commissions
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

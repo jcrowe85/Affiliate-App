@@ -58,6 +58,7 @@ export async function PATCH(
       webhook_parameter_mapping,
       redirect_base_url,
       affiliate_number,
+      recalculate_eligible_dates,
     } = body;
 
     // Store original password for verification test later
@@ -173,6 +174,36 @@ export async function PATCH(
     } else if (offer_id === null || offer_id === '') {
       // Allow clearing the offer
       data.offer_id = null;
+    }
+
+    // If recalculate_eligible_dates is true and payout_terms_days is being updated, recalculate eligible dates
+    if (recalculate_eligible_dates && payout_terms_days !== undefined && payout_terms_days !== affiliate.payout_terms_days) {
+      // Get all commissions that need eligible date recalculation
+      // Only recalculate for pending, eligible, and approved commissions (not paid or reversed)
+      const commissionsToUpdate = await prisma.commission.findMany({
+        where: {
+          affiliate_id: params.id,
+          shopify_shop_id: admin.shopify_shop_id,
+          status: { in: ['pending', 'eligible', 'approved'] },
+        },
+        select: {
+          id: true,
+          created_at: true,
+        },
+      });
+
+      // Recalculate eligible_date for each commission: created_at + new payout_terms_days
+      for (const commission of commissionsToUpdate) {
+        const newEligibleDate = new Date(commission.created_at);
+        newEligibleDate.setDate(newEligibleDate.getDate() + payout_terms_days);
+
+        await prisma.commission.update({
+          where: { id: commission.id },
+          data: {
+            eligible_date: newEligibleDate,
+          },
+        });
+      }
     }
 
     // Check if there's any data to update
