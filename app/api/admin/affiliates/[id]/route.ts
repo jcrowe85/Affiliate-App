@@ -98,14 +98,8 @@ export async function PATCH(
     // Only update password if a new password is provided (and it's not just whitespace)
     if (password !== undefined && password !== null && typeof password === 'string' && password.trim().length > 0) {
       const trimmedPassword = password.trim();
-      console.log('[Affiliate Update] Updating password for affiliate:', params.id, 'Email:', affiliate.email);
-      console.log('[Affiliate Update] Password length:', trimmedPassword.length);
       const hashedPassword = await hashPassword(trimmedPassword);
-      console.log('[Affiliate Update] Password hash generated, length:', hashedPassword.length);
       data.password_hash = hashedPassword;
-    } else if (password !== undefined) {
-      console.log('[Affiliate Update] Password field provided but empty/whitespace, skipping password update');
-      console.log('[Affiliate Update] Password value:', JSON.stringify(password), 'Type:', typeof password);
     }
 
     if (email !== undefined) {
@@ -181,13 +175,6 @@ export async function PATCH(
       data.offer_id = null;
     }
 
-    console.log('[Affiliate Update] About to update affiliate. Data keys:', Object.keys(data));
-    console.log('[Affiliate Update] Has password_hash in data:', 'password_hash' in data);
-    if ('password_hash' in data) {
-      console.log('[Affiliate Update] password_hash length:', (data.password_hash as string).length);
-      console.log('[Affiliate Update] password_hash preview:', (data.password_hash as string).substring(0, 20) + '...');
-    }
-    
     const updated = await prisma.affiliate.update({
       where: { id: params.id },
       data: data as any,
@@ -195,33 +182,6 @@ export async function PATCH(
         offer: true,
       },
     });
-    
-    console.log('[Affiliate Update] Update completed successfully');
-    
-    // Verify password was updated if it was in the data
-    if (data.password_hash) {
-      const verifyAffiliate = await prisma.affiliate.findUnique({
-        where: { id: params.id },
-        select: { password_hash: true, email: true },
-      });
-      console.log('[Affiliate Update] Password update verified. Hash exists:', !!verifyAffiliate?.password_hash);
-      console.log('[Affiliate Update] Hash length:', verifyAffiliate?.password_hash?.length || 0);
-      console.log('[Affiliate Update] Email:', verifyAffiliate?.email);
-      
-      // Test verification immediately
-      if (verifyAffiliate?.password_hash && originalPassword) {
-        const testPassword = typeof originalPassword === 'string' ? originalPassword.trim() : '';
-        console.log('[Affiliate Update] Testing password verification with:', testPassword.length, 'characters');
-        const testResult = await verifyPassword(testPassword, verifyAffiliate.password_hash);
-        console.log('[Affiliate Update] Immediate password verification test result:', testResult);
-        if (!testResult) {
-          console.error('[Affiliate Update] ⚠️ WARNING: Password verification failed immediately after update!');
-          console.error('[Affiliate Update] This suggests the password was not hashed correctly or verification is broken');
-        } else {
-          console.log('[Affiliate Update] ✅ Password verification test PASSED - password should work for login');
-        }
-      }
-    }
 
     return NextResponse.json({
       success: true,

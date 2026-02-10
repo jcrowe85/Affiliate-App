@@ -16,10 +16,6 @@ export default function AffiliateLoginPage() {
     setLoading(true);
 
     try {
-      console.log('[Affiliate Login Page] Attempting login for:', email);
-      console.log('[Affiliate Login Page] Password length:', password.length);
-      console.log('[Affiliate Login Page] Calling endpoint: /api/affiliate/auth/login');
-      
       const response = await fetch('/api/affiliate/auth/login', {
         method: 'POST',
         headers: {
@@ -28,12 +24,9 @@ export default function AffiliateLoginPage() {
         body: JSON.stringify({ email: email.trim(), password }),
       });
 
-      console.log('[Affiliate Login Page] Response status:', response.status);
       const data = await response.json();
-      console.log('[Affiliate Login Page] Response data:', { ...data, password: '***' });
 
       if (!response.ok) {
-        console.error('[Affiliate Login Page] Login failed:', data.error);
         setError(data.error || 'Login failed');
         setLoading(false);
         return;
