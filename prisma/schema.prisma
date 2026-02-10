@@ -52,6 +52,7 @@ model Affiliate {
   offer                     Offer?                    @relation(fields: [offer_id], references: [id], onDelete: SetNull)
   affiliate_offers          AffiliateOffer[]
   PayoutRun                 PayoutRun[]
+  affiliate_webhook_logs    AffiliateWebhookLog[]
 
   @@index([shopify_shop_id, status])
   @@index([email])
@@ -151,6 +152,7 @@ model Commission {
   payout_run_commissions PayoutRunCommission[]
   fraud_flags            FraudFlag[]
   postback_logs          PostbackLog[]
+  affiliate_webhook_logs AffiliateWebhookLog[]
 
   @@index([affiliate_id, status])
   @@index([shopify_order_id])
@@ -239,6 +241,30 @@ model PostbackLog {
 
   @@index([commission_id])
   @@index([status, last_attempt_at])
+}
+
+model AffiliateWebhookLog {
+  id               String   @id @default(cuid())
+  commission_id    String
+  affiliate_id     String
+  webhook_url      String
+  request_method   String   @default("GET")
+  request_params   Json?
+  status           String   @default("pending")
+  response_code    Int?
+  response_body    String?
+  error_message    String?
+  last_attempt_at  DateTime @default(now())
+  shopify_shop_id  String
+  created_at       DateTime @default(now())
+
+  commission Commission @relation(fields: [commission_id], references: [id], onDelete: Cascade)
+  affiliate  Affiliate  @relation(fields: [affiliate_id], references: [id], onDelete: Cascade)
+
+  @@index([commission_id])
+  @@index([affiliate_id])
+  @@index([status, last_attempt_at])
+  @@index([shopify_shop_id])
 }
 
 model FraudFlag {
