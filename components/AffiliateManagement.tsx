@@ -1952,7 +1952,7 @@ export default function AffiliateManagement() {
             <div className="px-6 py-5 border-b border-gray-200">
               <h3 className="text-xl font-bold text-gray-900">Apply New Net Payment Terms?</h3>
               <p className="text-sm text-gray-600 mt-1">
-                You've changed the payout terms from <strong>Net-{originalPayoutTermsDays}</strong> to <strong>Net-{pendingPayoutTermsDays}</strong>
+                You&apos;ve changed the payout terms from <strong>Net-{originalPayoutTermsDays}</strong> to <strong>Net-{pendingPayoutTermsDays}</strong>
               </p>
             </div>
             
