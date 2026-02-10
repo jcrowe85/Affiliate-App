@@ -20,10 +20,11 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '20');
     const skip = (page - 1) * limit;
 
+    // Get both pending (needs validation) and eligible (needs approval) commissions
     const commissions = await prisma.commission.findMany({
       where: {
         shopify_shop_id: admin.shopify_shop_id,
-        status: 'eligible', // Pending approval
+        status: { in: ['pending', 'eligible'] }, // Both pending validation and eligible for approval
       },
       include: {
         affiliate: {
@@ -54,13 +55,14 @@ export async function GET(request: NextRequest) {
     const total = await prisma.commission.count({
       where: {
         shopify_shop_id: admin.shopify_shop_id,
-        status: 'eligible',
+        status: { in: ['pending', 'eligible'] },
       },
     });
 
     return NextResponse.json({
       commissions: commissions.map(c => ({
         id: c.id,
+        status: c.status, // Include status to distinguish pending vs eligible
         affiliate_name: c.affiliate.name,
         affiliate_email: c.affiliate.email,
         order_number: c.order_attribution.shopify_order_number,

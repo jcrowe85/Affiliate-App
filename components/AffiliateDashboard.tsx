@@ -13,6 +13,7 @@ interface DashboardStats {
   totalCommissionsAmount: string;
   paidCommissionsAmount: string;
   pendingCommissionsAmount: string;
+  owedCommissionsAmount?: string; // Eligible/approved commissions not yet paid
   totalClicks: number;
   totalConversions: number;
   conversionRate: string;
@@ -182,13 +183,14 @@ export default function AffiliateDashboard() {
       } ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <div className="flex flex-col h-full">
           <div className="p-4 border-b border-slate-800">
-            <div className="flex items-center justify-between">
-              <h1 className={`text-xl font-bold ${sidebarCollapsed ? 'hidden md:block' : 'block'}`}>
+            <div className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
+              <h1 className={`text-xl font-bold ${sidebarCollapsed ? 'hidden' : 'block'}`}>
                 Partner Portal
               </h1>
               <button
                 onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                className="hidden md:block text-slate-400 hover:text-white"
+                className="hidden md:block text-slate-400 hover:text-white shrink-0"
+                title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               >
                 {sidebarCollapsed ? '→' : '←'}
               </button>
@@ -271,6 +273,18 @@ export default function AffiliateDashboard() {
                   </div>
                 </div>
               </div>
+
+              {stats.owedCommissionsAmount !== undefined && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                    <div className="text-sm text-gray-600 mb-1">Owed</div>
+                    <div className="text-2xl font-bold text-blue-600">
+                      {formatCurrency(stats.owedCommissionsAmount, stats.currency)}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">Eligible commissions ready for payout</div>
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">

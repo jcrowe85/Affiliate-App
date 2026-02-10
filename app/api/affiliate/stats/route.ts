@@ -75,6 +75,12 @@ export async function GET(request: NextRequest) {
       .filter(c => c.status === 'pending' || c.status === 'eligible')
       .reduce((sum, c) => sum + Number(c.amount), 0);
 
+    // Calculate "owed" - eligible commissions that haven't been paid yet
+    // This represents commissions that have been validated and are ready for payout
+    const owedCommissionsAmount = allCommissions
+      .filter(c => c.status === 'eligible' || c.status === 'approved')
+      .reduce((sum, c) => sum + Number(c.amount), 0);
+
     // Get total clicks
     const totalClicks = await prisma.click.count({
       where: {
@@ -122,6 +128,7 @@ export async function GET(request: NextRequest) {
       totalCommissionsAmount: totalCommissionsAmount.toFixed(2),
       paidCommissionsAmount: paidCommissionsAmount.toFixed(2),
       pendingCommissionsAmount: pendingCommissionsAmount.toFixed(2),
+      owedCommissionsAmount: owedCommissionsAmount.toFixed(2), // Eligible/approved commissions not yet paid
       totalClicks,
       totalConversions,
       conversionRate,

@@ -27,6 +27,7 @@ interface DashboardStats {
 
 interface PendingCommission {
   id: string;
+  status: string; // 'pending' or 'eligible'
   affiliate_name: string;
   affiliate_email: string;
   order_number: string;
@@ -152,6 +153,29 @@ export default function AdminDashboard() {
     // Cleanup interval on unmount
     return () => clearInterval(interval);
   }, [fetchDashboardData]);
+
+  const handleValidate = async (commissionId: string) => {
+    setActionLoading(commissionId);
+    try {
+      const res = await fetch('/api/admin/commissions/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ commissionIds: [commissionId] }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        await fetchDashboardData(); // Refresh data
+        alert(`Commission validated! Moved from pending to eligible.`);
+      } else {
+        alert(`Error: ${data.error}`);
+      }
+    } catch (err) {
+      console.error('Error validating commission:', err);
+      alert('Failed to validate commission');
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
   const handleApprove = async (commissionId: string) => {
     setActionLoading(commissionId);
@@ -730,18 +754,36 @@ export default function AdminDashboard() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{formatDate(commission.eligible_date)}</td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          {commission.has_fraud_flags && (
-                            <span className="px-2.5 py-1 text-xs font-semibold bg-red-100 text-red-800 rounded-full">Fraud Flagged</span>
-                          )}
+                          <div className="flex flex-col gap-1">
+                            {commission.status === 'pending' && (
+                              <span className="px-2.5 py-1 text-xs font-semibold bg-yellow-100 text-yellow-800 rounded-full w-fit">Pending Validation</span>
+                            )}
+                            {commission.status === 'eligible' && (
+                              <span className="px-2.5 py-1 text-xs font-semibold bg-blue-100 text-blue-800 rounded-full w-fit">Eligible</span>
+                            )}
+                            {commission.has_fraud_flags && (
+                              <span className="px-2.5 py-1 text-xs font-semibold bg-red-100 text-red-800 rounded-full w-fit">Fraud Flagged</span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
-                          <button
-                            onClick={() => handleApprove(commission.id)}
-                            disabled={commission.has_fraud_flags || actionLoading === commission.id}
-                            className="px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium shadow-sm hover:shadow transition-all disabled:hover:shadow-sm"
-                          >
-                            {actionLoading === commission.id ? 'Processing...' : 'Approve'}
-                          </button>
+                          {commission.status === 'pending' ? (
+                            <button
+                              onClick={() => handleValidate(commission.id)}
+                              disabled={commission.has_fraud_flags || actionLoading === commission.id}
+                              className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-lg hover:from-indigo-700 hover:to-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium shadow-sm hover:shadow transition-all disabled:hover:shadow-sm"
+                            >
+                              {actionLoading === commission.id ? 'Processing...' : 'Validate'}
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleApprove(commission.id)}
+                              disabled={commission.has_fraud_flags || actionLoading === commission.id}
+                              className="px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium shadow-sm hover:shadow transition-all disabled:hover:shadow-sm"
+                            >
+                              {actionLoading === commission.id ? 'Processing...' : 'Approve'}
+                            </button>
+                          )}
                           <button
                             onClick={() => handleReject(commission.id)}
                             disabled={actionLoading === commission.id}
