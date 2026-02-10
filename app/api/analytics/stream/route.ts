@@ -80,15 +80,16 @@ export async function GET(request: NextRequest) {
           const sessionsWithTime = recentSessions.filter(s => s.total_time).length;
           const avgSessionTime = sessionsWithTime > 0 ? totalSessionTime / sessionsWithTime : 0;
           
-          const totalPages = recentSessions.reduce((sum, s) => sum + s.pages_visited.length, 0);
+          const totalPages = recentSessions.reduce((sum, s) => sum + (s.pages_visited?.length || 0), 0);
           const pagesPerSession = totalVisitors > 0 ? totalPages / totalVisitors : 0;
 
           // Format active visitors
           const activeVisitors = activeEvents.map(event => {
             const session = event.session;
+            const pagesVisited = session.pages_visited || [];
             return {
               session_id: session.session_id,
-              currentPage: session.pages_visited[session.pages_visited.length - 1] || '/',
+              currentPage: pagesVisited[pagesVisited.length - 1] || '/',
               device: session.device_type || 'Unknown',
               location: session.location_country || 'Unknown',
               lastSeen: Number(session.updated_at.getTime()),

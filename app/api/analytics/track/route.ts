@@ -97,8 +97,9 @@ export async function POST(request: NextRequest) {
       } else {
         console.log('[Analytics Track] Updating existing session:', visitorSession.id);
         // Update existing session
+        const existingPages = visitorSession.pages_visited || [];
         const updatedPagesVisited = Array.from(
-          new Set([...visitorSession.pages_visited, ...pagesVisited])
+          new Set([...existingPages, ...pagesVisited])
         );
         const updatedPageViews = Math.max(visitorSession.page_views, pageViews);
 
@@ -160,7 +161,7 @@ export async function POST(request: NextRequest) {
         // Create exit event
         await prisma.visitorEvent.create({
           data: {
-            session_id: visitorSession.id,
+            visitor_session_id: visitorSession.id,
             visitor_id,
             event_type: 'page_exit',
             shopify_shop_id: shopifyShopId,
@@ -183,7 +184,7 @@ export async function POST(request: NextRequest) {
       if (visitorSession) {
         await prisma.visitorEvent.create({
           data: {
-            session_id: visitorSession.id,
+            visitor_session_id: visitorSession.id,
             visitor_id,
             event_type: event,
             shopify_shop_id: shopifyShopId,

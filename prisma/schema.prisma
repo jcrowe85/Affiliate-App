@@ -37,6 +37,12 @@ model Affiliate {
   webhook_parameter_mapping   Json?
   redirect_base_url           String?
   redirect_parameters_enabled Boolean   @default(false)
+  postback_transaction_id     String?
+  postback_sub1               String?
+  postback_sub2               String?
+  postback_sub3               String?
+  postback_sub4               String?
+  postback_affiliate_id       String?
   last_login                  DateTime?
   shopify_shop_id             String
   created_at                  DateTime  @default(now())

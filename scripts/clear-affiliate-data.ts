@@ -75,7 +75,7 @@ async function clearAffiliateData(affiliateNumber: number) {
     });
     const sessionIds = visitorSessions.map(s => s.id);
     const visitorEventsCount = sessionIds.length > 0 
-      ? await prisma.visitorEvent.count({ where: { session_id: { in: sessionIds } } })
+      ? await prisma.visitorEvent.count({ where: { visitor_session_id: { in: sessionIds } } })
       : 0;
 
     console.log(`\n📊 Records to be deleted:`);
@@ -101,7 +101,7 @@ async function clearAffiliateData(affiliateNumber: number) {
       // 1. Delete Visitor Events first (they reference sessions)
       if (sessionIds.length > 0) {
         const deletedEvents = await tx.visitorEvent.deleteMany({
-          where: { session_id: { in: sessionIds } },
+          where: { visitor_session_id: { in: sessionIds } },
         });
         console.log(`   ✅ Deleted ${deletedEvents.count} visitor events`);
       }

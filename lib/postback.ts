@@ -167,7 +167,7 @@ export async function retryFailedPostbacks(
           },
         },
       },
-      template: true,
+      postback_template: true,
     },
     take: 100, // Limit batch size
   });

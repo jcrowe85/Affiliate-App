@@ -34,7 +34,7 @@ async function cleanupOldData(options: CleanupOptions) {
     // 1. Clean up old VisitorEvents (keep sessions for now)
     const oldEvents = await prisma.visitorEvent.count({
       where: {
-        created_at: {
+        timestamp: {
           lt: cutoffDate,
         },
       },
@@ -44,7 +44,7 @@ async function cleanupOldData(options: CleanupOptions) {
     if (!dryRun && oldEvents > 0) {
       const deleted = await prisma.visitorEvent.deleteMany({
         where: {
-          created_at: {
+          timestamp: {
             lt: cutoffDate,
           },
         },
@@ -55,7 +55,7 @@ async function cleanupOldData(options: CleanupOptions) {
     // 2. Clean up old VisitorSessions (only if they have no events)
     const oldSessions = await prisma.visitorSession.count({
       where: {
-        created_at: {
+        start_time: {
           lt: cutoffDate,
         },
         events: {
@@ -68,7 +68,7 @@ async function cleanupOldData(options: CleanupOptions) {
     if (!dryRun && oldSessions > 0) {
       const deleted = await prisma.visitorSession.deleteMany({
         where: {
-          created_at: {
+          start_time: {
             lt: cutoffDate,
           },
           events: {

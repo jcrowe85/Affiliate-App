@@ -42,13 +42,13 @@ async function analyzeDatabase() {
 
     // Get oldest records
     const oldestEvent = await prisma.visitorEvent.findFirst({
-      orderBy: { created_at: 'asc' },
-      select: { created_at: true },
+      orderBy: { timestamp: 'asc' },
+      select: { timestamp: true },
     });
 
     const oldestSession = await prisma.visitorSession.findFirst({
-      orderBy: { created_at: 'asc' },
-      select: { created_at: true },
+      orderBy: { start_time: 'asc' },
+      select: { start_time: true },
     });
 
     const oldestClick = await prisma.click.findFirst({
@@ -58,10 +58,10 @@ async function analyzeDatabase() {
 
     console.log('\n📅 Oldest Records:');
     if (oldestEvent) {
-      console.log(`   Oldest VisitorEvent: ${oldestEvent.created_at.toISOString()}`);
+      console.log(`   Oldest VisitorEvent: ${oldestEvent.timestamp.toISOString()}`);
     }
     if (oldestSession) {
-      console.log(`   Oldest VisitorSession: ${oldestSession.created_at.toISOString()}`);
+      console.log(`   Oldest VisitorSession: ${oldestSession.start_time.toISOString()}`);
     }
     if (oldestClick) {
       console.log(`   Oldest Click: ${oldestClick.created_at.toISOString()}`);

@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
     // Calculate metrics
     const totalVisitors = sessions.length;
     const uniqueVisitors = new Set(sessions.map(s => s.visitor_id)).size;
-    const totalPageViews = sessions.reduce((sum, s) => sum + s.page_views, 0);
+    const totalPageViews = sessions.reduce((sum, s) => sum + (s.page_views || 0), 0);
     const bouncedSessions = sessions.filter(s => s.is_bounce).length;
     const bounceRate = totalVisitors > 0 ? (bouncedSessions / totalVisitors) * 100 : 0;
     
@@ -71,16 +71,16 @@ export async function GET(request: NextRequest) {
     const sessionsWithTime = sessions.filter(s => s.total_time).length;
     const avgSessionTime = sessionsWithTime > 0 ? totalSessionTime / sessionsWithTime : 0;
     
-    const totalPages = sessions.reduce((sum, s) => sum + s.pages_visited.length, 0);
+    const totalPages = sessions.reduce((sum, s) => sum + (s.pages_visited?.length || 0), 0);
     const pagesPerSession = totalVisitors > 0 ? totalPages / totalVisitors : 0;
 
     // Get top pages
     const pageViewsMap = new Map<string, { views: number; bounces: number }>();
     sessions.forEach(session => {
-      session.pages_visited.forEach(path => {
+      (session.pages_visited || []).forEach(path => {
         const current = pageViewsMap.get(path) || { views: 0, bounces: 0 };
         current.views++;
-        if (session.is_bounce && session.pages_visited.length === 1) {
+        if (session.is_bounce && (session.pages_visited?.length || 0) === 1) {
           current.bounces++;
         }
         pageViewsMap.set(path, current);
@@ -100,8 +100,9 @@ export async function GET(request: NextRequest) {
     // Get entry pages
     const entryPagesMap = new Map<string, number>();
     sessions.forEach(session => {
-      const count = entryPagesMap.get(session.entry_page) || 0;
-      entryPagesMap.set(session.entry_page, count + 1);
+      const entryPage: string = session.entry_page || '/';
+      const count = entryPagesMap.get(entryPage) || 0;
+      entryPagesMap.set(entryPage, count + 1);
     });
 
     const entryPages = Array.from(entryPagesMap.entries())
@@ -114,8 +115,9 @@ export async function GET(request: NextRequest) {
     sessions
       .filter(s => s.exit_page)
       .forEach(session => {
-        const count = exitPagesMap.get(session.exit_page!) || 0;
-        exitPagesMap.set(session.exit_page!, count + 1);
+        const exitPage: string = session.exit_page || '/';
+        const count = exitPagesMap.get(exitPage) || 0;
+        exitPagesMap.set(exitPage, count + 1);
       });
 
     const exitPages = Array.from(exitPagesMap.entries())
@@ -206,9 +208,10 @@ export async function GET(request: NextRequest) {
     // Format active visitors
     const activeVisitors = activeSessions.map(event => {
       const session = event.session;
+      const pagesVisited = session.pages_visited || [];
       return {
         session_id: session.session_id,
-        currentPage: session.pages_visited[session.pages_visited.length - 1] || '/',
+        currentPage: pagesVisited[pagesVisited.length - 1] || '/',
         device: session.device_type || 'Unknown',
         location: session.location_country || 'Unknown',
         lastSeen: Number(session.updated_at.getTime()),
