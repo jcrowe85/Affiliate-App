@@ -58,11 +58,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Search by order number, customer email, or customer name (through order_attribution)
-    // Note: Prisma doesn't support OR with nested relations directly, so we'll filter after fetching
-    // For now, search only by shopify_order_id which is on Commission directly
     if (search) {
       where.OR = [
-        { shopify_order_id: { contains: search, mode: 'insensitive' } },
+        { order_attribution: { shopify_order_number: { contains: search, mode: 'insensitive' } } },
+        { order_attribution: { customer_email: { contains: search, mode: 'insensitive' } } },
+        { order_attribution: { customer_name: { contains: search, mode: 'insensitive' } } },
       ];
     }
 
@@ -86,26 +86,8 @@ export async function GET(request: NextRequest) {
       take: 1000, // Limit to 1000 results
     });
 
-    // Filter by search term if provided (after fetching, since Prisma doesn't support OR with nested relations)
-    let filteredCommissions = commissions;
-    if (search) {
-      const searchLower = search.toLowerCase();
-      filteredCommissions = commissions.filter((commission) => {
-        const orderNumber = commission.order_attribution?.shopify_order_number?.toLowerCase() || '';
-        const customerEmail = commission.order_attribution?.customer_email?.toLowerCase() || '';
-        const customerName = commission.order_attribution?.customer_name?.toLowerCase() || '';
-        const orderId = commission.shopify_order_id?.toLowerCase() || '';
-        return (
-          orderNumber.includes(searchLower) ||
-          customerEmail.includes(searchLower) ||
-          customerName.includes(searchLower) ||
-          orderId.includes(searchLower)
-        );
-      });
-    }
-
     // Get subscription attributions for all commissions
-    const orderIds = filteredCommissions.map((c) => c.shopify_order_id);
+    const orderIds = commissions.map((c) => c.shopify_order_id);
     const subscriptions = await prisma.subscriptionAttribution.findMany({
       where: {
         original_order_id: { in: orderIds },
@@ -118,7 +100,7 @@ export async function GET(request: NextRequest) {
     );
 
     // Format response
-    const conversions = filteredCommissions.map((commission) => {
+    const conversions = commissions.map((commission) => {
       const subscription = subscriptionMap.get(commission.shopify_order_id);
       const offer = commission.affiliate.offer;
       const isSubscription = offer?.selling_subscriptions && offer.selling_subscriptions !== 'no';

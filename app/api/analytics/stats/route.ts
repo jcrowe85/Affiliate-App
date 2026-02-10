@@ -40,70 +40,30 @@ export async function GET(request: NextRequest) {
     });
 
     // Get active visitors (sessions with activity in last 5 minutes)
-    // Handle case where VisitorEvent table might not exist yet (migration not applied)
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-    let activeSessions: any[] = [];
-    
-    try {
-      const recentEvents = await prisma.visitorEvent.findMany({
-        where: {
-          shopify_shop_id: shopifyShopId,
-          timestamp: {
-            gte: fiveMinutesAgo,
-          },
+    const recentEvents = await prisma.visitorEvent.findMany({
+      where: {
+        shopify_shop_id: shopifyShopId,
+        timestamp: {
+          gte: fiveMinutesAgo,
         },
-        include: {
-          session: {
-            select: {
-              id: true,
-              session_id: true,
-              visitor_id: true,
-              start_time: true,
-              updated_at: true,
-              pages_visited: true,
-              device_type: true,
-              location_country: true,
-              page_views: true,
-              is_bounce: true,
-              total_time: true,
-              referrer_url: true,
-              referrer_domain: true,
-              entry_page: true,
-              exit_page: true,
-            },
-          },
-        },
-        orderBy: {
-          timestamp: 'desc',
-        },
-        take: 1000,
-      });
+      },
+      include: {
+        session: true,
+      },
+      orderBy: {
+        timestamp: 'desc',
+      },
+      take: 1000, // Get more events to ensure we have unique sessions
+    });
 
-      // Get unique sessions - handle both old and new schema
-      const uniqueSessionIds = new Set<string>();
-      for (const event of recentEvents) {
-        // visitor_session_id is a field on VisitorEvent, session.id is from the relation
-        const sessionId = event.visitor_session_id || event.session?.id;
-        if (sessionId && !uniqueSessionIds.has(sessionId) && activeSessions.length < 50) {
-          uniqueSessionIds.add(sessionId);
-          activeSessions.push(event);
-        }
-      }
-    } catch (error: any) {
-      // If VisitorEvent table doesn't exist, use recent sessions instead
-      if (error.message?.includes('does not exist') || error.message?.includes('VisitorEvent') || error.message?.includes('visitor_session_id')) {
-        const recentSessionsForActive = await prisma.visitorSession.findMany({
-          where: {
-            shopify_shop_id: shopifyShopId,
-            updated_at: {
-              gte: fiveMinutesAgo,
-            },
-          },
-          take: 50,
-        });
-        activeSessions = recentSessionsForActive.map(s => ({ session: s }));
-      } else {
-        throw error;
+    // Get unique sessions by visitor_session_id
+    const uniqueSessionIds = new Set<string>();
+    const activeSessions: typeof recentEvents = [];
+    for (const event of recentEvents) {
+      if (!uniqueSessionIds.has(event.visitor_session_id) && activeSessions.length < 50) {
+        uniqueSessionIds.add(event.visitor_session_id);
+        activeSessions.push(event);
       }
     }
 
@@ -197,86 +157,58 @@ export async function GET(request: NextRequest) {
     // Get devices
     const devicesMap = new Map<string, number>();
     sessions.forEach(session => {
-      const type = session.device_type || 'unknown';
-      const count = devicesMap.get(type) || 0;
-      devicesMap.set(type, count + 1);
+      const device = session.device_type || 'unknown';
+      const count = devicesMap.get(device) || 0;
+      devicesMap.set(device, count + 1);
     });
 
-    const totalDevices = Array.from(devicesMap.values()).reduce((a, b) => a + b, 0);
     const devices = Array.from(devicesMap.entries())
-      .map(([type, count]) => ({
-        type,
-        count,
-        percentage: totalDevices > 0 ? (count / totalDevices) * 100 : 0,
-      }))
-      .sort((a, b) => b.count - a.count);
+      .map(([device, count]) => ({ device, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
 
-    // Get browsers (from user agent)
+    // Get browsers (from user_agent if available, otherwise 'unknown')
     const browsersMap = new Map<string, number>();
     sessions.forEach(session => {
+      let browser = 'unknown';
       if (session.user_agent) {
-        let browser = 'Unknown';
-        if (session.user_agent.includes('Chrome')) browser = 'Chrome';
-        else if (session.user_agent.includes('Safari') && !session.user_agent.includes('Chrome')) browser = 'Safari';
+        if (session.user_agent.includes('Chrome') && !session.user_agent.includes('Edg')) browser = 'Chrome';
         else if (session.user_agent.includes('Firefox')) browser = 'Firefox';
-        else if (session.user_agent.includes('Edge')) browser = 'Edge';
-        else if (session.user_agent.includes('Opera')) browser = 'Opera';
-        
-        const count = browsersMap.get(browser) || 0;
-        browsersMap.set(browser, count + 1);
+        else if (session.user_agent.includes('Safari') && !session.user_agent.includes('Chrome')) browser = 'Safari';
+        else if (session.user_agent.includes('Edg')) browser = 'Edge';
       }
+      const count = browsersMap.get(browser) || 0;
+      browsersMap.set(browser, count + 1);
     });
 
-    const totalBrowsers = Array.from(browsersMap.values()).reduce((a, b) => a + b, 0);
     const browsers = Array.from(browsersMap.entries())
-      .map(([name, count]) => ({
-        name,
-        count,
-        percentage: totalBrowsers > 0 ? (count / totalBrowsers) * 100 : 0,
-      }))
-      .sort((a, b) => b.count - a.count);
+      .map(([browser, count]) => ({ browser, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
 
     // Get geography
     const geographyMap = new Map<string, number>();
     sessions.forEach(session => {
-      const country = session.location_country || 'Unknown';
+      const country = session.location_country || 'unknown';
       const count = geographyMap.get(country) || 0;
       geographyMap.set(country, count + 1);
     });
 
-    const totalGeo = Array.from(geographyMap.values()).reduce((a, b) => a + b, 0);
     const geography = Array.from(geographyMap.entries())
-      .map(([country, visitors]) => ({
-        country,
-        visitors,
-        percentage: totalGeo > 0 ? (visitors / totalGeo) * 100 : 0,
-      }))
-      .sort((a, b) => b.visitors - a.visitors)
+      .map(([country, count]) => ({ country, count }))
+      .sort((a, b) => b.count - a.count)
       .slice(0, 10);
-
-    // Format active visitors
-    const activeVisitors = activeSessions.map(event => {
-      const session = event.session;
-      const pagesVisited = session?.pages_visited || [];
-      return {
-        session_id: session?.session_id || '',
-        currentPage: pagesVisited[pagesVisited.length - 1] || '/',
-        device: session?.device_type || 'Unknown',
-        location: session?.location_country || 'Unknown',
-        lastSeen: session?.updated_at ? Number(session.updated_at.getTime()) : Date.now(),
-      };
-    });
 
     return NextResponse.json({
       metrics: {
         total_visitors: totalVisitors,
         unique_visitors: uniqueVisitors,
-        sessions: totalVisitors,
+        active_visitors: activeSessions.length,
+        total_page_views: totalPageViews,
         bounce_rate: bounceRate,
         avg_session_time: avgSessionTime,
         pages_per_session: pagesPerSession,
       },
-      activeVisitors,
       topPages,
       entryPages,
       exitPages,
@@ -284,11 +216,12 @@ export async function GET(request: NextRequest) {
       devices,
       browsers,
       geography,
+      affiliates: [], // This would need to be populated if needed
     });
   } catch (error: any) {
-    console.error('Analytics stats error:', error);
+    console.error('Error fetching analytics stats:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch stats' },
+      { error: error.message || 'Failed to fetch analytics stats' },
       { status: 500 }
     );
   }
