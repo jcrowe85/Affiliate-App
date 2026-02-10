@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { getCurrentAdmin, hashPassword } from '@/lib/auth';
+import { getCurrentAdmin, hashPassword, verifyPassword } from '@/lib/auth';
 
 // Mark route as dynamic to prevent static analysis during build
 export const runtime = 'nodejs';
