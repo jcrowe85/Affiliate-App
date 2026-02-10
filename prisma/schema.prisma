@@ -99,6 +99,10 @@ model OrderAttribution {
   affiliate_id         String
   click_id             String?
   attribution_type     String
+  customer_email       String?
+  customer_name        String?
+  order_total          Decimal? @db.Decimal(10, 2)
+  order_currency       String?
   shopify_shop_id      String
   created_at           DateTime @default(now())
 
