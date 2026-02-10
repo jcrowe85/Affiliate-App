@@ -18,13 +18,20 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const limit = parseInt(searchParams.get('limit') || '10');
 
-    // Get affiliate performance stats
+    // Get affiliate performance stats - using same pattern as /api/admin/affiliates
     const affiliateStats = await prisma.affiliate.findMany({
       where: {
         shopify_shop_id: admin.shopify_shop_id,
         status: 'active',
       },
       include: {
+        commissions: {
+          select: {
+            amount: true,
+            status: true,
+            currency: true,
+          },
+        },
         _count: {
           select: {
             clicks: true,
@@ -35,44 +42,19 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Fetch commissions separately to avoid conflicts
-    const affiliateIds = affiliateStats.map(a => a.id);
-    const allCommissions = await prisma.commission.findMany({
-      where: {
-        affiliate_id: { in: affiliateIds },
-        shopify_shop_id: admin.shopify_shop_id,
-      },
-      select: {
-        affiliate_id: true,
-        amount: true,
-        status: true,
-        currency: true,
-      },
-    });
-
-    // Group commissions by affiliate_id
-    const commissionsByAffiliate = new Map<string, typeof allCommissions>();
-    allCommissions.forEach(commission => {
-      const existing = commissionsByAffiliate.get(commission.affiliate_id) || [];
-      existing.push(commission);
-      commissionsByAffiliate.set(commission.affiliate_id, existing);
-    });
-
     // Calculate performance metrics for each affiliate
     const performance = affiliateStats.map(affiliate => {
-      const commissions = commissionsByAffiliate.get(affiliate.id) || [];
-      
-      const totalCommissions = commissions
+      const totalCommissions = affiliate.commissions
         .filter(c => c.status !== 'reversed')
-        .reduce((sum, c) => sum + parseFloat(c.amount.toString()), 0);
+        .reduce((sum, c) => sum + parseFloat(String(c.amount)), 0);
       
-      const paidCommissions = commissions
+      const paidCommissions = affiliate.commissions
         .filter(c => c.status === 'paid')
-        .reduce((sum, c) => sum + parseFloat(c.amount.toString()), 0);
+        .reduce((sum, c) => sum + parseFloat(String(c.amount)), 0);
       
-      const pendingCommissions = commissions
+      const pendingCommissions = affiliate.commissions
         .filter(c => c.status === 'eligible' || c.status === 'approved')
-        .reduce((sum, c) => sum + parseFloat(c.amount.toString()), 0);
+        .reduce((sum, c) => sum + parseFloat(String(c.amount)), 0);
 
       const orders = affiliate._count.orders;
       const clicks = affiliate._count.clicks;
@@ -101,8 +83,13 @@ export async function GET(request: NextRequest) {
     });
   } catch (error: any) {
     console.error('Error fetching affiliate performance:', error);
+    console.error('Error stack:', error.stack);
+    console.error('Error details:', JSON.stringify(error, null, 2));
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch affiliate performance' },
+      { 
+        error: error.message || 'Failed to fetch affiliate performance',
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      },
       { status: 500 }
     );
   }
