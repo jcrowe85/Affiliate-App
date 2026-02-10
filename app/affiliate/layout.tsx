@@ -1,16 +1,9 @@
-import { redirect } from 'next/navigation';
-import { getCurrentAffiliate } from '@/lib/auth';
-
-export default async function AffiliateLayout({
+export default function AffiliateLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const affiliate = await getCurrentAffiliate();
-
-  if (!affiliate) {
-    redirect('/affiliate/login');
-  }
-
+  // Layout doesn't enforce auth - let individual pages handle it
+  // This prevents redirect loops on the login page
   return <>{children}</>;
 }
