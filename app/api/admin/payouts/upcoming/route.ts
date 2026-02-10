@@ -19,12 +19,17 @@ export async function GET(request: NextRequest) {
     const date = searchParams.get('date'); // Optional: specific date to check
 
     // Get eligible/approved commissions (ready for payout)
+    // Also include pending commissions that are past their eligible_date (they should be validated)
+    const now = date ? new Date(date) : new Date();
+    
+    console.log(`[Upcoming Payouts] Fetching commissions ready for payout (eligible_date <= ${now.toISOString()})`);
+    
     const eligibleCommissions = await prisma.commission.findMany({
       where: {
         shopify_shop_id: admin.shopify_shop_id,
-        status: { in: ['eligible', 'approved'] }, // Include both eligible and approved commissions
+        status: { in: ['eligible', 'approved', 'pending'] }, // Include pending that are past eligible_date
         eligible_date: {
-          lte: date ? new Date(date) : new Date(), // Eligible now or by specific date
+          lte: now, // Eligible now or by specific date
         },
       },
       include: {
@@ -47,6 +52,17 @@ export async function GET(request: NextRequest) {
         eligible_date: 'asc',
       },
     });
+
+    console.log(`[Upcoming Payouts] Found ${eligibleCommissions.length} commissions ready for payout`);
+    if (eligibleCommissions.length > 0) {
+      console.log(`[Upcoming Payouts] Sample commission:`, {
+        id: eligibleCommissions[0].id,
+        affiliate_id: eligibleCommissions[0].affiliate_id,
+        status: eligibleCommissions[0].status,
+        eligible_date: eligibleCommissions[0].eligible_date.toISOString(),
+        amount: eligibleCommissions[0].amount.toString(),
+      });
+    }
 
     // Group by affiliate
     const payoutByAffiliate = eligibleCommissions.reduce((acc, commission) => {
