@@ -175,6 +175,14 @@ export async function PATCH(
       data.offer_id = null;
     }
 
+    // Check if there's any data to update
+    if (Object.keys(data).length === 0) {
+      return NextResponse.json(
+        { error: 'No fields to update' },
+        { status: 400 }
+      );
+    }
+
     const updated = await prisma.affiliate.update({
       where: { id: params.id },
       data: data as any,

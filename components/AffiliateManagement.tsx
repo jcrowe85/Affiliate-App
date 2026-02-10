@@ -289,10 +289,17 @@ export default function AffiliateManagement() {
         setShowForm(false);
         resetForm();
       } else {
-        setError(data.error || 'Failed to update affiliate');
+        console.error('Update failed:', {
+          status: res.status,
+          statusText: res.statusText,
+          error: data,
+          payload: Object.keys(payload),
+        });
+        setError(data.error || `Failed to update affiliate (${res.status})`);
       }
-    } catch (err) {
-      setError('Failed to update affiliate');
+    } catch (err: any) {
+      console.error('Update error:', err);
+      setError(err.message || 'Failed to update affiliate. Please check your connection.');
     }
   };
 
