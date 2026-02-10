@@ -32,27 +32,45 @@ export async function GET(request: NextRequest) {
             commissions: true,
           },
         },
-        commissions: {
-          select: {
-            amount: true,
-            status: true,
-            currency: true,
-          },
-        },
       },
+    });
+
+    // Fetch commissions separately to avoid conflicts
+    const affiliateIds = affiliateStats.map(a => a.id);
+    const allCommissions = await prisma.commission.findMany({
+      where: {
+        affiliate_id: { in: affiliateIds },
+        shopify_shop_id: admin.shopify_shop_id,
+      },
+      select: {
+        affiliate_id: true,
+        amount: true,
+        status: true,
+        currency: true,
+      },
+    });
+
+    // Group commissions by affiliate_id
+    const commissionsByAffiliate = new Map<string, typeof allCommissions>();
+    allCommissions.forEach(commission => {
+      const existing = commissionsByAffiliate.get(commission.affiliate_id) || [];
+      existing.push(commission);
+      commissionsByAffiliate.set(commission.affiliate_id, existing);
     });
 
     // Calculate performance metrics for each affiliate
     const performance = affiliateStats.map(affiliate => {
-      const totalCommissions = affiliate.commissions
+      const commissions = commissionsByAffiliate.get(affiliate.id) || [];
+      
+      const totalCommissions = commissions
         .filter(c => c.status !== 'reversed')
         .reduce((sum, c) => sum + parseFloat(c.amount.toString()), 0);
       
-      const paidCommissions = affiliate.commissions
+      const paidCommissions = commissions
         .filter(c => c.status === 'paid')
         .reduce((sum, c) => sum + parseFloat(c.amount.toString()), 0);
       
-      const pendingCommissions = affiliate.commissions
+      const pendingCommissions = commissions
         .filter(c => c.status === 'eligible' || c.status === 'approved')
         .reduce((sum, c) => sum + parseFloat(c.amount.toString()), 0);
 
