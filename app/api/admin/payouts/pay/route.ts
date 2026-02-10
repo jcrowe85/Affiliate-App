@@ -81,6 +81,22 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Create a payout run record for tracking
+    const payoutRun = await prisma.payoutRun.create({
+      data: {
+        period_start: commissions.reduce((min, c) => (c.created_at < min ? c.created_at : min), new Date()),
+        period_end: commissions.reduce((max, c) => (c.created_at > max ? c.created_at : max), new Date()),
+        status: 'paid',
+        payout_reference: payout_reference || null,
+        shopify_shop_id: admin.shopify_shop_id,
+        commissions: {
+          create: commissions.map(c => ({
+            commission_id: c.id,
+          })),
+        },
+      },
+    });
+
     // Fire postbacks for payment event
     for (const commissionId of commission_ids) {
       try {
@@ -101,6 +117,7 @@ export async function POST(request: NextRequest) {
       paid_count: commissions.length,
       total_amount: totalAmount.toFixed(2),
       currency,
+      payout_run_id: payoutRun.id,
       commissions: commissions.map(c => ({
         id: c.id,
         order_number: c.order_attribution?.shopify_order_number || c.shopify_order_id,
