@@ -391,6 +391,7 @@ export default function AdminDashboard() {
         const paidRes = await fetch('/api/admin/payouts/paid?limit=10');
         const paidData = await paidRes.json();
         setPaidPayouts(paidData.payouts || []);
+        
       } else if (activeTab === 'performance' || activeTab === 'overview') {
         const perfRes = await fetch('/api/admin/affiliates/performance');
         const perfData = await perfRes.json();

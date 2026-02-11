@@ -43,7 +43,6 @@ model Affiliate {
   postback_sub3               String?
   postback_sub4               String?
   postback_affiliate_id       String?
-  last_login                  DateTime?
   shopify_shop_id             String
   created_at                  DateTime  @default(now())
   updated_at                  DateTime  @updatedAt
@@ -57,7 +56,6 @@ model Affiliate {
   sessions                  AffiliateSession[]
   offer                     Offer?                    @relation(fields: [offer_id], references: [id], onDelete: SetNull)
   affiliate_offers          AffiliateOffer[]
-  PayoutRun                 PayoutRun[]
   affiliate_webhook_logs    AffiliateWebhookLog[]
 
   @@index([shopify_shop_id, status])
@@ -188,7 +186,6 @@ model SubscriptionAttribution {
 
 model PayoutRun {
   id               String   @id @default(cuid())
-  affiliate_id     String?
   period_start     DateTime
   period_end       DateTime
   status           String   @default("draft")
@@ -197,11 +194,9 @@ model PayoutRun {
   created_at       DateTime @default(now())
   updated_at       DateTime @updatedAt
 
-  affiliate   Affiliate?            @relation(fields: [affiliate_id], references: [id], onDelete: Cascade)
   commissions PayoutRunCommission[]
 
   @@index([shopify_shop_id, status])
-  @@index([affiliate_id])
 }
 
 model PayoutRunCommission {
@@ -317,7 +312,6 @@ model AdminUser {
   shopify_shop_id String
   created_at      DateTime  @default(now())
   updated_at      DateTime  @updatedAt
-  last_login      DateTime?
 
   sessions AdminSession[]
 

@@ -81,8 +81,8 @@ export async function GET(request: NextRequest) {
     let uniqueActiveSessions: Array<{ session: SessionWithAffiliate; event: VisitorEvent | null }>;
     
     if (viewMode === 'realtime') {
-      // Real-time mode: Find sessions with recent events (last 30 minutes)
-      const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+      // Real-time mode: Find sessions with recent activity (last 5 minutes)
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
       
       // First, find sessions that have recent events (this is the real indicator of "active")
       const recentEvents = await prisma.visitorEvent.findMany({
@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
           shopify_shop_id: shopifyShopId,
           event_type: 'page_view',
           timestamp: {
-            gte: thirtyMinutesAgo,
+            gte: fiveMinutesAgo,
           },
         },
         select: {
@@ -108,16 +108,20 @@ export async function GET(request: NextRequest) {
       console.log('[Analytics Stats] Real-time mode:', {
         recentEventsFound: recentEvents.length,
         activeSessionIds: activeSessionIds.length,
-        thirtyMinutesAgo: thirtyMinutesAgo.toISOString(),
+        fiveMinutesAgo: fiveMinutesAgo.toISOString(),
       });
       
       // Get sessions for these active session IDs (only affiliate traffic)
+      // Also filter by updated_at to ensure sessions are truly active (within last 5 minutes)
       sessionsList = activeSessionIds.length > 0
         ? await prisma.visitorSession.findMany({
             where: {
               id: { in: activeSessionIds },
               shopify_shop_id: shopifyShopId,
               affiliate_id: { not: null }, // Only affiliate traffic
+              updated_at: {
+                gte: fiveMinutesAgo, // Only sessions updated in last 5 minutes
+              },
             },
             orderBy: {
               updated_at: 'desc',
@@ -166,13 +170,14 @@ export async function GET(request: NextRequest) {
       const sessionIds = sessionsList.map(s => s.id);
       
       // Get all recent page_view events for these sessions, ordered by timestamp
+      // Only get events from the last 5 minutes to match the active session filter
       const allRecentEvents = sessionIds.length > 0
         ? await prisma.visitorEvent.findMany({
             where: {
               visitor_session_id: { in: sessionIds },
               event_type: 'page_view',
               timestamp: {
-                gte: thirtyMinutesAgo,
+                gte: fiveMinutesAgo,
               },
             },
             orderBy: {
@@ -449,17 +454,29 @@ export async function GET(request: NextRequest) {
         }
       });
       
+      // Debug: Check what's actually in the events and sessions
+      const sampleEvent = allHistoricalEvents[0];
+      const sampleSession = sessionsList[0];
       console.log('[Analytics Stats] Event map stats:', {
         totalEvents: allHistoricalEvents.length,
         uniqueSessionsWithEvents: eventMap.size,
         totalSessions: sessionsList.length,
-        sampleEvent: allHistoricalEvents[0] ? {
-          visitor_session_id: allHistoricalEvents[0].visitor_session_id,
-          event_type: allHistoricalEvents[0].event_type,
-          has_event_data: !!allHistoricalEvents[0].event_data,
+        sampleEvent: sampleEvent ? {
+          visitor_session_id: sampleEvent.visitor_session_id,
+          event_type: sampleEvent.event_type,
+          has_event_data: !!sampleEvent.event_data,
+          page_url: sampleEvent.page_url,
+          page_url_has_query: sampleEvent.page_url?.includes('?'),
+          event_data_url_params: (sampleEvent.event_data as any)?.url_params,
         } : null,
-        sampleSessionId: sessionsList[0]?.id,
-        eventMapHasSession: sessionsList[0] ? eventMap.has(sessionsList[0].id) : false,
+        sampleSession: sampleSession ? {
+          id: sampleSession.id,
+          session_id: sampleSession.session_id,
+          landing_page: sampleSession.landing_page,
+          landing_page_has_query: sampleSession.landing_page?.includes('?'),
+          url_params: (sampleSession as any).url_params,
+        } : null,
+        eventMapHasSession: sampleSession ? eventMap.has(sampleSession.id) : false,
       });
       
       // Combine sessions with their most recent events
@@ -645,48 +662,95 @@ export async function GET(request: NextRequest) {
         if ((session as any).url_params) {
           try {
             const urlParamsData = (session as any).url_params;
-            if (urlParamsData && typeof urlParamsData === 'object') {
+            if (urlParamsData && typeof urlParamsData === 'object' && !Array.isArray(urlParamsData)) {
               sessionUrlParams = urlParamsData as Record<string, string>;
             }
           } catch (e) {
-            // Ignore if not an object
+            console.warn('[Analytics Stats] Error parsing session.url_params:', e);
           }
         }
         
         const eventData = event?.event_data as any;
         let eventUrlParams = (eventData?.url_params || {}) as Record<string, string>;
         
-        // Extract from event.page_url if event_data.url_params is empty
-        if (Object.keys(eventUrlParams).length === 0 && event?.page_url) {
-          try {
-            const url = new URL(event.page_url);
-            const params = Object.fromEntries(url.searchParams.entries());
-            eventUrlParams = params;
-          } catch (e) {
-            // If URL parsing fails, try simple string extraction
-            if (event.page_url.includes('?')) {
-              const queryString = event.page_url.substring(event.page_url.indexOf('?') + 1);
-              queryString.split('&').forEach(param => {
-                const [key, value] = param.split('=');
-                if (key) eventUrlParams[decodeURIComponent(key)] = value ? decodeURIComponent(value) : '';
-              });
+        // Extract from event.page_url - ALWAYS try this if page_url exists and has query params
+        // This is the most reliable source for historical data
+        if (event?.page_url && event.page_url.trim() !== '') {
+          const pageUrlHasQuery = event.page_url.includes('?');
+          if (pageUrlHasQuery || Object.keys(eventUrlParams).length === 0) {
+            try {
+              // Try parsing as absolute URL first
+              let url: URL;
+              try {
+                url = new URL(event.page_url);
+              } catch (e) {
+                // If that fails, try with a base URL (for relative URLs)
+                url = new URL(event.page_url, 'https://example.com');
+              }
+              const params = Object.fromEntries(url.searchParams.entries());
+              // Merge with existing eventUrlParams (page_url takes precedence)
+              eventUrlParams = { ...eventUrlParams, ...params };
+            } catch (e) {
+              // If URL parsing fails, try simple string extraction
+              if (event.page_url.includes('?')) {
+                const queryString = event.page_url.substring(event.page_url.indexOf('?') + 1);
+                queryString.split('&').forEach(param => {
+                  const [key, value] = param.split('=');
+                  if (key) {
+                    try {
+                      const decodedKey = decodeURIComponent(key);
+                      const decodedValue = value ? decodeURIComponent(value) : '';
+                      eventUrlParams[decodedKey] = decodedValue;
+                    } catch (decodeError) {
+                      // If decoding fails, use raw values
+                      eventUrlParams[key] = value || '';
+                    }
+                  }
+                });
+              }
             }
           }
         }
         
         // Extract URL params from landing_page if available (fallback)
-        if (Object.keys(sessionUrlParams).length === 0 && session.landing_page?.includes('?')) {
+        // ALWAYS try this if landing_page has query params, regardless of sessionUrlParams
+        if (session.landing_page?.includes('?')) {
           try {
-            const url = new URL(session.landing_page, 'https://example.com');
+            let url: URL;
+            try {
+              url = new URL(session.landing_page);
+            } catch (e) {
+              // If that fails, try with a base URL (for relative URLs)
+              url = new URL(session.landing_page, 'https://example.com');
+            }
             const params = Object.fromEntries(url.searchParams.entries());
-            sessionUrlParams = params;
+            // Merge with existing sessionUrlParams (landing_page params take precedence if sessionUrlParams is empty)
+            if (Object.keys(sessionUrlParams).length === 0) {
+              sessionUrlParams = params;
+            } else {
+              // Merge, but don't overwrite existing params
+              sessionUrlParams = { ...params, ...sessionUrlParams };
+            }
           } catch (e) {
             // If URL parsing fails, try simple string extraction
             if (session.landing_page.includes('?')) {
               const queryString = session.landing_page.substring(session.landing_page.indexOf('?') + 1);
               queryString.split('&').forEach(param => {
                 const [key, value] = param.split('=');
-                if (key) sessionUrlParams[decodeURIComponent(key)] = value ? decodeURIComponent(value) : '';
+                if (key) {
+                  try {
+                    const decodedKey = decodeURIComponent(key);
+                    const decodedValue = value ? decodeURIComponent(value) : '';
+                    if (Object.keys(sessionUrlParams).length === 0 || !sessionUrlParams[decodedKey]) {
+                      sessionUrlParams[decodedKey] = decodedValue;
+                    }
+                  } catch (decodeError) {
+                    // If decoding fails, use raw values
+                    if (Object.keys(sessionUrlParams).length === 0 || !sessionUrlParams[key]) {
+                      sessionUrlParams[key] = value || '';
+                    }
+                  }
+                }
               });
             }
           }
@@ -739,6 +803,13 @@ export async function GET(request: NextRequest) {
     }>();
 
     console.log(`[Analytics Stats] Processing ${uniqueActiveSessions.length} sessions for affiliate grouping`);
+    console.log(`[Analytics Stats] Sessions breakdown:`, {
+      total: uniqueActiveSessions.length,
+      withUrlParams: uniqueActiveSessions.filter(item => (item.session as any).url_params).length,
+      withUrlParamsButNoEvents: uniqueActiveSessions.filter(item => (item.session as any).url_params && !item.event).length,
+      withEvents: uniqueActiveSessions.filter(item => item.event).length,
+      withoutEvents: uniqueActiveSessions.filter(item => !item.event).length,
+    });
     
     // Use uniqueActiveSessions instead of all sessions for affiliate grouping
     uniqueActiveSessions.forEach(item => {
@@ -780,48 +851,95 @@ export async function GET(request: NextRequest) {
       if ((session as any).url_params) {
         try {
           const urlParamsData = (session as any).url_params;
-          if (urlParamsData && typeof urlParamsData === 'object') {
+          if (urlParamsData && typeof urlParamsData === 'object' && !Array.isArray(urlParamsData)) {
             sessionUrlParams = urlParamsData as Record<string, string>;
           }
         } catch (e) {
-          // Ignore if not an object
+          console.warn('[Analytics Stats] Error parsing session.url_params:', e);
         }
       }
       
       const eventData = event?.event_data as any;
       let eventUrlParams = (eventData?.url_params || {}) as Record<string, string>;
       
-      // Extract from event.page_url if event_data.url_params is empty
-      if (Object.keys(eventUrlParams).length === 0 && event?.page_url) {
-        try {
-          const url = new URL(event.page_url);
-          const params = Object.fromEntries(url.searchParams.entries());
-          eventUrlParams = params;
-        } catch (e) {
-          // If URL parsing fails, try simple string extraction
-          if (event.page_url.includes('?')) {
-            const queryString = event.page_url.substring(event.page_url.indexOf('?') + 1);
-            queryString.split('&').forEach(param => {
-              const [key, value] = param.split('=');
-              if (key) eventUrlParams[decodeURIComponent(key)] = value ? decodeURIComponent(value) : '';
-            });
+      // Extract from event.page_url - ALWAYS try this if page_url exists and has query params
+      // This is the most reliable source for historical data
+      if (event?.page_url && event.page_url.trim() !== '') {
+        const pageUrlHasQuery = event.page_url.includes('?');
+        if (pageUrlHasQuery || Object.keys(eventUrlParams).length === 0) {
+          try {
+            // Try parsing as absolute URL first
+            let url: URL;
+            try {
+              url = new URL(event.page_url);
+            } catch (e) {
+              // If that fails, try with a base URL (for relative URLs)
+              url = new URL(event.page_url, 'https://example.com');
+            }
+            const params = Object.fromEntries(url.searchParams.entries());
+            // Merge with existing eventUrlParams (page_url takes precedence)
+            eventUrlParams = { ...eventUrlParams, ...params };
+          } catch (e) {
+            // If URL parsing fails, try simple string extraction
+            if (event.page_url.includes('?')) {
+              const queryString = event.page_url.substring(event.page_url.indexOf('?') + 1);
+              queryString.split('&').forEach(param => {
+                const [key, value] = param.split('=');
+                if (key) {
+                  try {
+                    const decodedKey = decodeURIComponent(key);
+                    const decodedValue = value ? decodeURIComponent(value) : '';
+                    eventUrlParams[decodedKey] = decodedValue;
+                  } catch (decodeError) {
+                    // If decoding fails, use raw values
+                    eventUrlParams[key] = value || '';
+                  }
+                }
+              });
+            }
           }
         }
       }
       
       // Extract URL params from landing_page if available (fallback)
-      if (Object.keys(sessionUrlParams).length === 0 && session.landing_page?.includes('?')) {
+      // ALWAYS try this if landing_page has query params, regardless of sessionUrlParams
+      if (session.landing_page?.includes('?')) {
         try {
-          const url = new URL(session.landing_page, 'https://example.com');
+          let url: URL;
+          try {
+            url = new URL(session.landing_page);
+          } catch (e) {
+            // If that fails, try with a base URL (for relative URLs)
+            url = new URL(session.landing_page, 'https://example.com');
+          }
           const params = Object.fromEntries(url.searchParams.entries());
-          sessionUrlParams = params;
+          // Merge with existing sessionUrlParams (landing_page params take precedence if sessionUrlParams is empty)
+          if (Object.keys(sessionUrlParams).length === 0) {
+            sessionUrlParams = params;
+          } else {
+            // Merge, but don't overwrite existing params
+            sessionUrlParams = { ...params, ...sessionUrlParams };
+          }
         } catch (e) {
           // If URL parsing fails, try simple string extraction
           if (session.landing_page.includes('?')) {
             const queryString = session.landing_page.substring(session.landing_page.indexOf('?') + 1);
             queryString.split('&').forEach(param => {
               const [key, value] = param.split('=');
-              if (key) sessionUrlParams[decodeURIComponent(key)] = value ? decodeURIComponent(value) : '';
+              if (key) {
+                try {
+                  const decodedKey = decodeURIComponent(key);
+                  const decodedValue = value ? decodeURIComponent(value) : '';
+                  if (Object.keys(sessionUrlParams).length === 0 || !sessionUrlParams[decodedKey]) {
+                    sessionUrlParams[decodedKey] = decodedValue;
+                  }
+                } catch (decodeError) {
+                  // If decoding fails, use raw values
+                  if (Object.keys(sessionUrlParams).length === 0 || !sessionUrlParams[key]) {
+                    sessionUrlParams[key] = value || '';
+                  }
+                }
+              }
             });
           }
         }
@@ -830,19 +948,28 @@ export async function GET(request: NextRequest) {
       // Merge: event params take precedence, but session params persist if event doesn't have them
       const urlParams = { ...sessionUrlParams, ...eventUrlParams };
       
-      // Debug: Log URL params extraction for first few sessions
-      if (existing.active_visitors.length < 3) {
-        console.log('[Analytics Stats] URL params extraction:', {
+      // Debug: Log URL params extraction for sessions (especially those without events or with empty params)
+      const hasUrlParamsInSession = !!(session as any).url_params;
+      const hasNoEvent = !event;
+      const finalUrlParamsCount = Object.keys(urlParams).length;
+      const shouldLog = existing.active_visitors.length < 3 || (hasUrlParamsInSession && hasNoEvent) || (finalUrlParamsCount === 0 && (event?.page_url?.includes('?') || session.landing_page?.includes('?')));
+      
+      if (shouldLog) {
+        console.log('[Analytics Stats] URL params extraction (affiliate grouping):', {
           session_id: session.session_id,
-          landing_page: session.landing_page,
-          sessionUrlParams,
-          eventUrlParams,
-          mergedUrlParams: urlParams,
+          hasUrlParamsInSession,
+          sessionUrlParams: (session as any).url_params,
           hasEvent: !!event,
-          eventPageUrl: event?.page_url?.substring(0, 150),
-          eventData: event?.event_data,
-          urlParamsKeys: Object.keys(urlParams),
-          urlParamsCount: Object.keys(urlParams).length,
+          eventPageUrl: event?.page_url,
+          eventPageUrlHasQuery: event?.page_url?.includes('?'),
+          eventDataUrlParams: eventData?.url_params,
+          landingPage: session.landing_page,
+          landingPageHasQuery: session.landing_page?.includes('?'),
+          sessionUrlParamsKeys: Object.keys(sessionUrlParams),
+          eventUrlParamsKeys: Object.keys(eventUrlParams),
+          mergedUrlParamsKeys: Object.keys(urlParams),
+          urlParamsCount: finalUrlParamsCount,
+          finalUrlParams: urlParams,
         });
       }
       
@@ -893,16 +1020,22 @@ export async function GET(request: NextRequest) {
       
       // Debug: Log first affiliate's active_visitors to verify URL params are included
       if (aff.affiliate_id === Array.from(affiliateMap.keys())[0]) {
+        const visitorsWithParams = result.active_visitors.filter(v => v.url_params && Object.keys(v.url_params).length > 0);
         console.log('[Analytics Stats] Sample affiliate active_visitors:', {
           affiliate_id: aff.affiliate_id,
           affiliate_name: aff.affiliate_name,
           active_visitors_count: result.active_visitors.length,
+          visitors_with_url_params: visitorsWithParams.length,
           first_visitor: result.active_visitors[0] ? {
             session_id: result.active_visitors[0].session_id,
             currentPage: result.active_visitors[0].currentPage,
             has_url_params: !!result.active_visitors[0].url_params,
             url_params_keys: result.active_visitors[0].url_params ? Object.keys(result.active_visitors[0].url_params) : [],
             url_params: result.active_visitors[0].url_params,
+          } : null,
+          sample_visitor_with_params: visitorsWithParams[0] ? {
+            session_id: visitorsWithParams[0].session_id,
+            url_params: visitorsWithParams[0].url_params,
           } : null,
         });
       }

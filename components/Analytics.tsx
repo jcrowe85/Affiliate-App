@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 
 interface AnalyticsMetrics {
   total_visitors: number;
@@ -93,12 +93,20 @@ export default function Analytics() {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState('30d'); // Default to 30 days for historical mode
-  // Default to real-time mode (shows active sessions in last 30 minutes)
+  // Default to real-time mode (shows active sessions in last 5 minutes)
   const [viewMode, setViewMode] = useState<'realtime' | 'historical'>('realtime');
   const [refreshInterval, setRefreshInterval] = useState(10); // seconds
+  // Use ref to track current viewMode to avoid stale closures in intervals/SSE handlers
+  const viewModeRef = useRef(viewMode);
+  const fetchAnalyticsRef = useRef<((isInitialLoad?: boolean) => Promise<void>) | null>(null);
 
-  const fetchAnalytics = useCallback(async () => {
+  const fetchAnalytics = useCallback(async (isInitialLoad = false) => {
     try {
+      // Only set loading state on initial load to prevent flashing during polling
+      if (isInitialLoad) {
+        setLoading(true);
+      }
+      
       // Only include timeRange for historical mode
       const url = viewMode === 'historical' 
         ? `/api/analytics/stats?timeRange=${timeRange}&viewMode=${viewMode}`
@@ -111,14 +119,18 @@ export default function Analytics() {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Failed to fetch analytics' }));
         console.error('Analytics API error:', errorData);
-        setLoading(false);
+        if (isInitialLoad) {
+          setLoading(false);
+        }
         return;
       }
       const analyticsData = await response.json();
       // Validate that the response has the expected structure
       if (analyticsData.error) {
         console.error('Analytics API returned error:', analyticsData.error);
-        setLoading(false);
+        if (isInitialLoad) {
+          setLoading(false);
+        }
         return;
       }
       // Ensure metrics exist with default values if missing
@@ -132,18 +144,38 @@ export default function Analytics() {
           pages_per_session: 0,
         };
       }
+      // Only update data if we got a valid response (prevents clearing data on empty results)
       setData(analyticsData);
-      setLoading(false);
+      if (isInitialLoad) {
+        setLoading(false);
+      }
     } catch (error) {
       console.error('Error fetching analytics:', error);
-      setLoading(false);
+      if (isInitialLoad) {
+        setLoading(false);
+      }
     }
   }, [timeRange, viewMode]);
 
+  // Update refs whenever they change
+  useEffect(() => {
+    viewModeRef.current = viewMode;
+    fetchAnalyticsRef.current = fetchAnalytics;
+  }, [viewMode, fetchAnalytics]);
+
   // Set up Server-Sent Events for real-time updates
   useEffect(() => {
-    // Initial fetch
-    fetchAnalytics();
+    let isMounted = true;
+    
+    // Initial fetch - mark as initial load to show loading state
+    if (fetchAnalyticsRef.current) {
+      fetchAnalyticsRef.current(true);
+    }
+
+    // Only set up SSE connection and polling for real-time mode
+    if (viewMode !== 'realtime') {
+      return; // No cleanup needed in historical mode
+    }
 
     // Set up SSE connection for real-time updates
     const eventSource = new EventSource('/api/analytics/stream');
@@ -152,18 +184,27 @@ export default function Analytics() {
       try {
         const message = JSON.parse(event.data);
         if (message.type === 'update' && message.data) {
-          // Only update in real-time mode (SSE doesn't make sense for historical)
-          if (viewMode === 'realtime' && message.data.affiliates) {
+          // Only update if we're still in real-time mode (check ref to avoid stale closure)
+          if (viewModeRef.current === 'realtime') {
             setData(prevData => {
               if (!prevData) return prevData;
-              return {
+              // DON'T update metrics from SSE - they conflict with polling data
+              // SSE metrics are calculated differently and cause flashing
+              // Only update activeVisitors from SSE, preserve everything else
+              const updatedData: AnalyticsData = {
                 ...prevData,
-                affiliates: message.data.affiliates,
-                metrics: {
-                  ...prevData.metrics,
-                  ...message.data.metrics,
-                },
+                // Keep existing metrics - don't overwrite with SSE metrics
+                // metrics: prevData.metrics,
               };
+              // Only update activeVisitors if provided, otherwise keep existing
+              if (message.data.activeVisitors) {
+                updatedData.activeVisitors = message.data.activeVisitors;
+              }
+              // Preserve affiliates data - don't overwrite with undefined
+              if (message.data.affiliates) {
+                updatedData.affiliates = message.data.affiliates;
+              }
+              return updatedData;
             });
           }
         } else if (message.type === 'error') {
@@ -176,25 +217,25 @@ export default function Analytics() {
 
     eventSource.onerror = (error) => {
       console.error('SSE connection error:', error);
-      // Fallback to polling if SSE fails
-      const interval = setInterval(fetchAnalytics, refreshInterval * 1000);
-      return () => {
-        clearInterval(interval);
-        eventSource.close();
-      };
     };
 
     // Fallback polling for time range changes (SSE only updates active visitors)
     // Only poll in real-time mode
-    const interval = viewMode === 'realtime' 
-      ? setInterval(fetchAnalytics, refreshInterval * 1000)
-      : null;
+    // Pass false to prevent loading state changes during polling (prevents flashing)
+    const interval = setInterval(() => {
+      // Check ref to ensure we're still in real-time mode and component is mounted
+      if (isMounted && viewModeRef.current === 'realtime' && fetchAnalyticsRef.current) {
+        fetchAnalyticsRef.current(false);
+      }
+    }, refreshInterval * 1000);
 
     return () => {
+      isMounted = false;
       eventSource.close();
-      if (interval) clearInterval(interval);
+      clearInterval(interval);
     };
-  }, [fetchAnalytics, refreshInterval, viewMode]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode, refreshInterval]); // Only depend on viewMode and refreshInterval, not fetchAnalytics
 
   const formatTime = (seconds: number) => {
     if (seconds < 60) return `${Math.round(seconds)}s`;
@@ -233,16 +274,16 @@ export default function Analytics() {
           <div className="flex items-center gap-4">
             {/* View Mode Toggle */}
             <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-gray-700">View:</label>
               <button
                 onClick={() => setViewMode('realtime')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
                   viewMode === 'realtime'
                     ? 'bg-indigo-600 text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                🟢 Real-Time
+                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                Real-Time
               </button>
               <button
                 onClick={() => setViewMode('historical')}
@@ -252,7 +293,7 @@ export default function Analytics() {
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                📊 Historical
+                Historical
               </button>
             </div>
             
@@ -281,10 +322,15 @@ export default function Analytics() {
           </button>
         </div>
         <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-600">
-            {viewMode === 'realtime' 
-              ? '🟢 Live: Showing active sessions (last 30 minutes) - Auto-refreshes every 10 seconds' 
-              : `📊 Historical: Showing all sessions (${timeRange === '1h' ? 'last hour' : timeRange === '24h' ? 'last 24 hours' : timeRange === '7d' ? 'last 7 days' : 'last 30 days'})`}
+          <span className="text-sm text-gray-600 flex items-center gap-2">
+            {viewMode === 'realtime' ? (
+              <>
+                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                <span>Live: Showing active sessions (last 5 minutes) - Auto-refreshes every 10 seconds</span>
+              </>
+            ) : (
+              `Historical: Showing all sessions (${timeRange === '1h' ? 'last hour' : timeRange === '24h' ? 'last 24 hours' : timeRange === '7d' ? 'last 7 days' : 'last 30 days'})`
+            )}
           </span>
         </div>
       </div>
@@ -343,10 +389,15 @@ export default function Analytics() {
                       <span className="ml-2 text-base font-normal text-gray-500">#{affiliate.affiliate_number}</span>
                     )}
                   </h3>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {viewMode === 'realtime' 
-                      ? '🟢 Active Sessions (Live - last 30 minutes)' 
-                      : `📊 Historical Sessions (${timeRange === '1h' ? 'last hour' : timeRange === '24h' ? 'last 24 hours' : timeRange === '7d' ? 'last 7 days' : 'last 30 days'})`}
+                  <p className="text-sm text-gray-500 mt-1 flex items-center gap-2">
+                    {viewMode === 'realtime' ? (
+                      <>
+                        <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                        <span>Active Sessions (Live - last 5 minutes)</span>
+                      </>
+                    ) : (
+                      `Historical Sessions (${timeRange === '1h' ? 'last hour' : timeRange === '24h' ? 'last 24 hours' : timeRange === '7d' ? 'last 7 days' : 'last 30 days'})`
+                    )}
                   </p>
                 </div>
               </div>
@@ -398,9 +449,9 @@ export default function Analytics() {
                           <div className="text-xs font-medium text-gray-600 mb-2">URL Parameters:</div>
                           <div className="flex flex-wrap gap-2">
                             {Object.entries(visitor.url_params).map(([key, value]) => (
-                              <div key={key} className="inline-flex items-center gap-1 px-2 py-1 bg-white rounded text-xs border border-gray-200">
-                                <span className="font-medium text-gray-700">{key}:</span>
-                                <span className="text-gray-600">{value}</span>
+                              <div key={key} className="inline-flex items-center gap-1 px-2 py-1 bg-white rounded text-xs border border-gray-200 max-w-full min-w-0">
+                                <span className="font-medium text-gray-700 whitespace-nowrap">{key}:</span>
+                                <span className="text-gray-600 break-words break-all">{value}</span>
                               </div>
                             ))}
                           </div>
@@ -421,7 +472,7 @@ export default function Analytics() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
           <p className="text-gray-500">
             {viewMode === 'realtime' 
-              ? 'No active affiliate sessions (no activity in last 30 minutes)' 
+              ? 'No active affiliate sessions (no activity in last 5 minutes)' 
               : 'No historical sessions found for the selected time range'}
           </p>
         </div>
