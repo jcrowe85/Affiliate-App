@@ -40,8 +40,8 @@ export async function GET(request: NextRequest) {
           const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
           const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-          // Get active visitors
-          const activeEvents = await prisma.visitorEvent.findMany({
+          // Get active visitors - get unique sessions from recent events
+          const recentEvents = await prisma.visitorEvent.findMany({
             where: {
               shopify_shop_id: shopifyShopId,
               timestamp: {
@@ -49,7 +49,17 @@ export async function GET(request: NextRequest) {
               },
             },
             include: {
-              session: true,
+              session: {
+                select: {
+                  id: true,
+                  session_id: true,
+                  pages_visited: true,
+                  device_type: true,
+                  location_country: true,
+                  updated_at: true,
+                  affiliate_id: true,
+                },
+              },
             },
             orderBy: {
               timestamp: 'desc',
@@ -57,15 +67,13 @@ export async function GET(request: NextRequest) {
             take: 1000,
           });
 
-          // Get unique sessions by visitor_session_id
-          const uniqueSessionIds = new Set<string>();
-          const uniqueActiveEvents: typeof activeEvents = [];
-          for (const event of activeEvents) {
-            if (!uniqueSessionIds.has(event.visitor_session_id) && uniqueActiveEvents.length < 50) {
-              uniqueSessionIds.add(event.visitor_session_id);
-              uniqueActiveEvents.push(event);
+          // Get unique sessions (deduplicate by visitor_session_id)
+          const uniqueSessions = new Map<string, typeof recentEvents[0]>();
+          recentEvents.forEach(event => {
+            if (!uniqueSessions.has(event.visitor_session_id)) {
+              uniqueSessions.set(event.visitor_session_id, event);
             }
-          }
+          });
 
           // Get recent sessions for metrics
           const recentSessions = await prisma.visitorSession.findMany({
@@ -93,15 +101,17 @@ export async function GET(request: NextRequest) {
           const pagesPerSession = totalVisitors > 0 ? totalPages / totalVisitors : 0;
 
           // Format active visitors
-          const activeVisitors = uniqueActiveEvents.map(event => {
+          const activeVisitors = Array.from(uniqueSessions.values()).map(event => {
             const session = event.session;
-            const pagesVisited = session.pages_visited || [];
+            const pagesVisited = session?.pages_visited || [];
+            const currentPage = pagesVisited[pagesVisited.length - 1] || '/';
+            
             return {
-              session_id: session.session_id,
-              currentPage: pagesVisited[pagesVisited.length - 1] || '/',
-              device: session.device_type || 'Unknown',
-              location: session.location_country || 'Unknown',
-              lastSeen: Number(session.updated_at.getTime()),
+              session_id: session?.session_id || '',
+              currentPage: currentPage,
+              device: session?.device_type || 'Unknown',
+              location: session?.location_country || 'Unknown',
+              lastSeen: session ? Number(session.updated_at.getTime()) : Date.now(),
             };
           });
 
@@ -151,6 +161,7 @@ export async function GET(request: NextRequest) {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
       'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no', // Disable buffering in nginx
     },
   });
 }

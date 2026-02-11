@@ -19,53 +19,406 @@ function getTimeRangeMs(timeRange: string): number {
  */
 export async function GET(request: NextRequest) {
   try {
-    const admin = await getCurrentAdmin();
+    let admin;
+    try {
+      admin = await getCurrentAdmin();
+    } catch (authError: any) {
+      console.error('Auth error in analytics stats:', authError);
+      return NextResponse.json(
+        { error: 'Authentication error: ' + (authError.message || 'Unknown error') },
+        { status: 500 }
+      );
+    }
+    
     if (!admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const shopifyShopId = admin.shopify_shop_id;
     const searchParams = request.nextUrl.searchParams;
-    const timeRange = searchParams.get('timeRange') || '24h';
-    const startTime = new Date(Date.now() - getTimeRangeMs(timeRange));
+    const timeRange = searchParams.get('timeRange') || '30d'; // Default to 30 days to show more data
+    const viewMode = searchParams.get('viewMode') || 'historical'; // Default to historical
+    const startTime = Date.now() - getTimeRangeMs(timeRange);
+    const startTimeDate = new Date(startTime);
 
-    // Get all sessions in time range
-    const sessions = await prisma.visitorSession.findMany({
-      where: {
-        shopify_shop_id: shopifyShopId,
-        start_time: {
-          gte: startTime,
+    // Determine which sessions to show based on view mode
+    type SessionWithAffiliate = Awaited<ReturnType<typeof prisma.visitorSession.findMany>>[0] & {
+      affiliate: {
+        id: string;
+        affiliate_number: number | null;
+        name: string;
+        first_name: string | null;
+        last_name: string | null;
+      } | null;
+      affiliate_number?: number | null; // For backward compatibility
+    };
+    
+    type VisitorEvent = Awaited<ReturnType<typeof prisma.visitorEvent.findFirst>>;
+    
+    let sessionsList: SessionWithAffiliate[];
+    let uniqueActiveSessions: Array<{ session: SessionWithAffiliate; event: VisitorEvent | null }>;
+    
+    if (viewMode === 'realtime') {
+      // Real-time mode: Find sessions with recent events (last 30 minutes)
+      const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+      
+      // First, find sessions that have recent events (this is the real indicator of "active")
+      const recentEvents = await prisma.visitorEvent.findMany({
+        where: {
+          shopify_shop_id: shopifyShopId,
+          event_type: 'page_view',
+          timestamp: {
+            gte: thirtyMinutesAgo,
+          },
         },
-      },
-    });
-
-    // Get active visitors (sessions with activity in last 5 minutes)
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-    const recentEvents = await prisma.visitorEvent.findMany({
-      where: {
-        shopify_shop_id: shopifyShopId,
-        timestamp: {
-          gte: fiveMinutesAgo,
+        select: {
+          visitor_session_id: true,
         },
-      },
-      include: {
-        session: true,
-      },
-      orderBy: {
-        timestamp: 'desc',
-      },
-      take: 1000, // Get more events to ensure we have unique sessions
-    });
-
-    // Get unique sessions by visitor_session_id
-    const uniqueSessionIds = new Set<string>();
-    const activeSessions: typeof recentEvents = [];
-    for (const event of recentEvents) {
-      if (!uniqueSessionIds.has(event.visitor_session_id) && activeSessions.length < 50) {
-        uniqueSessionIds.add(event.visitor_session_id);
-        activeSessions.push(event);
-      }
+        orderBy: {
+          timestamp: 'desc',
+        },
+        take: 1000,
+      });
+      
+      // Deduplicate by visitor_session_id (get unique session IDs)
+      const activeSessionIds = Array.from(new Set(recentEvents.map(e => e.visitor_session_id)));
+      
+      console.log('[Analytics Stats] Real-time mode:', {
+        recentEventsFound: recentEvents.length,
+        activeSessionIds: activeSessionIds.length,
+        thirtyMinutesAgo: thirtyMinutesAgo.toISOString(),
+      });
+      
+      // Get sessions for these active session IDs (only affiliate traffic)
+      sessionsList = activeSessionIds.length > 0
+        ? await prisma.visitorSession.findMany({
+            where: {
+              id: { in: activeSessionIds },
+              shopify_shop_id: shopifyShopId,
+              affiliate_id: { not: null }, // Only affiliate traffic
+            },
+            orderBy: {
+              updated_at: 'desc',
+            },
+            take: 50,
+          })
+        : [];
+      
+      // Fetch affiliate data separately since VisitorSession doesn't have affiliate relation
+      const affiliateIds = Array.from(new Set(sessionsList.map(s => s.affiliate_id).filter(Boolean)));
+      const affiliatesData = affiliateIds.length > 0
+        ? await prisma.affiliate.findMany({
+            where: {
+              id: { in: affiliateIds as string[] },
+              shopify_shop_id: shopifyShopId,
+            },
+            select: {
+              id: true,
+              affiliate_number: true,
+              name: true,
+              first_name: true,
+              last_name: true,
+            },
+          })
+        : [];
+      const affiliateMap = new Map(affiliatesData.map(a => [a.id, a]));
+      
+      // Add affiliate data to sessions (matching old structure)
+      sessionsList = sessionsList.map(session => {
+        const affiliate = session.affiliate_id ? affiliateMap.get(session.affiliate_id) || null : null;
+        return {
+          ...session,
+          affiliate,
+          affiliate_number: affiliate?.affiliate_number || null, // For backward compatibility
+        };
+      }) as SessionWithAffiliate[];
+      
+      // Get the most recent event for each active session to capture URL parameters and current page
+      const sessionIds = sessionsList.map(s => s.id);
+      
+      // Get all recent page_view events for these sessions, ordered by timestamp
+      const allRecentEvents = sessionIds.length > 0
+        ? await prisma.visitorEvent.findMany({
+            where: {
+              visitor_session_id: { in: sessionIds },
+              event_type: 'page_view',
+              timestamp: {
+                gte: thirtyMinutesAgo,
+              },
+            },
+            orderBy: {
+              timestamp: 'desc',
+            },
+            take: 1000, // Get enough to find most recent per session
+          })
+        : [];
+      
+      // Create a map of visitor_session_id to most recent event (first one encountered is most recent due to ordering)
+      const eventMap = new Map<string, typeof allRecentEvents[0]>();
+      allRecentEvents.forEach(event => {
+        if (!eventMap.has(event.visitor_session_id)) {
+          eventMap.set(event.visitor_session_id, event);
+        }
+      });
+      
+      // Combine sessions with their most recent events
+      uniqueActiveSessions = sessionsList.map(session => {
+        const recentEvent = eventMap.get(session.id);
+        return {
+          session: session,
+          event: recentEvent || null,
+        };
+      });
+    } else {
+      // Historical mode: Show all sessions within time range
+      // First, check if there are any sessions at all (for debugging)
+      const allSessionsCount = await prisma.visitorSession.count({
+        where: {
+          shopify_shop_id: shopifyShopId,
+        },
+      });
+      const affiliateSessionsCount = await prisma.visitorSession.count({
+        where: {
+          shopify_shop_id: shopifyShopId,
+          affiliate_id: { not: null },
+        },
+      });
+      
+      // Test the exact same query we'll use, but as a count
+      const timeRangeSessionsCount = await prisma.visitorSession.count({
+        where: {
+          shopify_shop_id: shopifyShopId,
+          affiliate_id: { not: null },
+          start_time: {
+            gte: startTimeDate,
+          },
+        },
+      });
+      
+      // Also test without the time filter to see if that's the issue
+      const affiliateSessionsWithoutTimeFilter = await prisma.visitorSession.findMany({
+        where: {
+          shopify_shop_id: shopifyShopId,
+          affiliate_id: { not: null },
+        },
+        select: {
+          id: true,
+          start_time: true,
+        },
+        take: 10,
+        orderBy: {
+          start_time: 'desc',
+        },
+      });
+      
+      console.log('[Analytics Stats] Pre-query debug:', {
+        shopifyShopId,
+        startTimeDate: startTimeDate.toISOString(),
+        timeRangeSessionsCount,
+        affiliateSessionsWithoutTimeFilter: affiliateSessionsWithoutTimeFilter.map(s => ({
+          id: s.id,
+          start_time: s.start_time.toISOString(),
+          isAfterStartTime: s.start_time >= startTimeDate,
+        })),
+      });
+      // Get sample session dates to understand the data
+      // First, get sessions that SHOULD match the filter
+      const testQuerySessions = await prisma.visitorSession.findMany({
+        where: {
+          shopify_shop_id: shopifyShopId,
+          affiliate_id: { not: null },
+          start_time: {
+            gte: startTimeDate,
+          },
+        },
+        select: {
+          start_time: true,
+          updated_at: true,
+          id: true,
+        },
+        orderBy: {
+          start_time: 'desc',
+        },
+        take: 5,
+      });
+      
+      // Also get recent sessions without the time filter for comparison
+      const sampleSessions = await prisma.visitorSession.findMany({
+        where: {
+          shopify_shop_id: shopifyShopId,
+          affiliate_id: { not: null },
+        },
+        select: {
+          start_time: true,
+          updated_at: true,
+        },
+        orderBy: {
+          start_time: 'desc',
+        },
+        take: 5,
+      });
+      
+      const oldestSession = await prisma.visitorSession.findFirst({
+        where: {
+          shopify_shop_id: shopifyShopId,
+          affiliate_id: { not: null },
+        },
+        select: {
+          start_time: true,
+        },
+        orderBy: {
+          start_time: 'asc',
+        },
+      });
+      
+      console.log('[Analytics Stats] Debug counts (historical):', {
+        allSessions: allSessionsCount,
+        affiliateSessions: affiliateSessionsCount,
+        timeRangeAffiliateSessions: timeRangeSessionsCount,
+        startTimeDate: startTimeDate.toISOString(),
+        timeRange,
+        now: new Date().toISOString(),
+        testQuerySessions: testQuerySessions.map(s => ({
+          id: s.id,
+          start_time: s.start_time.toISOString(),
+          updated_at: s.updated_at.toISOString(),
+        })),
+        sampleRecentSessions: sampleSessions.map(s => ({
+          start_time: s.start_time.toISOString(),
+          updated_at: s.updated_at.toISOString(),
+        })),
+        oldestSession: oldestSession ? oldestSession.start_time.toISOString() : 'none',
+        dateComparison: {
+          sampleStartTime: sampleSessions[0]?.start_time?.toISOString(),
+          startTimeDate: startTimeDate.toISOString(),
+          isSampleAfterStart: sampleSessions[0]?.start_time ? sampleSessions[0].start_time >= startTimeDate : 'N/A',
+        },
+      });
+      
+      // Query sessions with time filter
+      // Note: Using in-memory filtering as fallback since Prisma date comparison seems to have issues
+      sessionsList = await prisma.visitorSession.findMany({
+        where: {
+          shopify_shop_id: shopifyShopId,
+          affiliate_id: { not: null }, // Only affiliate traffic
+        },
+        orderBy: {
+          start_time: 'desc',
+        },
+        take: 1000,
+      });
+      
+      // Filter in memory by time range (Prisma date filter was excluding valid sessions)
+      const filteredSessions = sessionsList.filter(s => s.start_time >= startTimeDate);
+      sessionsList = filteredSessions as SessionWithAffiliate[];
+      
+      console.log('[Analytics Stats] Historical query result:', {
+        sessionsFound: sessionsList.length,
+        firstSessionStartTime: sessionsList[0]?.start_time?.toISOString(),
+        lastSessionStartTime: sessionsList[sessionsList.length - 1]?.start_time?.toISOString(),
+        startTimeDate: startTimeDate.toISOString(),
+      });
+      
+      // Fetch affiliate data separately since VisitorSession doesn't have affiliate relation
+      const affiliateIds = Array.from(new Set(sessionsList.map(s => s.affiliate_id).filter(Boolean)));
+      const affiliatesData = affiliateIds.length > 0
+        ? await prisma.affiliate.findMany({
+            where: {
+              id: { in: affiliateIds as string[] },
+              shopify_shop_id: shopifyShopId,
+            },
+            select: {
+              id: true,
+              affiliate_number: true,
+              name: true,
+              first_name: true,
+              last_name: true,
+            },
+          })
+        : [];
+      const affiliateMap = new Map(affiliatesData.map(a => [a.id, a]));
+      
+      // Add affiliate data to sessions (matching old structure)
+      sessionsList = sessionsList.map(session => {
+        const affiliate = session.affiliate_id ? affiliateMap.get(session.affiliate_id) || null : null;
+        return {
+          ...session,
+          affiliate,
+          affiliate_number: affiliate?.affiliate_number || null, // For backward compatibility
+        };
+      }) as SessionWithAffiliate[];
+      
+      // Get the most recent event for each historical session
+      const sessionIds = sessionsList.map(s => s.id);
+      
+      // Get all page_view events for these sessions (get most recent event per session, regardless of timestamp)
+      // For historical mode, we want the most recent event for each session to get current page and URL params
+      // Also get events for sessions that might not have affiliate_id set yet (they might have been created before affiliate was set)
+      const allHistoricalEvents = sessionIds.length > 0
+        ? await prisma.visitorEvent.findMany({
+            where: {
+              visitor_session_id: { in: sessionIds },
+              event_type: 'page_view',
+              // Don't filter by timestamp - we want the most recent event for each session
+            },
+            select: {
+              id: true,
+              visitor_session_id: true,
+              visitor_id: true,
+              event_type: true,
+              shopify_shop_id: true,
+              page_url: true,
+              page_path: true,
+              page_title: true,
+              referrer: true,
+              timestamp: true,
+              event_data: true,
+            },
+            orderBy: {
+              timestamp: 'desc',
+            },
+            take: 5000, // Get enough to find most recent per session
+          })
+        : [];
+      
+      // Create a map of visitor_session_id to most recent event
+      const eventMap = new Map<string, typeof allHistoricalEvents[0]>();
+      allHistoricalEvents.forEach(event => {
+        if (!eventMap.has(event.visitor_session_id)) {
+          eventMap.set(event.visitor_session_id, event);
+        }
+      });
+      
+      console.log('[Analytics Stats] Event map stats:', {
+        totalEvents: allHistoricalEvents.length,
+        uniqueSessionsWithEvents: eventMap.size,
+        totalSessions: sessionsList.length,
+        sampleEvent: allHistoricalEvents[0] ? {
+          visitor_session_id: allHistoricalEvents[0].visitor_session_id,
+          event_type: allHistoricalEvents[0].event_type,
+          has_event_data: !!allHistoricalEvents[0].event_data,
+        } : null,
+        sampleSessionId: sessionsList[0]?.id,
+        eventMapHasSession: sessionsList[0] ? eventMap.has(sessionsList[0].id) : false,
+      });
+      
+      // Combine sessions with their most recent events
+      uniqueActiveSessions = sessionsList.map(session => {
+        const recentEvent = eventMap.get(session.id);
+        return {
+          session: session,
+          event: recentEvent || null,
+        };
+      });
     }
+
+    // Use sessionsList for all metrics calculations (based on viewMode)
+    const sessions = sessionsList;
+
+    // Debug: Log session count and affiliate IDs
+    console.log('[Analytics Stats] Sessions found:', sessions.length);
+    console.log('[Analytics Stats] Sessions with affiliate_id:', sessions.filter(s => s.affiliate_id).length);
+    console.log('[Analytics Stats] Sample affiliate_ids:', sessions.slice(0, 5).map(s => s.affiliate_id));
 
     // Calculate metrics
     const totalVisitors = sessions.length;
@@ -109,7 +462,7 @@ export async function GET(request: NextRequest) {
     // Get entry pages
     const entryPagesMap = new Map<string, number>();
     sessions.forEach(session => {
-      const entryPage: string = session.entry_page || '/';
+      const entryPage = session.entry_page || '/';
       const count = entryPagesMap.get(entryPage) || 0;
       entryPagesMap.set(entryPage, count + 1);
     });
@@ -124,7 +477,7 @@ export async function GET(request: NextRequest) {
     sessions
       .filter(s => s.exit_page)
       .forEach(session => {
-        const exitPage: string = session.exit_page || '/';
+        const exitPage = session.exit_page || '/';
         const count = exitPagesMap.get(exitPage) || 0;
         exitPagesMap.set(exitPage, count + 1);
       });
@@ -157,58 +510,352 @@ export async function GET(request: NextRequest) {
     // Get devices
     const devicesMap = new Map<string, number>();
     sessions.forEach(session => {
-      const device = session.device_type || 'unknown';
-      const count = devicesMap.get(device) || 0;
-      devicesMap.set(device, count + 1);
+      const type = session.device_type || 'unknown';
+      const count = devicesMap.get(type) || 0;
+      devicesMap.set(type, count + 1);
     });
 
+    const totalDevices = Array.from(devicesMap.values()).reduce((a, b) => a + b, 0);
     const devices = Array.from(devicesMap.entries())
-      .map(([device, count]) => ({ device, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10);
+      .map(([type, count]) => ({
+        type,
+        count,
+        percentage: totalDevices > 0 ? (count / totalDevices) * 100 : 0,
+      }))
+      .sort((a, b) => b.count - a.count);
 
-    // Get browsers (from user_agent if available, otherwise 'unknown')
+    // Get browsers (from user agent)
     const browsersMap = new Map<string, number>();
     sessions.forEach(session => {
-      let browser = 'unknown';
       if (session.user_agent) {
-        if (session.user_agent.includes('Chrome') && !session.user_agent.includes('Edg')) browser = 'Chrome';
-        else if (session.user_agent.includes('Firefox')) browser = 'Firefox';
+        let browser = 'Unknown';
+        if (session.user_agent.includes('Chrome')) browser = 'Chrome';
         else if (session.user_agent.includes('Safari') && !session.user_agent.includes('Chrome')) browser = 'Safari';
-        else if (session.user_agent.includes('Edg')) browser = 'Edge';
+        else if (session.user_agent.includes('Firefox')) browser = 'Firefox';
+        else if (session.user_agent.includes('Edge')) browser = 'Edge';
+        else if (session.user_agent.includes('Opera')) browser = 'Opera';
+        
+        const count = browsersMap.get(browser) || 0;
+        browsersMap.set(browser, count + 1);
       }
-      const count = browsersMap.get(browser) || 0;
-      browsersMap.set(browser, count + 1);
     });
 
+    const totalBrowsers = Array.from(browsersMap.values()).reduce((a, b) => a + b, 0);
     const browsers = Array.from(browsersMap.entries())
-      .map(([browser, count]) => ({ browser, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10);
+      .map(([name, count]) => ({
+        name,
+        count,
+        percentage: totalBrowsers > 0 ? (count / totalBrowsers) * 100 : 0,
+      }))
+      .sort((a, b) => b.count - a.count);
 
     // Get geography
     const geographyMap = new Map<string, number>();
     sessions.forEach(session => {
-      const country = session.location_country || 'unknown';
+      const country = session.location_country || 'Unknown';
       const count = geographyMap.get(country) || 0;
       geographyMap.set(country, count + 1);
     });
 
+    const totalGeo = Array.from(geographyMap.values()).reduce((a, b) => a + b, 0);
     const geography = Array.from(geographyMap.entries())
-      .map(([country, count]) => ({ country, count }))
-      .sort((a, b) => b.count - a.count)
+      .map(([country, visitors]) => ({
+        country,
+        visitors,
+        percentage: totalGeo > 0 ? (visitors / totalGeo) * 100 : 0,
+      }))
+      .sort((a, b) => b.visitors - a.visitors)
       .slice(0, 10);
+
+    // Format active visitors (only affiliate traffic)
+    // Use the most recent event's page_path as the current page (always up-to-date)
+    const activeVisitors = uniqueActiveSessions
+      .filter(item => item.session.affiliate_id)
+      .map(item => {
+        const session = item.session;
+        const event = item.event;
+        // Get URL parameters from multiple sources (in order of preference):
+        // 1. session.url_params (persistent from initial visit - PRIMARY SOURCE)
+        // 2. event.event_data.url_params (if tracking script sends it)
+        // 3. event.page_url query string (fallback)
+        // 4. session.landing_page query string (fallback)
+        
+        // Start with session.url_params (this is the main source, like the old system)
+        let sessionUrlParams: Record<string, string> = {};
+        if ((session as any).url_params) {
+          try {
+            const urlParamsData = (session as any).url_params;
+            if (urlParamsData && typeof urlParamsData === 'object') {
+              sessionUrlParams = urlParamsData as Record<string, string>;
+            }
+          } catch (e) {
+            // Ignore if not an object
+          }
+        }
+        
+        const eventData = event?.event_data as any;
+        let eventUrlParams = (eventData?.url_params || {}) as Record<string, string>;
+        
+        // Extract from event.page_url if event_data.url_params is empty
+        if (Object.keys(eventUrlParams).length === 0 && event?.page_url) {
+          try {
+            const url = new URL(event.page_url);
+            const params = Object.fromEntries(url.searchParams.entries());
+            eventUrlParams = params;
+          } catch (e) {
+            // If URL parsing fails, try simple string extraction
+            if (event.page_url.includes('?')) {
+              const queryString = event.page_url.substring(event.page_url.indexOf('?') + 1);
+              queryString.split('&').forEach(param => {
+                const [key, value] = param.split('=');
+                if (key) eventUrlParams[decodeURIComponent(key)] = value ? decodeURIComponent(value) : '';
+              });
+            }
+          }
+        }
+        
+        // Extract URL params from landing_page if available (fallback)
+        if (Object.keys(sessionUrlParams).length === 0 && session.landing_page?.includes('?')) {
+          try {
+            const url = new URL(session.landing_page, 'https://example.com');
+            const params = Object.fromEntries(url.searchParams.entries());
+            sessionUrlParams = params;
+          } catch (e) {
+            // If URL parsing fails, try simple string extraction
+            if (session.landing_page.includes('?')) {
+              const queryString = session.landing_page.substring(session.landing_page.indexOf('?') + 1);
+              queryString.split('&').forEach(param => {
+                const [key, value] = param.split('=');
+                if (key) sessionUrlParams[decodeURIComponent(key)] = value ? decodeURIComponent(value) : '';
+              });
+            }
+          }
+        }
+        
+        // Merge: event params take precedence, but session params persist if event doesn't have them
+        const urlParams = { ...sessionUrlParams, ...eventUrlParams };
+        
+        // Ensure url_params is always an object (even if empty)
+        const finalUrlParams = urlParams && typeof urlParams === 'object' && Object.keys(urlParams).length > 0 ? urlParams : {};
+        
+        // Use the most recent event's page_path, or fall back to last page in pages_visited
+        const currentPage = event?.page_path || session.pages_visited?.[session.pages_visited.length - 1] || '/';
+        return {
+          session_id: session.session_id,
+          currentPage: currentPage,
+          device: session.device_type || 'Unknown',
+          location: session.location_country || 'Unknown',
+          lastSeen: Number(session.updated_at.getTime()),
+          affiliate_id: session.affiliate_id,
+          affiliate_number: session.affiliate_number || session.affiliate?.affiliate_number || null,
+          affiliate_name: session.affiliate?.name || 
+                         (session.affiliate?.first_name && session.affiliate?.last_name 
+                           ? `${session.affiliate.first_name} ${session.affiliate.last_name}` 
+                           : `Affiliate #${session.affiliate_number || session.affiliate?.affiliate_number || 'N/A'}`),
+          url_params: finalUrlParams, // Always include url_params, even if empty
+        };
+      });
+
+    // Group ACTIVE sessions by affiliate (sessions updated in last 30 minutes)
+    const affiliateMap = new Map<string, {
+      affiliate_id: string;
+      affiliate_number: number | null;
+      affiliate_name: string;
+      sessions: number;
+      visitors: Set<string>;
+      page_views: number;
+      bounce_rate: number;
+      avg_session_time: number;
+      active_visitors: Array<{
+        session_id: string;
+        currentPage: string;
+        device: string;
+        location: string;
+        lastSeen: number;
+        url_params: Record<string, string>;
+      }>;
+    }>();
+
+    console.log(`[Analytics Stats] Processing ${uniqueActiveSessions.length} sessions for affiliate grouping`);
+    
+    // Use uniqueActiveSessions instead of all sessions for affiliate grouping
+    uniqueActiveSessions.forEach(item => {
+      const session = item.session;
+      const event = item.event;
+      if (!session.affiliate_id) {
+        return;
+      }
+      
+      const key = session.affiliate_id;
+      const existing = affiliateMap.get(key) || {
+        affiliate_id: session.affiliate_id,
+        affiliate_number: session.affiliate_number || session.affiliate?.affiliate_number || null,
+        affiliate_name: session.affiliate?.name || 
+                       (session.affiliate?.first_name && session.affiliate?.last_name 
+                         ? `${session.affiliate.first_name} ${session.affiliate.last_name}` 
+                         : `Affiliate #${session.affiliate_number || session.affiliate?.affiliate_number || 'N/A'}`),
+        sessions: 0,
+        visitors: new Set<string>(),
+        page_views: 0,
+        bounce_rate: 0,
+        avg_session_time: 0,
+        active_visitors: [],
+      };
+
+      existing.sessions++;
+      existing.visitors.add(session.visitor_id);
+      existing.page_views += session.page_views || 0;
+      existing.avg_session_time += session.total_time || 0;
+      
+      // Get URL parameters from multiple sources (in order of preference):
+      // 1. session.url_params (persistent from initial visit - PRIMARY SOURCE)
+      // 2. event.event_data.url_params (if tracking script sends it)
+      // 3. event.page_url query string (fallback)
+      // 4. session.landing_page query string (fallback)
+      
+      // Start with session.url_params (this is the main source, like the old system)
+      let sessionUrlParams: Record<string, string> = {};
+      if ((session as any).url_params) {
+        try {
+          const urlParamsData = (session as any).url_params;
+          if (urlParamsData && typeof urlParamsData === 'object') {
+            sessionUrlParams = urlParamsData as Record<string, string>;
+          }
+        } catch (e) {
+          // Ignore if not an object
+        }
+      }
+      
+      const eventData = event?.event_data as any;
+      let eventUrlParams = (eventData?.url_params || {}) as Record<string, string>;
+      
+      // Extract from event.page_url if event_data.url_params is empty
+      if (Object.keys(eventUrlParams).length === 0 && event?.page_url) {
+        try {
+          const url = new URL(event.page_url);
+          const params = Object.fromEntries(url.searchParams.entries());
+          eventUrlParams = params;
+        } catch (e) {
+          // If URL parsing fails, try simple string extraction
+          if (event.page_url.includes('?')) {
+            const queryString = event.page_url.substring(event.page_url.indexOf('?') + 1);
+            queryString.split('&').forEach(param => {
+              const [key, value] = param.split('=');
+              if (key) eventUrlParams[decodeURIComponent(key)] = value ? decodeURIComponent(value) : '';
+            });
+          }
+        }
+      }
+      
+      // Extract URL params from landing_page if available (fallback)
+      if (Object.keys(sessionUrlParams).length === 0 && session.landing_page?.includes('?')) {
+        try {
+          const url = new URL(session.landing_page, 'https://example.com');
+          const params = Object.fromEntries(url.searchParams.entries());
+          sessionUrlParams = params;
+        } catch (e) {
+          // If URL parsing fails, try simple string extraction
+          if (session.landing_page.includes('?')) {
+            const queryString = session.landing_page.substring(session.landing_page.indexOf('?') + 1);
+            queryString.split('&').forEach(param => {
+              const [key, value] = param.split('=');
+              if (key) sessionUrlParams[decodeURIComponent(key)] = value ? decodeURIComponent(value) : '';
+            });
+          }
+        }
+      }
+      
+      // Merge: event params take precedence, but session params persist if event doesn't have them
+      const urlParams = { ...sessionUrlParams, ...eventUrlParams };
+      
+      // Debug: Log URL params extraction for first few sessions
+      if (existing.active_visitors.length < 3) {
+        console.log('[Analytics Stats] URL params extraction:', {
+          session_id: session.session_id,
+          landing_page: session.landing_page,
+          sessionUrlParams,
+          eventUrlParams,
+          mergedUrlParams: urlParams,
+          hasEvent: !!event,
+          eventPageUrl: event?.page_url?.substring(0, 150),
+          eventData: event?.event_data,
+          urlParamsKeys: Object.keys(urlParams),
+          urlParamsCount: Object.keys(urlParams).length,
+        });
+      }
+      
+      // Add active visitor info with URL parameters
+      // Use the most recent event's page_path as the current page (always up-to-date)
+      const currentPage = event?.page_path || session.pages_visited?.[session.pages_visited.length - 1] || '/';
+      
+      // Ensure url_params is always an object (even if empty)
+      const finalUrlParams = urlParams && typeof urlParams === 'object' ? urlParams : {};
+      
+      existing.active_visitors.push({
+        session_id: session.session_id,
+        currentPage: currentPage,
+        device: session.device_type || 'Unknown',
+        location: session.location_country || 'Unknown',
+        lastSeen: Number(session.updated_at.getTime()),
+        url_params: finalUrlParams, // Always include url_params, even if empty
+      });
+      
+      affiliateMap.set(key, existing);
+    });
+
+    // Calculate metrics per affiliate (only for active sessions)
+    console.log(`[Analytics Stats] Found ${affiliateMap.size} unique affiliates with active sessions`);
+    const affiliates = Array.from(affiliateMap.values()).map(aff => {
+      const activeSessionsForAffiliate = uniqueActiveSessions.filter(item => 
+        item.session.affiliate_id === aff.affiliate_id
+      );
+      const sessionsWithTime = activeSessionsForAffiliate.filter(item => 
+        item.session.total_time
+      ).length;
+      const bouncedSessions = activeSessionsForAffiliate.filter(item => 
+        item.session.is_bounce
+      ).length;
+      
+      const result = {
+        ...aff,
+        visitors: aff.visitors.size,
+        bounce_rate: aff.sessions > 0 ? (bouncedSessions / aff.sessions) * 100 : 0,
+        avg_session_time: sessionsWithTime > 0 
+          ? aff.avg_session_time / sessionsWithTime 
+          : 0,
+        // Ensure active_visitors is preserved (it should be from ...aff spread, but being explicit)
+        active_visitors: aff.active_visitors || [],
+      };
+      
+      // Debug: Log first affiliate's active_visitors to verify URL params are included
+      if (aff.affiliate_id === Array.from(affiliateMap.keys())[0]) {
+        console.log('[Analytics Stats] Sample affiliate active_visitors:', {
+          affiliate_id: aff.affiliate_id,
+          affiliate_name: aff.affiliate_name,
+          active_visitors_count: result.active_visitors.length,
+          first_visitor: result.active_visitors[0] ? {
+            session_id: result.active_visitors[0].session_id,
+            currentPage: result.active_visitors[0].currentPage,
+            has_url_params: !!result.active_visitors[0].url_params,
+            url_params_keys: result.active_visitors[0].url_params ? Object.keys(result.active_visitors[0].url_params) : [],
+            url_params: result.active_visitors[0].url_params,
+          } : null,
+        });
+      }
+      
+      return result;
+    }).sort((a, b) => b.sessions - a.sessions);
 
     return NextResponse.json({
       metrics: {
         total_visitors: totalVisitors,
         unique_visitors: uniqueVisitors,
-        active_visitors: activeSessions.length,
-        total_page_views: totalPageViews,
+        sessions: totalVisitors,
         bounce_rate: bounceRate,
         avg_session_time: avgSessionTime,
         pages_per_session: pagesPerSession,
       },
+      activeVisitors,
       topPages,
       entryPages,
       exitPages,
@@ -216,12 +863,13 @@ export async function GET(request: NextRequest) {
       devices,
       browsers,
       geography,
-      affiliates: [], // This would need to be populated if needed
+      affiliates, // New: affiliate-organized data
+      viewMode, // Include view mode in response
     });
   } catch (error: any) {
-    console.error('Error fetching analytics stats:', error);
+    console.error('Analytics stats error:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch analytics stats' },
+      { error: error.message || 'Failed to fetch stats' },
       { status: 500 }
     );
   }

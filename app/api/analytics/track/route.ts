@@ -21,6 +21,8 @@ export async function POST(request: NextRequest) {
       device,
       timestamp,
       event_data,
+      affiliate_id,
+      affiliate_number,
     } = body;
 
     // Log incoming request for debugging
@@ -51,7 +53,47 @@ export async function POST(request: NextRequest) {
       shopifyShopId = shop.replace('.myshopify.com', '');
     }
     
-    console.log('[Analytics Track] Processing for shop:', shopifyShopId);
+    // If we have affiliate_number but not affiliate_id, look it up
+    let finalAffiliateId = affiliate_id;
+    if (!finalAffiliateId && affiliate_number) {
+      try {
+        const affiliateNumberInt = parseInt(String(affiliate_number), 10);
+        console.log('[Analytics Track] Looking up affiliate:', {
+          shopifyShopId,
+          affiliate_number: affiliateNumberInt,
+          affiliate_number_type: typeof affiliate_number,
+        });
+        
+        const affiliate = await prisma.affiliate.findFirst({
+          where: {
+            shopify_shop_id: shopifyShopId,
+            affiliate_number: affiliateNumberInt,
+          },
+          select: { id: true, affiliate_number: true },
+        });
+        
+        if (affiliate) {
+          finalAffiliateId = affiliate.id;
+          console.log('[Analytics Track] ✅ Looked up affiliate_id from affiliate_number:', {
+            affiliate_id: finalAffiliateId,
+            affiliate_number: affiliate.affiliate_number,
+          });
+        } else {
+          console.warn('[Analytics Track] ❌ Affiliate not found for number:', {
+            shopifyShopId,
+            affiliate_number: affiliateNumberInt,
+            available_affiliates: await prisma.affiliate.findMany({
+              where: { shopify_shop_id: shopifyShopId },
+              select: { affiliate_number: true },
+            }).then(affs => affs.map(a => a.affiliate_number)),
+          });
+        }
+      } catch (err) {
+        console.error('[Analytics Track] Error looking up affiliate:', err);
+      }
+    }
+    
+    console.log('[Analytics Track] Processing for shop:', shopifyShopId, 'affiliate_id:', finalAffiliateId, 'affiliate_number:', affiliate_number);
 
     // Handle page_view events - update or create session
     if (event === 'page_view') {
@@ -69,15 +111,35 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      // Extract URL params from page data (sent by the tracking script)
+      const urlParams = page?.url_params || {};
+      
+      // Debug: Log URL params extraction
+      if (Object.keys(urlParams).length > 0) {
+        console.log('[Analytics Track] URL params received from script:', {
+          urlParams,
+          urlParamsKeys: Object.keys(urlParams),
+          page_url: page?.url,
+          page_path: page?.path,
+        });
+      }
+      
       if (!visitorSession) {
-        // Create new session
+        // Create new session - store URL params from initial visit in landing_page
         console.log('[Analytics Track] Creating new session:', session_id);
+        const landingPage = page?.url || page?.path || '/';
+        const landingPageWithParams = urlParams && Object.keys(urlParams).length > 0
+          ? `${landingPage}?${new URLSearchParams(urlParams as Record<string, string>).toString()}`
+          : landingPage;
+        
         visitorSession = await prisma.visitorSession.create({
           data: {
             session_id,
             visitor_id,
             shopify_shop_id: shopifyShopId,
+            affiliate_id: finalAffiliateId || null,
             entry_page: entryPage,
+            landing_page: landingPageWithParams,
             start_time: new Date(sessionStartTime),
             page_views: pageViews,
             pages_visited: pagesVisited,
@@ -91,31 +153,70 @@ export async function POST(request: NextRequest) {
             referrer_url: referrer?.url,
             referrer_domain: referrer?.domain,
             is_bounce: pageViews === 1,
+            // Store URL params directly in the session (like the old system)
+            url_params: Object.keys(urlParams).length > 0 ? urlParams : null,
           },
         });
-        console.log('[Analytics Track] Session created:', visitorSession.id);
+        console.log('[Analytics Track] Session created:', {
+          session_id: visitorSession.id,
+          affiliate_id: visitorSession.affiliate_id,
+          has_url_params: !!(visitorSession as any).url_params,
+          url_params: (visitorSession as any).url_params,
+        });
       } else {
         console.log('[Analytics Track] Updating existing session:', visitorSession.id);
         // Update existing session
-        const existingPages = visitorSession.pages_visited || [];
         const updatedPagesVisited = Array.from(
-          new Set([...existingPages, ...pagesVisited])
+          new Set([...visitorSession.pages_visited, ...pagesVisited])
         );
-        const updatedPageViews = Math.max(visitorSession.page_views, pageViews);
+        const updatedPageViews = Math.max(visitorSession.page_views || 0, pageViews);
+        
+        // Update landing_page with URL params if provided
+        let updatedLandingPage = visitorSession.landing_page || page?.url || page?.path || '/';
+        if (urlParams && Object.keys(urlParams).length > 0) {
+          try {
+            const url = new URL(updatedLandingPage, 'https://example.com');
+            Object.entries(urlParams as Record<string, string>).forEach(([key, value]) => {
+              url.searchParams.set(key, value);
+            });
+            updatedLandingPage = url.pathname + (url.search ? url.search : '');
+          } catch (e) {
+            // If URL parsing fails, append params manually
+            const params = new URLSearchParams(urlParams as Record<string, string>).toString();
+            updatedLandingPage = `${updatedLandingPage}${updatedLandingPage.includes('?') ? '&' : '?'}${params}`;
+          }
+        }
+
+        // Merge URL params: keep existing ones, add new ones if they don't exist
+        // Only update if new URL params are provided (don't overwrite with empty object)
+        const existingUrlParams = ((visitorSession as any).url_params as Record<string, string>) || {};
+        const mergedUrlParams = Object.keys(urlParams).length > 0 
+          ? { ...existingUrlParams, ...urlParams } // Merge if new params exist
+          : existingUrlParams; // Keep existing if no new params
 
         visitorSession = await prisma.visitorSession.update({
           where: { id: visitorSession.id },
           data: {
+            ...(finalAffiliateId && { affiliate_id: finalAffiliateId }),
             page_views: updatedPageViews,
             pages_visited: updatedPagesVisited,
+            landing_page: updatedLandingPage,
             is_bounce: updatedPageViews === 1,
             updated_at: new Date(),
+            // Store URL params directly in the session (like the old system)
+            url_params: Object.keys(mergedUrlParams).length > 0 ? mergedUrlParams : null,
           },
+        });
+        console.log('[Analytics Track] Session updated:', {
+          session_id: visitorSession.id,
+          affiliate_id: visitorSession.affiliate_id,
+          has_url_params: !!(visitorSession as any).url_params,
+          url_params: (visitorSession as any).url_params,
         });
       }
 
       // Create page view event
-      const event = await prisma.visitorEvent.create({
+      const eventRecord = await prisma.visitorEvent.create({
         data: {
           visitor_session_id: visitorSession.id,
           visitor_id,
@@ -127,11 +228,12 @@ export async function POST(request: NextRequest) {
           referrer: page?.referrer || referrer?.url,
           event_data: {
             time_on_page: timeOnPage,
+            url_params: page?.url_params || {}, // Store URL parameters
           },
           timestamp: new Date(timestamp),
         },
       });
-      console.log('[Analytics Track] Event created:', event.id);
+      console.log('[Analytics Track] Event created:', eventRecord.id);
     } else if (event === 'page_exit') {
       // Handle page exit - update session end time
       const visitorSession = await prisma.visitorSession.findFirst({

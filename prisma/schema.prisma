@@ -416,6 +416,7 @@ model VisitorSession {
   timezone        String?
   referrer_type   String?
   location_country String?
+  url_params      Json? // Persistent URL parameters from initial visit (stored as key-value pairs)
   shopify_shop_id String
 
   events          VisitorEvent[]

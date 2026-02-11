@@ -70,7 +70,13 @@ export async function GET(request: NextRequest) {
       where,
       include: {
         affiliate: {
-          include: {
+          select: {
+            id: true,
+            name: true,
+            first_name: true,
+            last_name: true,
+            email: true,
+            affiliate_number: true,
             offer: true,
           },
         },
