@@ -354,6 +354,9 @@ export async function GET(request: NextRequest) {
         if (!s.start_time || isNaN(s.start_time.getTime())) {
           return false; // Skip sessions with invalid dates
         }
+        if (!startTimeDate || isNaN(startTimeDate.getTime())) {
+          return true; // If startTimeDate is invalid or null, include all sessions
+        }
         return s.start_time >= startTimeDate;
       });
       sessionsList = filteredSessions as SessionWithAffiliate[];
