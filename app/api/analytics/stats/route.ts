@@ -214,13 +214,16 @@ export async function GET(request: NextRequest) {
       });
       
       // Test the exact same query we'll use, but as a count
+      // Only include start_time filter if startTimeDate is valid
       const timeRangeSessionsCount = await prisma.visitorSession.count({
         where: {
           shopify_shop_id: shopifyShopId,
           affiliate_id: { not: null },
-          start_time: {
-            gte: startTimeDate,
-          },
+          ...(startTimeDate && !isNaN(startTimeDate.getTime()) ? {
+            start_time: {
+              gte: startTimeDate,
+            },
+          } : {}),
         },
       });
       
@@ -256,9 +259,11 @@ export async function GET(request: NextRequest) {
         where: {
           shopify_shop_id: shopifyShopId,
           affiliate_id: { not: null },
-          start_time: {
-            gte: startTimeDate,
-          },
+          ...(startTimeDate && !isNaN(startTimeDate.getTime()) ? {
+            start_time: {
+              gte: startTimeDate,
+            },
+          } : {}),
         },
         select: {
           start_time: true,
