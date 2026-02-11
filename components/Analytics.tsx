@@ -89,7 +89,12 @@ interface AnalyticsData {
   affiliates: AffiliateData[];
 }
 
-export default function Analytics() {
+interface AnalyticsProps {
+  apiEndpoint?: string; // Optional custom API endpoint (for affiliate context)
+  redirectOn401?: string; // Optional redirect URL on 401 (defaults to /login)
+}
+
+export default function Analytics({ apiEndpoint, redirectOn401 = '/login' }: AnalyticsProps = {} as AnalyticsProps) {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState('30d'); // Default to 30 days for historical mode
@@ -109,13 +114,15 @@ export default function Analytics() {
         setLoading(true);
       }
       
+      // Use custom endpoint if provided, otherwise use default
+      const baseUrl = apiEndpoint || '/api/analytics/stats';
       // Only include timeRange for historical mode
       const url = viewMode === 'historical' 
-        ? `/api/analytics/stats?timeRange=${timeRange}&viewMode=${viewMode}`
-        : `/api/analytics/stats?viewMode=${viewMode}`;
+        ? `${baseUrl}?timeRange=${timeRange}&viewMode=${viewMode}`
+        : `${baseUrl}?viewMode=${viewMode}`;
       const response = await fetch(url);
       if (response.status === 401) {
-        window.location.href = '/login';
+        window.location.href = redirectOn401;
         return;
       }
       if (!response.ok) {
@@ -157,7 +164,7 @@ export default function Analytics() {
         setLoading(false);
       }
     }
-  }, [timeRange, viewMode]);
+  }, [timeRange, viewMode, apiEndpoint, redirectOn401]);
 
   // Update refs whenever they change
   useEffect(() => {
@@ -179,7 +186,21 @@ export default function Analytics() {
       return; // No cleanup needed in historical mode
     }
 
-    // Set up SSE connection for real-time updates
+    // For affiliate context (custom endpoint), skip SSE and use polling only
+    if (apiEndpoint) {
+      const interval = setInterval(() => {
+        if (isMounted && viewModeRef.current === 'realtime' && fetchAnalyticsRef.current) {
+          fetchAnalyticsRef.current(false);
+        }
+      }, refreshInterval * 1000);
+
+      return () => {
+        isMounted = false;
+        clearInterval(interval);
+      };
+    }
+
+    // Set up SSE connection for real-time updates (admin only)
     const eventSource = new EventSource('/api/analytics/stream');
     
     eventSource.onmessage = (event) => {
@@ -262,7 +283,7 @@ export default function Analytics() {
   if (loading && !data) {
     return (
       <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg p-12 text-center border border-gray-200 dark:border-gray-800">
-        <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-indigo-600 mb-4"></div>
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 dark:border-gray-700 border-t-indigo-600 dark:border-t-indigo-500 mb-4"></div>
         <p className="text-gray-500 dark:text-gray-400">Loading analytics...</p>
       </div>
     );

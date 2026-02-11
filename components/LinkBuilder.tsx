@@ -88,7 +88,12 @@ export default function LinkBuilder() {
   };
 
   if (loading) {
-    return <div className="p-8 text-center text-gray-900 dark:text-gray-100">Loading...</div>;
+    return (
+      <div className="p-8 text-center bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 dark:border-gray-700 border-t-indigo-600 dark:border-t-indigo-500 mb-4"></div>
+        <p className="text-gray-900 dark:text-gray-100">Loading...</p>
+      </div>
+    );
   }
 
   return (

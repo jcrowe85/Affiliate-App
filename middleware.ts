@@ -13,7 +13,7 @@ export function middleware(request: NextRequest) {
   }
 
   // Always allow login pages
-  if (pathname.startsWith('/login') || pathname.startsWith('/affiliate/login')) {
+  if (pathname.startsWith('/login') || pathname.startsWith('/affiliate/login') || pathname.startsWith('/affiliates/login')) {
     return NextResponse.next();
   }
 
@@ -46,13 +46,14 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  // Protect affiliate routes (everything under /affiliate except login)
-  if (pathname.startsWith('/affiliate') && !pathname.startsWith('/affiliate/login')) {
+  // Protect affiliate routes (everything under /affiliate or /affiliates except login)
+  if ((pathname.startsWith('/affiliate') && !pathname.startsWith('/affiliate/login')) ||
+      (pathname.startsWith('/affiliates') && !pathname.startsWith('/affiliates/login'))) {
     const sessionToken = request.cookies.get('affiliate_session')?.value;
 
     // If no session, redirect to affiliate login
     if (!sessionToken) {
-      const loginUrl = new URL('/affiliate/login', request.url);
+      const loginUrl = new URL('/affiliates/login', request.url);
       loginUrl.searchParams.set('redirect', pathname);
       return NextResponse.redirect(loginUrl);
     }

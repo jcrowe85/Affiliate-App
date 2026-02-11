@@ -615,9 +615,9 @@ export default function AdminDashboard() {
 
   if (loading && !stats) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-gray-300 border-t-indigo-600 mb-4"></div>
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-gray-300 dark:border-gray-700 border-t-indigo-600 dark:border-t-indigo-500 mb-4"></div>
           <p className="text-gray-600 dark:text-gray-400 font-medium">Loading dashboard...</p>
         </div>
       </div>
@@ -850,7 +850,7 @@ export default function AdminDashboard() {
                 {chartLoading ? (
                   <div className="h-full flex items-center justify-center">
                     <div className="text-center">
-                      <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-indigo-600 mb-2"></div>
+                      <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 dark:border-gray-700 border-t-indigo-600 dark:border-t-indigo-500 mb-2"></div>
                       <p className="text-sm text-gray-500 dark:text-gray-400">Loading chart data...</p>
                     </div>
                   </div>
@@ -1099,7 +1099,7 @@ export default function AdminDashboard() {
             </div>
             {loading ? (
               <div className="p-12 text-center">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-indigo-600 mb-4"></div>
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 dark:border-gray-700 border-t-indigo-600 dark:border-t-indigo-500 mb-4"></div>
                 <p className="text-gray-500 dark:text-gray-400">Loading...</p>
               </div>
             ) : pendingCommissions.length === 0 ? (
@@ -1191,7 +1191,7 @@ export default function AdminDashboard() {
             </div>
             {loading ? (
               <div className="p-12 text-center">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-red-600 mb-4"></div>
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 dark:border-gray-700 border-t-red-600 dark:border-t-red-500 mb-4"></div>
                 <p className="text-gray-500 dark:text-gray-400">Loading...</p>
               </div>
             ) : fraudFlags.length === 0 ? (
@@ -1263,7 +1263,7 @@ export default function AdminDashboard() {
 
             {loading ? (
               <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg p-12 text-center border border-gray-200 dark:border-gray-800">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-green-600 mb-4"></div>
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 dark:border-gray-700 border-t-green-600 dark:border-t-green-500 mb-4"></div>
                 <p className="text-gray-500 dark:text-gray-400">Loading...</p>
               </div>
             ) : payoutObligations.length === 0 ? (
@@ -1598,7 +1598,7 @@ export default function AdminDashboard() {
                 </div>
             {loading ? (
               <div className="p-12 text-center">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-blue-600 mb-4"></div>
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 dark:border-gray-700 border-t-blue-600 dark:border-t-blue-500 mb-4"></div>
                 <p className="text-gray-500 dark:text-gray-400">Loading...</p>
               </div>
             ) : affiliatePerformance.length === 0 ? (
