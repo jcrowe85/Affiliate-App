@@ -329,7 +329,7 @@ export async function GET(request: NextRequest) {
             ? sampleSessions[0].start_time.toISOString()
             : 'invalid',
           startTimeDate: startTimeDate && !isNaN(startTimeDate.getTime()) ? startTimeDate.toISOString() : 'invalid',
-          isSampleAfterStart: sampleSessions[0]?.start_time && !isNaN(sampleSessions[0].start_time.getTime())
+          isSampleAfterStart: sampleSessions[0]?.start_time && !isNaN(sampleSessions[0].start_time.getTime()) && startTimeDate && !isNaN(startTimeDate.getTime())
             ? sampleSessions[0].start_time >= startTimeDate
             : 'N/A',
         },
