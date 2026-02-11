@@ -848,12 +848,12 @@ export default function AdminDashboard() {
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Total Revenue */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+              <div className="bg-gray-100 rounded-lg p-6">
                 <h3 className="text-sm font-medium text-gray-600 mb-2">Total Revenue</h3>
                 <p className="text-3xl font-bold text-gray-900 mb-4">
                   {formatCurrency(stats?.totalRevenue || '0')}
                 </p>
-                <div className="space-y-2 pt-4 border-t border-gray-100">
+                <div className="space-y-2 pt-4 border-t border-gray-200">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">Profit</span>
                     <span className="text-sm font-semibold text-gray-900">
@@ -870,12 +870,12 @@ export default function AdminDashboard() {
               </div>
 
               {/* Total Commissions */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+              <div className="bg-gray-100 rounded-lg p-6">
                 <h3 className="text-sm font-medium text-gray-600 mb-2">Total Commissions</h3>
                 <p className="text-3xl font-bold text-gray-900 mb-4">
                   {formatCurrency(stats?.totalCommissionsAmount || '0')}
                 </p>
-                <div className="space-y-2 pt-4 border-t border-gray-100">
+                <div className="space-y-2 pt-4 border-t border-gray-200">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">Paid</span>
                     <span className="text-sm font-semibold text-green-600">
@@ -892,7 +892,7 @@ export default function AdminDashboard() {
               </div>
 
               {/* Conversion Rate */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+              <div className="bg-gray-100 rounded-lg p-6">
                 <h3 className="text-sm font-medium text-gray-600 mb-2">Conversion Rate</h3>
                 <div className="mb-4">
                   <div className="relative w-24 h-24 mx-auto">
@@ -923,7 +923,7 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                 </div>
-                <div className="space-y-2 pt-4 border-t border-gray-100">
+                <div className="space-y-2 pt-4 border-t border-gray-200">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">Clicks</span>
                     <span className="text-sm font-semibold text-green-600">
@@ -1246,7 +1246,7 @@ export default function AdminDashboard() {
                     </div>
                     <div className="space-y-2">
                       {payout.commissions.slice(0, 5).map((comm) => (
-                        <div key={comm.id} className="flex justify-between items-center text-sm py-2 px-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                        <div key={comm.id} className="flex justify-between items-center text-sm py-4 px-4 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
                           <span className="font-medium text-gray-700">
                             Order #{comm.order_number || comm.order_id.split('/').pop()}
                           </span>
