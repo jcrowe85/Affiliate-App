@@ -23,9 +23,14 @@ export async function GET(request: NextRequest) {
         affiliates: {
           select: {
             id: true,
-            commissions: {
-              where: { status: { not: 'reversed' } },
-              select: { amount: true },
+            orders: {
+              select: {
+                order_total: true,
+                commissions: {
+                  where: { status: { not: 'reversed' } },
+                  select: { id: true },
+                },
+              },
             },
           },
         },
@@ -34,8 +39,11 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       offers: offers.map((o) => {
+        // Calculate revenue from order totals (what customers paid), not commission amounts
         const revenue = o.affiliates.reduce(
-          (sum, a) => sum + a.commissions.reduce((s, c) => s + parseFloat(c.amount.toString()), 0),
+          (sum, a) => sum + a.orders
+            .filter(oa => oa.commissions.length > 0) // Only count orders with non-reversed commissions
+            .reduce((s, oa) => s + parseFloat(oa.order_total?.toString() || '0'), 0),
           0
         );
         return {

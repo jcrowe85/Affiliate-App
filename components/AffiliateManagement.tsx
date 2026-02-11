@@ -530,7 +530,7 @@ export default function AffiliateManagement() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-indigo-600" />
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 dark:border-gray-700 border-t-indigo-600" />
       </div>
     );
   }
@@ -551,9 +551,9 @@ export default function AffiliateManagement() {
       </div>
 
       {showForm && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
               {editingAffiliate ? 'Edit Affiliate' : 'Add New Affiliate'}
           </h3>
           </div>
@@ -573,130 +573,130 @@ export default function AffiliateManagement() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">First name *</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">First name *</label>
                 <input
                   type="text"
                   required
                   value={formData.first_name}
                   onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Last name *</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Last name *</label>
                 <input
                   type="text"
                   required
                   value={formData.last_name}
                   onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Company</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Company</label>
               <input
                 type="text"
                 value={formData.company}
                 onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
               </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email *</label>
                 <input
                   type="email"
                   required
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">PayPal Email</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">PayPal Email</label>
                 <input
                   type="email"
                   value={formData.paypal_email}
                   onChange={(e) => setFormData({ ...formData, paypal_email: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phone Number</label>
               <input
                 type="tel"
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Address</label>
               <input
                 type="text"
                 value={formData.address_line1}
                 onChange={(e) => setFormData({ ...formData, address_line1: e.target.value })}
                 placeholder="Street address"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Address Line 2</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Address Line 2</label>
               <input
                 type="text"
                 value={formData.address_line2}
                 onChange={(e) => setFormData({ ...formData, address_line2: e.target.value })}
                 placeholder="Apartment, suite, unit, etc. (optional)"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               />
               </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">City</label>
                 <input
                   type="text"
                   value={formData.city}
                   onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">State</label>
                 <input
                   type="text"
                   value={formData.state}
                   onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">ZIP Code</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">ZIP Code</label>
                 <input
                   type="text"
                   value={formData.zip}
                   onChange={(e) => setFormData({ ...formData, zip: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
               </div>
             </div>
 
-            <div className="border-t border-gray-200 pt-6">
-              <h4 className="text-sm font-semibold text-gray-900 mb-4">Offer</h4>
+            <div className="border-t border-gray-200 dark:border-gray-800 pt-6">
+              <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">Offer</h4>
               <div className="space-y-4">
                 <div className="flex gap-2">
                   <select
                     value={formData.offer_id}
                     onChange={(e) => setFormData({ ...formData, offer_id: e.target.value })}
                     required
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   >
                     <option value="">Select an offer *</option>
                     {offers.map((o) => (
@@ -713,35 +713,35 @@ export default function AffiliateManagement() {
                     Add new offer
                   </button>
                 </div>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
                   Each affiliate can have one offer. This offer applies to all new customers. Existing customers will continue with their original offer rules even if you change this affiliate&apos;s offer.
                 </p>
               </div>
             </div>
 
-            <div className="border-t border-gray-200 pt-6">
-              <h4 className="text-sm font-semibold text-gray-900 mb-4">Account Settings</h4>
+            <div className="border-t border-gray-200 dark:border-gray-800 pt-6">
+              <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">Account Settings</h4>
               <div className="space-y-4">
                 {!editingAffiliate && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Password *</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password *</label>
                       <input
                         type="password"
                         required={!editingAffiliate}
                         value={formData.password}
                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Confirm password *</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Confirm password *</label>
                       <input
                         type="password"
                         required={!editingAffiliate}
                         value={formData.confirm_password}
                         onChange={(e) => setFormData({ ...formData, confirm_password: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                       />
                     </div>
                   </div>
@@ -749,61 +749,61 @@ export default function AffiliateManagement() {
                 {editingAffiliate && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">New password (leave blank to keep)</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">New password (leave blank to keep)</label>
                       <input
                         type="password"
                         value={formData.password}
                         onChange={(e) => {
                           setFormData({ ...formData, password: e.target.value });
                         }}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Confirm new password</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Confirm new password</label>
                       <input
                         type="password"
                         value={formData.confirm_password}
                         onChange={(e) => {
                           setFormData({ ...formData, confirm_password: e.target.value });
                         }}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                       />
                     </div>
                   </div>
                 )}
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Source</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Source</label>
                   <input
                     type="text"
                     value={formData.source}
                     onChange={(e) => setFormData({ ...formData, source: e.target.value })}
                     placeholder="e.g., Referral, Cold Outreach, Partner Network"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     Where this affiliate came from (optional)
                   </p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Unique Merchant ID</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Unique Merchant ID</label>
                   <input
                     type="text"
                     value={formData.merchant_id}
                     onChange={(e) => setFormData({ ...formData, merchant_id: e.target.value })}
                     placeholder="e.g. AF-001 (optional)"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
                     <select
                       value={formData.status}
                       onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     >
                       <option value="active">Active</option>
                       <option value="suspended">Suspended</option>
@@ -811,7 +811,7 @@ export default function AffiliateManagement() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Payout Terms (days)</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Payout Terms (days)</label>
                     <input
                       type="text"
                       value={formData.payout_terms_days}
@@ -824,18 +824,18 @@ export default function AffiliateManagement() {
                           setFormData({ ...formData, payout_terms_days: parseInt(value, 10) });
                         }
                       }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Redirect URL */}
-              <div className="border-t border-gray-200 pt-6 mt-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Redirect URL</h3>
+              <div className="border-t border-gray-200 dark:border-gray-800 pt-6 mt-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Redirect URL</h3>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Redirect URL
                     </label>
                     <input
@@ -852,35 +852,35 @@ export default function AffiliateManagement() {
                         }
                       }}
                       placeholder={formData.redirect_base_url || editingAffiliate?.redirect_base_url || 'https://example.com'}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm"
                     />
-                    <p className="mt-1 text-xs text-gray-500">
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                       Enter the base URL for affiliate redirects. Parameters will be automatically appended below.
                     </p>
                   </div>
 
                   {/* Affiliate Reference ID (read-only) */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Affiliate Reference ID (ref)
                     </label>
                     <input
                       type="text"
                       readOnly
                       value={editingAffiliate?.affiliate_number || 'To be generated after account creation'}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 font-mono text-sm cursor-not-allowed"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg bg-gray-100 text-gray-600 dark:text-gray-400 font-mono text-sm cursor-not-allowed"
                     />
-                    <p className="mt-1 text-xs text-gray-500 italic">
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 italic">
                       This parameter will be automatically appended to the redirect URL after account creation.
                     </p>
                   </div>
 
                   {/* Redirect URL Parameters */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       URL Parameters
                     </label>
-                    <p className="text-xs text-gray-500 mb-3">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
                       Select which parameters to include in the redirect URL. The <code className="bg-gray-100 px-1 rounded">ref</code> parameter is always included.
                     </p>
                     <div className="space-y-2">
@@ -906,11 +906,11 @@ export default function AffiliateManagement() {
                                 },
                               });
                             }}
-                            className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                            className="w-4 h-4 text-indigo-600 border-gray-300 dark:border-gray-700 rounded focus:ring-indigo-500"
                           />
                           <label
                             htmlFor={`redirect_param_${param.key}`}
-                            className="text-sm text-gray-700 cursor-pointer"
+                            className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer"
                           >
                             <code className="bg-gray-100 px-1 rounded">{param.key}</code> - {param.label}
                           </label>
@@ -921,7 +921,7 @@ export default function AffiliateManagement() {
 
                   {/* Preview URL */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Preview URL (with parameters)
                     </label>
                     <div className="flex gap-2">
@@ -972,7 +972,7 @@ export default function AffiliateManagement() {
                             return 'Invalid URL format';
                           }
                         })()}
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 font-mono text-sm"
+                        className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 font-mono text-sm"
                       />
                       <button
                         type="button"
@@ -1031,7 +1031,7 @@ export default function AffiliateManagement() {
                         {copiedAffiliateId === 'redirect_url' ? 'Copied!' : 'Copy'}
                       </button>
                     </div>
-                    <p className="mt-1 text-xs text-gray-500">
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                       This preview shows how the redirect URL will look with all parameters appended. The <code className="bg-gray-100 px-1 rounded">ref</code> parameter will use the affiliate number once the account is created.
                     </p>
                   </div>
@@ -1039,11 +1039,11 @@ export default function AffiliateManagement() {
               </div>
 
               {/* Webhook Configuration */}
-              <div className="border-t border-gray-200 pt-6 mt-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Webhook Configuration</h3>
+              <div className="border-t border-gray-200 dark:border-gray-800 pt-6 mt-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Webhook Configuration</h3>
                 <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Webhook URL
                       </label>
                       <input
@@ -1058,16 +1058,16 @@ export default function AffiliateManagement() {
                           }
                         }}
                         placeholder="https://example.com"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm"
                       />
-                      <p className="mt-1 text-xs text-gray-500">
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                         Enter the base URL for webhook postbacks. Parameters will be automatically appended in the preview below.
                       </p>
                     </div>
 
                     {/* Preview Webhook URL */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Preview Webhook URL (with parameters)
                       </label>
                       <div className="flex gap-2">
@@ -1116,7 +1116,7 @@ export default function AffiliateManagement() {
                               return formData.webhook_url.trim();
                             }
                           })()}
-                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 font-mono text-sm"
+                          className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 font-mono text-sm"
                         />
                         <button
                           type="button"
@@ -1172,16 +1172,16 @@ export default function AffiliateManagement() {
                           Copy
                         </button>
                       </div>
-                      <p className="mt-1 text-xs text-gray-500">
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                         This preview shows how the webhook URL will look with all mapped parameters appended.
                       </p>
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Parameter Mapping
                       </label>
-                      <p className="text-xs text-gray-500 mb-3">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
                         Map placeholders in your webhook URL to either fixed values or dynamic database fields. For example, map {'{sub3}'} to &quot;order_number&quot; (dynamic) or &quot;613&quot; (fixed).
                       </p>
                       
@@ -1203,7 +1203,7 @@ export default function AffiliateManagement() {
                                 className={`flex gap-2 items-center p-2 rounded-lg border-2 transition-colors ${
                                   draggedWebhookParam === placeholder 
                                     ? 'border-indigo-500 bg-indigo-50' 
-                                    : 'border-transparent hover:border-gray-200'
+                                    : 'border-transparent hover:border-gray-200 dark:border-gray-800'
                                 }`}
                                 draggable
                                 onDragStart={(e) => {
@@ -1253,7 +1253,7 @@ export default function AffiliateManagement() {
                                 }}
                               >
                                 <div 
-                                  className="cursor-move text-gray-400 hover:text-gray-600 flex items-center"
+                                  className="cursor-move text-gray-400 hover:text-gray-600 dark:text-gray-400 flex items-center"
                                   title="Drag to reorder"
                                 >
                                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1276,9 +1276,9 @@ export default function AffiliateManagement() {
                                     });
                                   }}
                                   placeholder="Placeholder (e.g., sub3)"
-                                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                  className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                                 />
-                                <span className="text-gray-500">→</span>
+                                <span className="text-gray-500 dark:text-gray-400">→</span>
                                 <select
                                   value={mappingValue.type}
                                   onChange={(e) => {
@@ -1289,7 +1289,7 @@ export default function AffiliateManagement() {
                                     };
                                     setFormData({ ...formData, webhook_parameter_mapping: newMapping });
                                   }}
-                                  className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                  className="w-32 px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                                 >
                                   <option value="dynamic">Dynamic</option>
                                   <option value="fixed">Fixed</option>
@@ -1307,7 +1307,7 @@ export default function AffiliateManagement() {
                                         return { ...prev, webhook_parameter_mapping: newMapping };
                                       });
                                     }}
-                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                                   >
                                     <option value="">Select field...</option>
                                     <optgroup label="Commission">
@@ -1370,7 +1370,7 @@ export default function AffiliateManagement() {
                                       });
                                     }}
                                     placeholder="Fixed value (e.g., 613)"
-                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                                   />
                                 )}
                                 <button
@@ -1446,8 +1446,8 @@ export default function AffiliateManagement() {
                         if (availableParams.length === 0) return null;
                         
                         return (
-                          <div className="mt-4 pt-4 border-t border-gray-200">
-                            <p className="text-xs text-gray-500 mb-2">Available parameters to add:</p>
+                          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-800">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Available parameters to add:</p>
                             <div className="flex flex-wrap gap-2">
                               {availableParams.map(param => (
                                 <button
@@ -1469,7 +1469,7 @@ export default function AffiliateManagement() {
                                     newMapping[param.key] = { type: 'dynamic', value: defaultValue };
                                     setFormData({ ...formData, webhook_parameter_mapping: newMapping });
                                   }}
-                                  className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded border border-gray-300"
+                                  className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700"
                                 >
                                   + {param.label}
                                 </button>
@@ -1487,7 +1487,7 @@ export default function AffiliateManagement() {
               <button
                 type="button"
                 onClick={() => { setShowForm(false); resetForm(); }}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                className="px-4 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800"
               >
                 Cancel
               </button>
@@ -1504,10 +1504,10 @@ export default function AffiliateManagement() {
 
       {showAddOfferModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full my-8 max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 z-10">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-3xl w-full my-8 max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-4 z-10">
               <div className="flex justify-between items-center">
-                <h3 className="text-lg font-semibold text-gray-900">Create New Offer</h3>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Create New Offer</h3>
                 <button
                   type="button"
                   onClick={() => {
@@ -1532,7 +1532,7 @@ export default function AffiliateManagement() {
                     setAdvancedOpen(false);
                     setError('');
                   }}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-gray-400 hover:text-gray-600 dark:text-gray-400"
                 >
                   <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1546,32 +1546,32 @@ export default function AffiliateManagement() {
               )}
 
               <div>
-                <h4 className="text-sm font-semibold text-gray-900 mb-3">General Offer Settings</h4>
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">General Offer Settings</h4>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name *</label>
                   <input
                     type="text"
                     required
                     value={newOffer.name}
                     onChange={(e) => setNewOffer({ ...newOffer, name: e.target.value })}
                     placeholder="e.g. One-Time Purchase: $50 Per Sale"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
-                  <p className="mt-1 text-xs text-gray-500">
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     The offer name is how we will refer to this offer within the dashboard.
                   </p>
                 </div>
               </div>
 
               <div>
-                <h4 className="text-sm font-semibold text-gray-900 mb-3">Commission Structure</h4>
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">Commission Structure</h4>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Type *</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type *</label>
                     <select
                       value={newOffer.commission_type}
                       onChange={(e) => setNewOffer({ ...newOffer, commission_type: e.target.value as 'flat_rate' | 'percentage' })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     >
                       <option value="flat_rate">Flat Rate Per Order</option>
                       <option value="percentage">Percentage</option>
@@ -1579,7 +1579,7 @@ export default function AffiliateManagement() {
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Amount *</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Amount *</label>
                       <input
                         type="number"
                         required
@@ -1587,15 +1587,15 @@ export default function AffiliateManagement() {
                         step={newOffer.commission_type === 'percentage' ? 0.01 : 1}
                         value={newOffer.amount}
                         onChange={(e) => setNewOffer({ ...newOffer, amount: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Currency *</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Currency *</label>
                       <select
                         value={newOffer.currency}
                         onChange={(e) => setNewOffer({ ...newOffer, currency: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                       >
                         <option value="USD">USD</option>
                         <option value="EUR">EUR</option>
@@ -1604,13 +1604,13 @@ export default function AffiliateManagement() {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Commission terms</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Commission terms</label>
                     <textarea
                       rows={3}
                       value={newOffer.commission_terms}
                       onChange={(e) => setNewOffer({ ...newOffer, commission_terms: e.target.value })}
                       placeholder="Optional. Displayed on affiliate registration page and dashboard."
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     />
                   </div>
                   <label className="flex items-center gap-2">
@@ -1618,52 +1618,52 @@ export default function AffiliateManagement() {
                       type="checkbox"
                       checked={newOffer.enable_variable_commission}
                       onChange={(e) => setNewOffer({ ...newOffer, enable_variable_commission: e.target.checked })}
-                      className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                      className="rounded border-gray-300 dark:border-gray-700 text-indigo-600 focus:ring-indigo-500"
                     />
-                    <span className="text-sm text-gray-700">Enable Variable Commission by Attribution Type</span>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Enable Variable Commission by Attribution Type</span>
                   </label>
-                  <p className="text-xs text-gray-500">Available in higher tier plans.</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Available in higher tier plans.</p>
                 </div>
               </div>
 
-              <div className="border border-gray-200 rounded-lg">
+              <div className="border border-gray-200 dark:border-gray-800 rounded-lg">
                 <button
                   type="button"
                   onClick={() => setAdvancedOpen(!advancedOpen)}
-                  className="w-full px-4 py-3 flex justify-between items-center text-left text-sm font-medium text-gray-900 bg-gray-50 hover:bg-gray-100 rounded-t-lg"
+                  className="w-full px-4 py-3 flex justify-between items-center text-left text-sm font-medium text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 rounded-t-lg"
                 >
                   Advanced Options
-                  <span className="text-gray-500">{advancedOpen ? '−' : '+'}</span>
+                  <span className="text-gray-500 dark:text-gray-400">{advancedOpen ? '−' : '+'}</span>
                 </button>
                 {advancedOpen && (
-                  <div className="p-4 space-y-4 border-t border-gray-200">
+                  <div className="p-4 space-y-4 border-t border-gray-200 dark:border-gray-800">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Attribution Window (days)</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Attribution Window (days)</label>
                       <input
                         type="number"
                         min={1}
                         value={newOffer.attribution_window_days}
                         onChange={(e) => setNewOffer({ ...newOffer, attribution_window_days: parseInt(e.target.value, 10) || 90 })}
-                        className="w-full max-w-[120px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        className="w-full max-w-[120px] px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                       />
-                      <p className="mt-1 text-xs text-gray-500">
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                         In how many days does the customer have to complete the purchase for the affiliate to still get commission?
                       </p>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Automatically approve affiliates who apply to this offer?</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Automatically approve affiliates who apply to this offer?</label>
                       <select
                         value={newOffer.auto_approve_affiliates ? 'Yes' : 'No'}
                         onChange={(e) => setNewOffer({ ...newOffer, auto_approve_affiliates: e.target.value === 'Yes' })}
-                        className="w-full max-w-[120px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        className="w-full max-w-[120px] px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                       >
                         <option value="No">No</option>
                         <option value="Yes">Yes</option>
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Selling Subscriptions?</label>
-                      <p className="text-xs text-gray-500 mb-2">Adjust to limit affiliate commissions on subscription renewals. (Only applies to recurring subscriptions. If you do not sell subscriptions, select &quot;No&quot;.)</p>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Selling Subscriptions?</label>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Adjust to limit affiliate commissions on subscription renewals. (Only applies to recurring subscriptions. If you do not sell subscriptions, select &quot;No&quot;.)</p>
                       <div className="space-y-2">
                         {[
                           { value: 'no', label: 'No' },
@@ -1677,20 +1677,20 @@ export default function AffiliateManagement() {
                               name="selling_subscriptions"
                               checked={newOffer.selling_subscriptions === o.value}
                               onChange={() => setNewOffer({ ...newOffer, selling_subscriptions: o.value as any })}
-                              className="border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                              className="border-gray-300 dark:border-gray-700 text-indigo-600 focus:ring-indigo-500"
                             />
-                            <span className="text-sm text-gray-700">{o.label}</span>
+                            <span className="text-sm text-gray-700 dark:text-gray-300">{o.label}</span>
                           </label>
                         ))}
                       </div>
                     </div>
 
                     {newOffer.selling_subscriptions === 'credit_first_only' && (
-                      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-4">
-                        <p className="text-sm font-medium text-gray-900">First renewals – commission settings</p>
-                        <p className="text-xs text-gray-500">Limit how many rebill payments earn commission and set a fixed or percentage rate for those renewals.</p>
+                      <div className="rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 p-4 space-y-4">
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">First renewals – commission settings</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Limit how many rebill payments earn commission and set a fixed or percentage rate for those renewals.</p>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Number of rebill payments to credit</label>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Number of rebill payments to credit</label>
                           <input
                             type="number"
                             min={1}
@@ -1698,24 +1698,24 @@ export default function AffiliateManagement() {
                             value={newOffer.subscription_max_payments}
                             onChange={(e) => setNewOffer({ ...newOffer, subscription_max_payments: e.target.value })}
                             placeholder="e.g. 6"
-                            className="w-full max-w-[120px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                            className="w-full max-w-[120px] px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                           />
-                          <p className="mt-1 text-xs text-gray-500">Enter the exact number of rebill payments that will receive commission at the rebill rate. For example, entering 6 means 6 rebill payments will get commission (in addition to the initial payment at the initial rate).</p>
+                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Enter the exact number of rebill payments that will receive commission at the rebill rate. For example, entering 6 means 6 rebill payments will get commission (in addition to the initial payment at the initial rate).</p>
                         </div>
                         <div className="flex flex-wrap items-end gap-4">
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Rebill commission type</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Rebill commission type</label>
                             <select
                               value={newOffer.subscription_rebill_commission_type}
                               onChange={(e) => setNewOffer({ ...newOffer, subscription_rebill_commission_type: e.target.value as 'flat_rate' | 'percentage' })}
-                              className="w-full min-w-[140px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                              className="w-full min-w-[140px] px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                             >
                               <option value="flat_rate">Fixed</option>
                               <option value="percentage">Percentage</option>
                             </select>
                           </div>
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                               {newOffer.subscription_rebill_commission_type === 'percentage' ? 'Percentage' : 'Amount'}
                             </label>
                             <div className="flex items-center gap-1">
@@ -1728,7 +1728,7 @@ export default function AffiliateManagement() {
                                   value={newOffer.subscription_rebill_commission_value}
                                   onChange={(e) => setNewOffer({ ...newOffer, subscription_rebill_commission_value: e.target.value })}
                                   placeholder="0"
-                                  className="w-full max-w-[100px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                  className="w-full max-w-[100px] px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                                 />
                               ) : (
                                 <input
@@ -1738,10 +1738,10 @@ export default function AffiliateManagement() {
                                   value={newOffer.subscription_rebill_commission_value}
                                   onChange={(e) => setNewOffer({ ...newOffer, subscription_rebill_commission_value: e.target.value })}
                                   placeholder="0.00"
-                                  className="w-full max-w-[100px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                  className="w-full max-w-[100px] px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                                 />
                               )}
-                              <span className="text-sm text-gray-500">
+                              <span className="text-sm text-gray-500 dark:text-gray-400">
                                 {newOffer.subscription_rebill_commission_type === 'percentage' ? '%' : newOffer.currency}
                               </span>
                             </div>
@@ -1755,38 +1755,38 @@ export default function AffiliateManagement() {
                         type="checkbox"
                         checked={newOffer.make_private}
                         onChange={(e) => setNewOffer({ ...newOffer, make_private: e.target.checked })}
-                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        className="rounded border-gray-300 dark:border-gray-700 text-indigo-600 focus:ring-indigo-500"
                       />
-                      <span className="text-sm text-gray-700">Make private</span>
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Make private</span>
                     </label>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
                       When this is checked, the registration link to the offer will be encrypted and unavailable to the public. A default offer cannot be made private.
                     </p>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Hide referral links from affiliates?</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Hide referral links from affiliates?</label>
                       <select
                         value={newOffer.hide_referral_links ? 'Yes' : 'No'}
                         onChange={(e) => setNewOffer({ ...newOffer, hide_referral_links: e.target.value === 'Yes' })}
-                        className="w-full max-w-[120px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        className="w-full max-w-[120px] px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                       >
                         <option value="No">No</option>
                         <option value="Yes">Yes</option>
                       </select>
-                      <p className="mt-1 text-xs text-gray-500">
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                         If you select &quot;yes&quot;, the affiliate&apos;s referral link and link sharing tools will be hidden on the affiliate dashboard for affiliates in this offer.
                       </p>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Hide coupon code promotion methods from affiliates?</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Hide coupon code promotion methods from affiliates?</label>
                       <select
                         value={newOffer.hide_coupon_promotion ? 'Yes' : 'No'}
                         onChange={(e) => setNewOffer({ ...newOffer, hide_coupon_promotion: e.target.value === 'Yes' })}
-                        className="w-full max-w-[120px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        className="w-full max-w-[120px] px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                       >
                         <option value="No">No</option>
                         <option value="Yes">Yes</option>
                       </select>
-                      <p className="mt-1 text-xs text-gray-500">
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                         If you select &quot;yes&quot;, all coupon code promotion methods will be hidden on the affiliate dashboard for affiliates in this offer.
                       </p>
                     </div>
@@ -1794,7 +1794,7 @@ export default function AffiliateManagement() {
                 )}
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-gray-200">
+              <div className="flex justify-end gap-2 pt-2 border-t border-gray-200 dark:border-gray-800">
                 <button
                   type="button"
                   onClick={() => {
@@ -1819,7 +1819,7 @@ export default function AffiliateManagement() {
                     setAdvancedOpen(false);
                     setError('');
                   }}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                  className="px-4 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800"
                 >
                   Cancel
                 </button>
@@ -1836,28 +1836,28 @@ export default function AffiliateManagement() {
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
         {affiliates.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">No affiliates yet. Add one to get started.</div>
+          <div className="p-8 text-center text-gray-500 dark:text-gray-400">No affiliates yet. Add one to get started.</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
+              <thead className="bg-gray-50 dark:bg-gray-800">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Affiliate Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Affiliate ID</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Referral URL</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Creation Date</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Offer Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Revenue</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Orders</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">AOV</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pending Conversions</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Affiliate Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Affiliate ID</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Referral URL</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Creation Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Offer Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Revenue</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Orders</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">AOV</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Pending Conversions</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
                 {affiliates.map((a) => {
                   const formatCurrency = (amount: number, currency: string = 'USD') => {
                     return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
@@ -1868,15 +1868,15 @@ export default function AffiliateManagement() {
                   const primaryOffer = a.offer?.name || '—';
 
                   return (
-                    <tr key={a.id} className="hover:bg-gray-50">
+                    <tr key={a.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
+                        <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
                           {a.first_name && a.last_name ? `${a.first_name} ${a.last_name}` : a.name}
                         </div>
-                        {a.company && <div className="text-xs text-gray-500">{a.company}</div>}
+                        {a.company && <div className="text-xs text-gray-500 dark:text-gray-400">{a.company}</div>}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm font-mono text-gray-600">
+                        <span className="text-sm font-mono text-gray-600 dark:text-gray-400">
                           {a.affiliate_number != null ? `#${a.affiliate_number}` : '—'}
                         </span>
                       </td>
@@ -1899,7 +1899,7 @@ export default function AffiliateManagement() {
                           <span className="text-gray-400">—</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
                         {formatDate(a.created_at)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -1915,15 +1915,15 @@ export default function AffiliateManagement() {
                           {a.status}
                       </span>
                     </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{primaryOffer}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">{primaryOffer}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
                         {formatCurrency(a.stats.revenue, a.stats.currency)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{a.stats.orders}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">{a.stats.orders}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
                         {a.stats.aov > 0 ? formatCurrency(a.stats.aov, a.stats.currency) : '—'}
                     </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{a.stats.pending_conversions}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">{a.stats.pending_conversions}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
                       <button
                           type="button"
@@ -1952,16 +1952,16 @@ export default function AffiliateManagement() {
       {/* Net Terms Change Modal */}
       {showNetTermsModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
-            <div className="px-6 py-5 border-b border-gray-200">
-              <h3 className="text-xl font-bold text-gray-900">Apply New Net Payment Terms?</h3>
-              <p className="text-sm text-gray-600 mt-1">
+          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl max-w-md w-full">
+            <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-800">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">Apply New Net Payment Terms?</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                 You&apos;ve changed the payout terms from <strong>Net-{originalPayoutTermsDays}</strong> to <strong>Net-{pendingPayoutTermsDays}</strong>
               </p>
             </div>
             
             <div className="px-6 py-4">
-              <p className="text-sm text-gray-700 mb-4">
+              <p className="text-sm text-gray-700 dark:text-gray-300 mb-4">
                 How would you like to apply this change?
               </p>
               
@@ -1975,13 +1975,13 @@ export default function AffiliateManagement() {
                 
                 <button
                   onClick={() => handleNetTermsModalChoice(true)}
-                  className="w-full px-6 py-3 bg-gray-400 text-white rounded-lg hover:bg-gray-500 font-medium transition-colors"
+                  className="w-full px-6 py-3 bg-gray-400 text-white rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-8000 font-medium transition-colors"
                 >
                   Apply to Existing Conversions (Retroactive)
                 </button>
               </div>
               
-              <p className="text-xs text-gray-500 mt-4 text-center">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-4 text-center">
                 Retroactive changes will recalculate eligible dates for all pending, eligible, and approved commissions
               </p>
             </div>

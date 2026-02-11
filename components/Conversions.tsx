@@ -151,11 +151,11 @@ export default function Conversions() {
   return (
     <div className="space-y-6">
       {/* Filters */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-        <h2 className="text-lg font-semibold mb-4">Filters</h2>
+      <div className="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800">
+        <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Filters</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Search (Order #, Email, Name)
             </label>
             <input
@@ -163,18 +163,18 @@ export default function Conversions() {
               value={filters.search}
               onChange={(e) => setFilters({ ...filters, search: e.target.value })}
               placeholder="Search..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Affiliate
             </label>
             <select
               value={filters.affiliate_id}
               onChange={(e) => setFilters({ ...filters, affiliate_id: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">All Affiliates</option>
               {affiliates.map((aff) => (
@@ -189,13 +189,13 @@ export default function Conversions() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Offer
             </label>
             <select
               value={filters.offer_id}
               onChange={(e) => setFilters({ ...filters, offer_id: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">All Offers</option>
               {offers.map((offer) => (
@@ -208,13 +208,13 @@ export default function Conversions() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Status
             </label>
             <select
               value={filters.status}
               onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">All Statuses</option>
               <option value="pending">Pending</option>
@@ -226,43 +226,43 @@ export default function Conversions() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Start Date
             </label>
             <input
               type="date"
               value={filters.start_date}
               onChange={(e) => setFilters({ ...filters, start_date: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               End Date
             </label>
             <input
               type="date"
               value={filters.end_date}
               onChange={(e) => setFilters({ ...filters, end_date: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
         </div>
       </div>
 
       {/* Conversions Table */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-gray-500">Loading conversions...</div>
+          <div className="p-8 text-center text-gray-500 dark:text-gray-400">Loading conversions...</div>
         ) : conversions.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">No conversions found</div>
+          <div className="p-8 text-center text-gray-500 dark:text-gray-400">No conversions found</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
+              <thead className="bg-gray-50 dark:bg-gray-800">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Order
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -291,50 +291,50 @@ export default function Conversions() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
                 {conversions.map((conversion) => (
                   <tr 
                     key={conversion.id} 
-                    className="hover:bg-gray-50 cursor-pointer"
+                    className="hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
                     onClick={() => window.location.href = `/app/conversions/${conversion.id}`}
                     title="Click to view details"
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
+                      <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
                         #{conversion.shopify_order_number}
                       </div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
                         {conversion.shopify_order_id.slice(-8)}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
+                      <div className="text-sm text-gray-900 dark:text-gray-100">
                         {conversion.customer_name || '—'}
                       </div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
                         {conversion.customer_email || '—'}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                       {formatCurrency(conversion.order_total, conversion.order_currency)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
+                      <div className="text-sm text-gray-900 dark:text-gray-100">
                         {conversion.affiliate_number ? `#${conversion.affiliate_number}` : '—'}
                       </div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
                         {conversion.affiliate_name}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
+                      <div className="text-sm text-gray-900 dark:text-gray-100">
                         {conversion.offer_number ? `#${conversion.offer_number}` : '—'}
                       </div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
                         {conversion.offer_name || '—'}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
                       {formatCurrency(conversion.commission_amount, conversion.commission_currency)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -349,16 +349,16 @@ export default function Conversions() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       {conversion.is_subscription ? (
                         <div className="text-sm">
-                          <div className="text-gray-900 font-medium">
+                          <div className="text-gray-900 dark:text-gray-100 font-medium">
                             {conversion.subscription_payments_made || 0} / {conversion.subscription_max_payments ? conversion.subscription_max_payments + 1 : '∞'}
                           </div>
-                          <div className="text-xs text-gray-500">payments</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">payments</div>
                         </div>
                       ) : (
-                        <span className="text-sm text-gray-400">One-time</span>
+                        <span className="text-sm text-gray-400 dark:text-gray-500">One-time</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       {formatDate(conversion.created_at)}
                     </td>
                   </tr>

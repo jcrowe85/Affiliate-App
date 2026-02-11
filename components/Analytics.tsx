@@ -261,9 +261,9 @@ export default function Analytics() {
 
   if (loading && !data) {
     return (
-      <div className="bg-white rounded-xl shadow-lg p-12 text-center border border-gray-200">
+      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg p-12 text-center border border-gray-200 dark:border-gray-800">
         <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-indigo-600 mb-4"></div>
-        <p className="text-gray-500">Loading analytics...</p>
+        <p className="text-gray-500 dark:text-gray-400">Loading analytics...</p>
       </div>
     );
   }
@@ -271,7 +271,7 @@ export default function Analytics() {
   return (
     <div className="space-y-6">
       {/* Controls */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-4">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-4">
             {/* View Mode Toggle */}
@@ -281,7 +281,7 @@ export default function Analytics() {
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
                   viewMode === 'realtime'
                     ? 'bg-indigo-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
                 }`}
               >
                 <span className="w-2 h-2 bg-green-500 rounded-full"></span>
@@ -292,7 +292,7 @@ export default function Analytics() {
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                   viewMode === 'historical'
                     ? 'bg-indigo-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
                 }`}
               >
                 Historical
@@ -302,11 +302,11 @@ export default function Analytics() {
             {/* Time Range Selector - Only show for historical mode */}
             {viewMode === 'historical' && (
               <>
-                <label className="text-sm font-medium text-gray-700">Time Range:</label>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Time Range:</label>
                 <select
                   value={timeRange}
                   onChange={(e) => setTimeRange(e.target.value)}
-                  className="border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
                   <option value="1h">Last Hour</option>
                   <option value="24h">Last 24 Hours</option>
@@ -324,7 +324,7 @@ export default function Analytics() {
           </button>
         </div>
         <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-600 flex items-center gap-2">
+          <span className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2">
             {viewMode === 'realtime' ? (
               <>
                 <span className="w-2 h-2 bg-green-500 rounded-full"></span>
@@ -339,38 +339,38 @@ export default function Analytics() {
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
-          <div className="text-base text-gray-600 mb-2">Total Visitors</div>
-          <div className="text-3xl font-bold text-gray-900">
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-5">
+          <div className="text-base text-gray-600 dark:text-gray-400 mb-2">Total Visitors</div>
+          <div className="text-3xl font-bold text-gray-900 dark:text-gray-100">
             {data?.metrics?.total_visitors?.toLocaleString() || '0'}
           </div>
         </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
-          <div className="text-base text-gray-600 mb-2">Unique Visitors</div>
-          <div className="text-3xl font-bold text-gray-900">
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-5">
+          <div className="text-base text-gray-600 dark:text-gray-400 mb-2">Unique Visitors</div>
+          <div className="text-3xl font-bold text-gray-900 dark:text-gray-100">
             {data?.metrics?.unique_visitors?.toLocaleString() || '0'}
           </div>
         </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
-          <div className="text-base text-gray-600 mb-2">Bounce Rate</div>
-          <div className="text-3xl font-bold text-gray-900">
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-5">
+          <div className="text-base text-gray-600 dark:text-gray-400 mb-2">Bounce Rate</div>
+          <div className="text-3xl font-bold text-gray-900 dark:text-gray-100">
             {data?.metrics?.bounce_rate?.toFixed(1) || '0.0'}%
           </div>
         </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
-          <div className="text-base text-gray-600 mb-2">Avg Session Time</div>
-          <div className="text-3xl font-bold text-gray-900">
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-5">
+          <div className="text-base text-gray-600 dark:text-gray-400 mb-2">Avg Session Time</div>
+          <div className="text-3xl font-bold text-gray-900 dark:text-gray-100">
             {data?.metrics ? formatTime(data.metrics.avg_session_time || 0) : '0s'}
           </div>
         </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
-          <div className="text-base text-gray-600 mb-2">Pages/Session</div>
-          <div className="text-3xl font-bold text-gray-900">
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-5">
+          <div className="text-base text-gray-600 dark:text-gray-400 mb-2">Pages/Session</div>
+          <div className="text-3xl font-bold text-gray-900 dark:text-gray-100">
             {data?.metrics?.pages_per_session?.toFixed(1) || '0.0'}
           </div>
         </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
-          <div className="text-base text-gray-600 mb-2">Active Now</div>
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-5">
+          <div className="text-base text-gray-600 dark:text-gray-400 mb-2">Active Now</div>
           <div className="text-3xl font-bold text-indigo-600">
             {data?.affiliates?.reduce((sum, aff) => sum + (aff.active_visitors?.length || 0), 0) || 0}
           </div>
@@ -396,17 +396,17 @@ export default function Analytics() {
           };
 
           return (
-            <div key={idx} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <div key={idx} className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
               {/* Affiliate Header - Always Visible */}
-              <div className="px-6 py-4 border-b border-gray-200">
+              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800">
                 <div className="flex items-center gap-4">
                   <button
                     onClick={toggleExpanded}
-                    className="flex items-center justify-center w-7 h-7 rounded-md hover:bg-gray-100 transition-colors flex-shrink-0"
+                    className="flex items-center justify-center w-7 h-7 rounded-md hover:bg-gray-100 dark:bg-gray-800 transition-colors flex-shrink-0"
                     aria-label={isExpanded ? 'Collapse' : 'Expand'}
                   >
                     <svg
-                      className={`w-4 h-4 text-gray-500 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                      className={`w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -416,14 +416,14 @@ export default function Analytics() {
                   </button>
                   
                   <div className="flex-shrink-0 min-w-[200px]">
-                    <h3 className="text-base font-semibold text-gray-900">
+                    <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
                       {affiliate.affiliate_name}
                       {affiliate.affiliate_number && (
-                        <span className="ml-2 text-sm font-normal text-gray-500">#{affiliate.affiliate_number}</span>
+                        <span className="ml-2 text-sm font-normal text-gray-500 dark:text-gray-400">#{affiliate.affiliate_number}</span>
                       )}
                     </h3>
                     {affiliate.active_visitors && affiliate.active_visitors.length > 0 && (
-                      <div className="flex items-center gap-1.5 text-sm text-gray-600 mt-1">
+                      <div className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400 mt-1">
                         <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                         <span className="font-medium">{affiliate.active_visitors.length} active</span>
                       </div>
@@ -432,25 +432,25 @@ export default function Analytics() {
                   
                   {/* Gray Metric Cards - Always Visible on same line */}
                   <div className="flex items-center gap-3 flex-1">
-                    <div className="bg-gray-100 rounded-lg px-[1.125rem] py-3 flex-1">
-                      <div className="text-xs font-medium text-gray-600 mb-1.5">Sessions</div>
-                      <div className="text-lg font-bold text-gray-900">{affiliate.sessions}</div>
+                    <div className="bg-gray-100 dark:bg-gray-800 rounded-lg px-[1.125rem] py-3 flex-1">
+                      <div className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Sessions</div>
+                      <div className="text-lg font-bold text-gray-900 dark:text-gray-100">{affiliate.sessions}</div>
                     </div>
-                    <div className="bg-gray-100 rounded-lg px-[1.125rem] py-3 flex-1">
-                      <div className="text-xs font-medium text-gray-600 mb-1.5">Visitors</div>
-                      <div className="text-lg font-bold text-gray-900">{affiliate.visitors}</div>
+                    <div className="bg-gray-100 dark:bg-gray-800 rounded-lg px-[1.125rem] py-3 flex-1">
+                      <div className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Visitors</div>
+                      <div className="text-lg font-bold text-gray-900 dark:text-gray-100">{affiliate.visitors}</div>
                     </div>
-                    <div className="bg-gray-100 rounded-lg px-[1.125rem] py-3 flex-1">
-                      <div className="text-xs font-medium text-gray-600 mb-1.5">Page Views</div>
-                      <div className="text-lg font-bold text-gray-900">{affiliate.page_views}</div>
+                    <div className="bg-gray-100 dark:bg-gray-800 rounded-lg px-[1.125rem] py-3 flex-1">
+                      <div className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Page Views</div>
+                      <div className="text-lg font-bold text-gray-900 dark:text-gray-100">{affiliate.page_views}</div>
                     </div>
-                    <div className="bg-gray-100 rounded-lg px-[1.125rem] py-3 flex-1">
-                      <div className="text-xs font-medium text-gray-600 mb-1.5">Bounce Rate</div>
-                      <div className="text-lg font-bold text-gray-900">{affiliate.bounce_rate.toFixed(1)}%</div>
+                    <div className="bg-gray-100 dark:bg-gray-800 rounded-lg px-[1.125rem] py-3 flex-1">
+                      <div className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Bounce Rate</div>
+                      <div className="text-lg font-bold text-gray-900 dark:text-gray-100">{affiliate.bounce_rate.toFixed(1)}%</div>
                     </div>
-                    <div className="bg-gray-100 rounded-lg px-[1.125rem] py-3 flex-1">
-                      <div className="text-xs font-medium text-gray-600 mb-1.5">Avg Session</div>
-                      <div className="text-lg font-bold text-gray-900">{formatTime(affiliate.avg_session_time)}</div>
+                    <div className="bg-gray-100 dark:bg-gray-800 rounded-lg px-[1.125rem] py-3 flex-1">
+                      <div className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Avg Session</div>
+                      <div className="text-lg font-bold text-gray-900 dark:text-gray-100">{formatTime(affiliate.avg_session_time)}</div>
                     </div>
                   </div>
                 </div>
@@ -462,28 +462,28 @@ export default function Analytics() {
                   {/* Active Pages */}
                   {affiliate.active_visitors && affiliate.active_visitors.length > 0 ? (
                     <div>
-                      <h4 className="text-sm font-semibold text-gray-700 mb-3">Active Pages ({affiliate.active_visitors.length})</h4>
+                      <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Active Pages ({affiliate.active_visitors.length})</h4>
                       <div className="space-y-3">
                         {affiliate.active_visitors.map((visitor, vIdx) => (
-                          <div key={vIdx} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                          <div key={vIdx} className="bg-gray-50 dark:bg-gray-950 rounded-lg p-4 border border-gray-200 dark:border-gray-800">
                             <div className="flex items-center justify-between mb-3">
                               <div className="flex items-center gap-3">
-                                <span className="font-medium text-gray-900">{visitor.currentPage}</span>
-                                <span className="text-xs text-gray-500">•</span>
-                                <span className="text-xs text-gray-500">{visitor.device}</span>
-                                <span className="text-xs text-gray-500">•</span>
-                                <span className="text-xs text-gray-500">{visitor.location}</span>
+                                <span className="font-medium text-gray-900 dark:text-gray-100">{visitor.currentPage}</span>
+                                <span className="text-xs text-gray-500 dark:text-gray-400">•</span>
+                                <span className="text-xs text-gray-500 dark:text-gray-400">{visitor.device}</span>
+                                <span className="text-xs text-gray-500 dark:text-gray-400">•</span>
+                                <span className="text-xs text-gray-500 dark:text-gray-400">{visitor.location}</span>
                               </div>
-                              <span className="text-xs text-gray-500">{formatTimeAgo(visitor.lastSeen)}</span>
+                              <span className="text-xs text-gray-500 dark:text-gray-400">{formatTimeAgo(visitor.lastSeen)}</span>
                             </div>
                             {visitor.url_params && Object.keys(visitor.url_params).length > 0 && (
-                              <div className="pt-3 border-t border-gray-200">
-                                <div className="text-xs font-medium text-gray-600 mb-2">URL Parameters:</div>
+                              <div className="pt-3 border-t border-gray-200 dark:border-gray-800">
+                                <div className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">URL Parameters:</div>
                                 <div className="flex flex-wrap gap-2">
                                   {Object.entries(visitor.url_params).map(([key, value]) => (
-                                    <div key={key} className="inline-flex items-center gap-1 px-2 py-1 bg-white rounded text-xs border border-gray-200 max-w-full min-w-0">
-                                      <span className="font-medium text-gray-700 whitespace-nowrap">{key}:</span>
-                                      <span className="text-gray-600 break-words break-all">{value}</span>
+                                    <div key={key} className="inline-flex items-center gap-1 px-2 py-1 bg-white dark:bg-gray-800 rounded text-xs border border-gray-200 dark:border-gray-700 max-w-full min-w-0">
+                                      <span className="font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">{key}:</span>
+                                      <span className="text-gray-600 dark:text-gray-400 break-words break-all">{value}</span>
                                     </div>
                                   ))}
                                 </div>
@@ -494,7 +494,7 @@ export default function Analytics() {
                       </div>
                     </div>
                   ) : (
-                    <div className="text-center py-8 text-gray-500 text-sm">
+                    <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
                       No active pages for this affiliate
                     </div>
                   )}
@@ -504,8 +504,8 @@ export default function Analytics() {
           );
         })
       ) : (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-          <p className="text-gray-500">
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-12 text-center">
+          <p className="text-gray-500 dark:text-gray-400">
             {viewMode === 'realtime' 
               ? 'No active affiliate sessions (no activity in last 5 minutes)' 
               : 'No historical sessions found for the selected time range'}
@@ -517,47 +517,47 @@ export default function Analytics() {
       {/* Two Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Top Pages */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">Top Pages</h3>
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Top Pages</h3>
           </div>
-          <div className="divide-y divide-gray-200">
+          <div className="divide-y divide-gray-200 dark:divide-gray-800">
             {data?.topPages.length ? (
               data.topPages.map((page, idx) => (
-                <div key={idx} className="px-6 py-4 hover:bg-gray-50">
+                <div key={idx} className="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800">
                   <div className="flex items-center justify-between">
-                    <div className="font-medium text-gray-900 truncate flex-1">{page.path}</div>
-                    <div className="ml-4 text-sm text-gray-600">
+                    <div className="font-medium text-gray-900 dark:text-gray-100 truncate flex-1">{page.path}</div>
+                    <div className="ml-4 text-sm text-gray-600 dark:text-gray-400">
                       {page.views} views • {page.bounceRate?.toFixed(1)}% bounce
                     </div>
                   </div>
                 </div>
               ))
             ) : (
-              <div className="px-6 py-8 text-center text-gray-500">No page data</div>
+              <div className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">No page data</div>
             )}
           </div>
         </div>
 
         {/* Traffic Sources */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">Traffic Sources</h3>
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Traffic Sources</h3>
           </div>
-          <div className="divide-y divide-gray-200">
+          <div className="divide-y divide-gray-200 dark:divide-gray-800">
             {data?.trafficSources.length ? (
               data.trafficSources.map((source, idx) => (
-                <div key={idx} className="px-6 py-4 hover:bg-gray-50">
+                <div key={idx} className="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800">
                   <div className="flex items-center justify-between">
-                    <div className="font-medium text-gray-900">{source.source}</div>
-                    <div className="ml-4 text-sm text-gray-600">
+                    <div className="font-medium text-gray-900 dark:text-gray-100">{source.source}</div>
+                    <div className="ml-4 text-sm text-gray-600 dark:text-gray-400">
                       {source.visitors} ({source.percentage.toFixed(1)}%)
                     </div>
                   </div>
                 </div>
               ))
             ) : (
-              <div className="px-6 py-8 text-center text-gray-500">No traffic source data</div>
+              <div className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">No traffic source data</div>
             )}
           </div>
         </div>
@@ -565,42 +565,42 @@ export default function Analytics() {
 
       {/* Entry/Exit Pages */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">Top Entry Pages</h3>
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Top Entry Pages</h3>
           </div>
-          <div className="divide-y divide-gray-200">
+          <div className="divide-y divide-gray-200 dark:divide-gray-800">
             {data?.entryPages.length ? (
               data.entryPages.map((page, idx) => (
-                <div key={idx} className="px-6 py-4 hover:bg-gray-50">
+                <div key={idx} className="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800">
                   <div className="flex items-center justify-between">
-                    <div className="font-medium text-gray-900 truncate flex-1">{page.path}</div>
-                    <div className="ml-4 text-sm text-gray-600">{page.entries} entries</div>
+                    <div className="font-medium text-gray-900 dark:text-gray-100 truncate flex-1">{page.path}</div>
+                    <div className="ml-4 text-sm text-gray-600 dark:text-gray-400">{page.entries} entries</div>
                   </div>
                 </div>
               ))
             ) : (
-              <div className="px-6 py-8 text-center text-gray-500">No entry page data</div>
+              <div className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">No entry page data</div>
             )}
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">Top Exit Pages</h3>
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Top Exit Pages</h3>
           </div>
-          <div className="divide-y divide-gray-200">
+          <div className="divide-y divide-gray-200 dark:divide-gray-800">
             {data?.exitPages.length ? (
               data.exitPages.map((page, idx) => (
-                <div key={idx} className="px-6 py-4 hover:bg-gray-50">
+                <div key={idx} className="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800">
                   <div className="flex items-center justify-between">
-                    <div className="font-medium text-gray-900 truncate flex-1">{page.path}</div>
-                    <div className="ml-4 text-sm text-gray-600">{page.exits} exits</div>
+                    <div className="font-medium text-gray-900 dark:text-gray-100 truncate flex-1">{page.path}</div>
+                    <div className="ml-4 text-sm text-gray-600 dark:text-gray-400">{page.exits} exits</div>
                   </div>
                 </div>
               ))
             ) : (
-              <div className="px-6 py-8 text-center text-gray-500">No exit page data</div>
+              <div className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">No exit page data</div>
             )}
           </div>
         </div>
@@ -608,70 +608,70 @@ export default function Analytics() {
 
       {/* Devices & Browsers */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">Devices</h3>
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Devices</h3>
           </div>
-          <div className="divide-y divide-gray-200">
+          <div className="divide-y divide-gray-200 dark:divide-gray-800">
             {data?.devices.length ? (
               data.devices.map((device, idx) => (
-                <div key={idx} className="px-6 py-4 hover:bg-gray-50">
+                <div key={idx} className="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800">
                   <div className="flex items-center justify-between">
-                    <div className="font-medium text-gray-900 capitalize">{device.type}</div>
-                    <div className="ml-4 text-sm text-gray-600">
+                    <div className="font-medium text-gray-900 dark:text-gray-100 capitalize">{device.type}</div>
+                    <div className="ml-4 text-sm text-gray-600 dark:text-gray-400">
                       {device.count} ({device.percentage.toFixed(1)}%)
                     </div>
                   </div>
                 </div>
               ))
             ) : (
-              <div className="px-6 py-8 text-center text-gray-500">No device data</div>
+              <div className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">No device data</div>
             )}
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">Browsers</h3>
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Browsers</h3>
           </div>
-          <div className="divide-y divide-gray-200">
+          <div className="divide-y divide-gray-200 dark:divide-gray-800">
             {data?.browsers.length ? (
               data.browsers.map((browser, idx) => (
-                <div key={idx} className="px-6 py-4 hover:bg-gray-50">
+                <div key={idx} className="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800">
                   <div className="flex items-center justify-between">
-                    <div className="font-medium text-gray-900">{browser.name}</div>
-                    <div className="ml-4 text-sm text-gray-600">
+                    <div className="font-medium text-gray-900 dark:text-gray-100">{browser.name}</div>
+                    <div className="ml-4 text-sm text-gray-600 dark:text-gray-400">
                       {browser.count} ({browser.percentage.toFixed(1)}%)
                     </div>
                   </div>
                 </div>
               ))
             ) : (
-              <div className="px-6 py-8 text-center text-gray-500">No browser data</div>
+              <div className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">No browser data</div>
             )}
           </div>
         </div>
       </div>
 
       {/* Geography */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">Geographic Distribution</h3>
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Geographic Distribution</h3>
         </div>
-        <div className="divide-y divide-gray-200">
+        <div className="divide-y divide-gray-200 dark:divide-gray-800">
           {data?.geography.length ? (
             data.geography.map((geo, idx) => (
-              <div key={idx} className="px-6 py-4 hover:bg-gray-50">
+              <div key={idx} className="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800">
                 <div className="flex items-center justify-between">
-                  <div className="font-medium text-gray-900">{geo.country}</div>
-                  <div className="ml-4 text-sm text-gray-600">
+                  <div className="font-medium text-gray-900 dark:text-gray-100">{geo.country}</div>
+                  <div className="ml-4 text-sm text-gray-600 dark:text-gray-400">
                     {geo.visitors} visitors ({geo.percentage.toFixed(1)}%)
                   </div>
                 </div>
               </div>
             ))
           ) : (
-            <div className="px-6 py-8 text-center text-gray-500">No geographic data</div>
+            <div className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">No geographic data</div>
           )}
         </div>
       </div>

@@ -221,7 +221,7 @@ export default function OffersManagement() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-indigo-600" />
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 dark:border-gray-700 border-t-indigo-600" />
       </div>
     );
   }
@@ -242,9 +242,9 @@ export default function OffersManagement() {
       </div>
 
       {showForm && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
-            <h3 className="text-base sm:text-lg font-semibold text-gray-900 truncate">
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-800">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100 truncate">
               {editingOffer ? `Edit Offer: ${editingOffer.name}` : 'Create New Offer'}
             </h3>
           </div>
@@ -259,32 +259,32 @@ export default function OffersManagement() {
             )}
 
             <div>
-              <h4 className="text-sm font-semibold text-gray-900 mb-3">General Offer Settings</h4>
+              <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">General Offer Settings</h4>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
                 <input
                   type="text"
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="e.g. One-Time Purchase: $50 Per Sale"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   The offer name is how we will refer to this offer within the dashboard.
                 </p>
               </div>
             </div>
 
             <div>
-              <h4 className="text-sm font-semibold text-gray-900 mb-3">Commission Structure</h4>
+              <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">Commission Structure</h4>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type</label>
                   <select
                     value={formData.commission_type}
                     onChange={(e) => setFormData({ ...formData, commission_type: e.target.value as any })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   >
                     <option value="flat_rate">Flat Rate Per Order</option>
                     <option value="percentage">Percentage</option>
@@ -292,7 +292,7 @@ export default function OffersManagement() {
                 </div>
                 <div className={formData.commission_type === 'percentage' ? 'grid grid-cols-1 gap-4' : 'grid grid-cols-1 sm:grid-cols-2 gap-4'}>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       {formData.commission_type === 'percentage' ? 'Commission %' : 'Amount'}
                     </label>
                     <div className="relative">
@@ -304,20 +304,20 @@ export default function OffersManagement() {
                         step={formData.commission_type === 'percentage' ? 0.01 : 1}
                         value={formData.amount}
                         onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                       />
                       {formData.commission_type === 'percentage' && (
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">%</span>
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">%</span>
                       )}
                     </div>
                   </div>
                   {formData.commission_type === 'flat_rate' && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Currency</label>
                       <select
                         value={formData.currency}
                         onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                       >
                         <option value="USD">USD</option>
                         <option value="EUR">EUR</option>
@@ -327,13 +327,13 @@ export default function OffersManagement() {
                   )}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Commission terms</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Commission terms</label>
                   <textarea
                     rows={3}
                     value={formData.commission_terms}
                     onChange={(e) => setFormData({ ...formData, commission_terms: e.target.value })}
                     placeholder="Optional. Displayed on affiliate registration page and dashboard."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                 </div>
                 <label className="flex items-center gap-2">
@@ -341,52 +341,52 @@ export default function OffersManagement() {
                     type="checkbox"
                     checked={formData.enable_variable_commission}
                     onChange={(e) => setFormData({ ...formData, enable_variable_commission: e.target.checked })}
-                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    className="rounded border-gray-300 dark:border-gray-700 text-indigo-600 focus:ring-indigo-500"
                   />
-                  <span className="text-sm text-gray-700">Enable Variable Commission by Attribution Type</span>
+                  <span className="text-sm text-gray-700 dark:text-gray-300">Enable Variable Commission by Attribution Type</span>
                 </label>
-                <p className="text-xs text-gray-500">Available in higher tier plans.</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Available in higher tier plans.</p>
               </div>
             </div>
 
-            <div className="border border-gray-200 rounded-lg">
+            <div className="border border-gray-200 dark:border-gray-800 rounded-lg">
               <button
                 type="button"
                 onClick={() => setAdvancedOpen(!advancedOpen)}
-                className="w-full px-4 py-3 flex justify-between items-center text-left text-sm font-medium text-gray-900 bg-gray-50 hover:bg-gray-100 rounded-t-lg"
+                className="w-full px-4 py-3 flex justify-between items-center text-left text-sm font-medium text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 rounded-t-lg"
               >
                 Advanced Options
-                <span className="text-gray-500">{advancedOpen ? '−' : '+'}</span>
+                <span className="text-gray-500 dark:text-gray-400">{advancedOpen ? '−' : '+'}</span>
               </button>
               {advancedOpen && (
-                <div className="p-4 space-y-4 border-t border-gray-200">
+                <div className="p-4 space-y-4 border-t border-gray-200 dark:border-gray-800">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Attribution Window (days)</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Attribution Window (days)</label>
                     <input
                       type="number"
                       min={1}
                       value={formData.attribution_window_days}
                       onChange={(e) => setFormData({ ...formData, attribution_window_days: parseInt(e.target.value, 10) || 90 })}
-                      className="w-full max-w-[120px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      className="w-full max-w-[120px] px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     />
-                    <p className="mt-1 text-xs text-gray-500">
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                       In how many days does the customer have to complete the purchase for the affiliate to still get commission?
                     </p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Automatically approve affiliates who apply to this offer?</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Automatically approve affiliates who apply to this offer?</label>
                     <select
                       value={formData.auto_approve_affiliates ? 'Yes' : 'No'}
                       onChange={(e) => setFormData({ ...formData, auto_approve_affiliates: e.target.value === 'Yes' })}
-                      className="w-full max-w-[120px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      className="w-full max-w-[120px] px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     >
                       <option value="No">No</option>
                       <option value="Yes">Yes</option>
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Selling Subscriptions?</label>
-                    <p className="text-xs text-gray-500 mb-2">Adjust to limit affiliate commissions on subscription renewals. (Only applies to recurring subscriptions. If you do not sell subscriptions, select &quot;No&quot;.)</p>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Selling Subscriptions?</label>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Adjust to limit affiliate commissions on subscription renewals. (Only applies to recurring subscriptions. If you do not sell subscriptions, select &quot;No&quot;.)</p>
                     <div className="space-y-2">
                       {[
                         { value: 'no', label: 'No' },
@@ -400,20 +400,20 @@ export default function OffersManagement() {
                             name="selling_subscriptions"
                             checked={formData.selling_subscriptions === o.value}
                             onChange={() => setFormData({ ...formData, selling_subscriptions: o.value as any })}
-                            className="border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                            className="border-gray-300 dark:border-gray-700 text-indigo-600 focus:ring-indigo-500"
                           />
-                          <span className="text-sm text-gray-700">{o.label}</span>
+                          <span className="text-sm text-gray-700 dark:text-gray-300">{o.label}</span>
                         </label>
                       ))}
                     </div>
                   </div>
 
                   {formData.selling_subscriptions === 'credit_first_only' && (
-                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-4">
-                      <p className="text-sm font-medium text-gray-900">First renewals – commission settings</p>
-                      <p className="text-xs text-gray-500">Limit how many rebill payments earn commission and set a fixed or percentage rate for those renewals.</p>
+                    <div className="rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 p-4 space-y-4">
+                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">First renewals – commission settings</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Limit how many rebill payments earn commission and set a fixed or percentage rate for those renewals.</p>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Number of rebill payments to credit</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Number of rebill payments to credit</label>
                         <input
                           type="number"
                           min={1}
@@ -421,24 +421,24 @@ export default function OffersManagement() {
                           value={formData.subscription_max_payments}
                           onChange={(e) => setFormData({ ...formData, subscription_max_payments: e.target.value })}
                           placeholder="e.g. 6"
-                          className="w-full max-w-[120px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                          className="w-full max-w-[120px] px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                         />
-                        <p className="mt-1 text-xs text-gray-500">Enter the exact number of rebill payments that will receive commission at the rebill rate. For example, entering 6 means 6 rebill payments will get commission (in addition to the initial payment at the initial rate).</p>
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Enter the exact number of rebill payments that will receive commission at the rebill rate. For example, entering 6 means 6 rebill payments will get commission (in addition to the initial payment at the initial rate).</p>
                       </div>
                       <div className="flex flex-wrap items-end gap-4">
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Rebill commission type</label>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Rebill commission type</label>
                           <select
                             value={formData.subscription_rebill_commission_type}
                             onChange={(e) => setFormData({ ...formData, subscription_rebill_commission_type: e.target.value as 'flat_rate' | 'percentage' })}
-                            className="w-full min-w-[140px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                            className="w-full min-w-[140px] px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                           >
                             <option value="flat_rate">Fixed</option>
                             <option value="percentage">Percentage</option>
                           </select>
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                             {formData.subscription_rebill_commission_type === 'percentage' ? 'Percentage' : 'Amount'}
                           </label>
                           <div className="flex items-center gap-1">
@@ -451,7 +451,7 @@ export default function OffersManagement() {
                                 value={formData.subscription_rebill_commission_value}
                                 onChange={(e) => setFormData({ ...formData, subscription_rebill_commission_value: e.target.value })}
                                 placeholder="0"
-                                className="w-full max-w-[100px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                className="w-full max-w-[100px] px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                               />
                             ) : (
                               <input
@@ -461,10 +461,10 @@ export default function OffersManagement() {
                                 value={formData.subscription_rebill_commission_value}
                                 onChange={(e) => setFormData({ ...formData, subscription_rebill_commission_value: e.target.value })}
                                 placeholder="0.00"
-                                className="w-full max-w-[100px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                className="w-full max-w-[100px] px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                               />
                             )}
-                            <span className="text-sm text-gray-500">
+                            <span className="text-sm text-gray-500 dark:text-gray-400">
                               {formData.subscription_rebill_commission_type === 'percentage' ? '%' : formData.currency}
                             </span>
                           </div>
@@ -478,38 +478,38 @@ export default function OffersManagement() {
                       type="checkbox"
                       checked={formData.make_private}
                       onChange={(e) => setFormData({ ...formData, make_private: e.target.checked })}
-                      className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                      className="rounded border-gray-300 dark:border-gray-700 text-indigo-600 focus:ring-indigo-500"
                     />
-                    <span className="text-sm text-gray-700">Make private</span>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Make private</span>
                   </label>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
                     When this is checked, the registration link to the offer will be encrypted and unavailable to the public. A default offer cannot be made private.
                   </p>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Hide referral links from affiliates?</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Hide referral links from affiliates?</label>
                     <select
                       value={formData.hide_referral_links ? 'Yes' : 'No'}
                       onChange={(e) => setFormData({ ...formData, hide_referral_links: e.target.value === 'Yes' })}
-                      className="w-full max-w-[120px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      className="w-full max-w-[120px] px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     >
                       <option value="No">No</option>
                       <option value="Yes">Yes</option>
                     </select>
-                    <p className="mt-1 text-xs text-gray-500">
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                       If you select &quot;yes&quot;, the affiliate&apos;s referral link and link sharing tools will be hidden on the affiliate dashboard for affiliates in this offer.
                     </p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Hide coupon code promotion methods from affiliates?</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Hide coupon code promotion methods from affiliates?</label>
                     <select
                       value={formData.hide_coupon_promotion ? 'Yes' : 'No'}
                       onChange={(e) => setFormData({ ...formData, hide_coupon_promotion: e.target.value === 'Yes' })}
-                      className="w-full max-w-[120px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      className="w-full max-w-[120px] px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     >
                       <option value="No">No</option>
                       <option value="Yes">Yes</option>
                     </select>
-                    <p className="mt-1 text-xs text-gray-500">
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                       If you select &quot;yes&quot;, all coupon code promotion methods will be hidden on the affiliate dashboard for affiliates in this offer.
                     </p>
                   </div>
@@ -530,30 +530,30 @@ export default function OffersManagement() {
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
         {offers.length === 0 ? (
-          <div className="p-6 sm:p-8 text-center text-gray-500 text-sm sm:text-base">No offers yet. Create one to assign to affiliates.</div>
+          <div className="p-6 sm:p-8 text-center text-gray-500 dark:text-gray-400 text-sm sm:text-base">No offers yet. Create one to assign to affiliates.</div>
         ) : (
           <>
             {/* Mobile: cards */}
-            <div className="md:hidden divide-y divide-gray-200">
+            <div className="md:hidden divide-y divide-gray-200 dark:divide-gray-800">
               {offers.map((offer) => (
                 <div key={offer.id} className="p-4 space-y-2">
                   <div className="flex justify-between items-start gap-2">
                     <div>
-                      <p className="font-medium text-gray-900 truncate">{offer.name}</p>
-                      <p className="text-xs font-mono text-gray-500">{offerIdDisplay(offer)}</p>
+                      <p className="font-medium text-gray-900 dark:text-gray-100 truncate">{offer.name}</p>
+                      <p className="text-xs font-mono text-gray-500 dark:text-gray-400">{offerIdDisplay(offer)}</p>
                     </div>
                     <div className="flex gap-2 shrink-0">
                       <button type="button" onClick={() => startEdit(offer)} className="text-indigo-600 text-sm font-medium">Edit</button>
                       <button type="button" onClick={() => handleDelete(offer.id)} className="text-red-600 text-sm font-medium">Delete</button>
                     </div>
                   </div>
-                  <p className="text-sm text-gray-600">{formatOfferType(offer)}</p>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{formatOfferType(offer)}</p>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
                     <span>{offer.attribution_window_days}d attr</span>
                     <span>{formatDate(offer.created_at)}</span>
-                    <span className="font-medium text-gray-700">{formatCurrency(offer.offer_revenue ?? '0', offer.currency)}</span>
+                    <span className="font-medium text-gray-700 dark:text-gray-300">{formatCurrency(offer.offer_revenue ?? '0', offer.currency)}</span>
                     <span>{offer.affiliate_count ?? 0} affiliates</span>
                   </div>
                 </div>
@@ -561,31 +561,31 @@ export default function OffersManagement() {
             </div>
             {/* Desktop: table */}
             <div className="hidden md:block overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
+                <thead className="bg-gray-50 dark:bg-gray-800">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Offer ID</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Offer Type</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Attribution</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Revenue</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Affiliates</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Name</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Offer ID</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Offer Type</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Attribution</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Created</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Revenue</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Affiliates</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
                   {offers.map((offer) => (
-                    <tr key={offer.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{offer.name}</td>
+                    <tr key={offer.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">{offer.name}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm font-mono text-gray-600" title={offer.id}>{offerIdDisplay(offer)}</span>
+                        <span className="text-sm font-mono text-gray-600 dark:text-gray-400" title={offer.id}>{offerIdDisplay(offer)}</span>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">{formatOfferType(offer)}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{offer.attribution_window_days} days</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{formatDate(offer.created_at)}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{formatCurrency(offer.offer_revenue ?? '0', offer.currency)}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{offer.affiliate_count ?? 0}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400 max-w-xs">{formatOfferType(offer)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">{offer.attribution_window_days} days</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">{formatDate(offer.created_at)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">{formatCurrency(offer.offer_revenue ?? '0', offer.currency)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">{offer.affiliate_count ?? 0}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
                         <button type="button" onClick={() => startEdit(offer)} className="text-indigo-600 hover:text-indigo-800 font-medium">Edit</button>
                         <button type="button" onClick={() => handleDelete(offer.id)} className="text-red-600 hover:text-red-800 font-medium">Delete</button>

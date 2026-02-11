@@ -58,6 +58,26 @@ export async function GET(request: NextRequest) {
         })
       : [];
 
+    // Get order attributions to calculate revenue (revenue = order totals, not commission amounts)
+    const orderAttributions = affiliateIds.length > 0
+      ? await prisma.orderAttribution.findMany({
+          where: {
+            affiliate_id: { in: affiliateIds },
+            shopify_shop_id: admin.shopify_shop_id,
+          },
+          select: {
+            affiliate_id: true,
+            order_total: true,
+            order_currency: true,
+            commissions: {
+              select: {
+                status: true,
+              },
+            },
+          },
+        })
+      : [];
+
     // Group aggregates by affiliate_id
     const aggregatesByAffiliate = new Map<string, { 
       revenue: number; 
@@ -65,17 +85,35 @@ export async function GET(request: NextRequest) {
       pendingCount: number;
     }>();
     
+    // Calculate revenue from order totals (what customers paid)
+    orderAttributions.forEach(oa => {
+      const existing = aggregatesByAffiliate.get(oa.affiliate_id) || { 
+        revenue: 0, 
+        currency: 'USD', 
+        pendingCount: 0 
+      };
+      
+      // Only count orders with non-reversed commissions
+      const hasNonReversedCommission = oa.commissions.some(c => c.status !== 'reversed');
+      if (hasNonReversedCommission) {
+        existing.revenue += parseFloat(oa.order_total?.toString() || '0');
+      }
+      
+      if (!existing.currency && oa.order_currency) {
+        existing.currency = oa.order_currency;
+      }
+      
+      aggregatesByAffiliate.set(oa.affiliate_id, existing);
+    });
+    
+    // Add pending commission counts
     commissionAggregates.forEach(agg => {
       const existing = aggregatesByAffiliate.get(agg.affiliate_id) || { 
         revenue: 0, 
         currency: 'USD', 
         pendingCount: 0 
       };
-      const amount = parseFloat(agg._sum.amount?.toString() || '0');
       
-      if (agg.status === 'paid' || agg.status === 'approved') {
-        existing.revenue += amount;
-      }
       if (agg.status === 'pending') {
         existing.pendingCount += agg._count.id;
       }

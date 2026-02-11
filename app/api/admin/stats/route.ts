@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Get all commissions for calculations
+    // Get all commissions for commission calculations
     const allCommissions = await prisma.commission.findMany({
       where: {
         shopify_shop_id: shopifyShopId,
@@ -66,11 +66,27 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Calculate revenue and commission totals
-    const totalRevenue = allCommissions
-      .filter(c => c.status !== 'reversed')
-      .reduce((sum, c) => sum + parseFloat(c.amount.toString()), 0);
+    // Get all order attributions for revenue calculations (revenue = total sales, not commissions)
+    const allOrderAttributions = await prisma.orderAttribution.findMany({
+      where: {
+        shopify_shop_id: shopifyShopId,
+      },
+      select: {
+        order_total: true,
+        commissions: {
+          select: {
+            status: true,
+          },
+        },
+      },
+    });
 
+    // Calculate revenue from order totals (what customers actually paid)
+    const totalRevenue = allOrderAttributions
+      .filter(oa => oa.commissions.some(c => c.status !== 'reversed')) // Only count orders with non-reversed commissions
+      .reduce((sum, oa) => sum + parseFloat(oa.order_total?.toString() || '0'), 0);
+
+    // Calculate commission totals (what we pay affiliates)
     const totalCommissionsAmount = allCommissions
       .filter(c => c.status !== 'reversed')
       .reduce((sum, c) => sum + parseFloat(c.amount.toString()), 0);

@@ -9,6 +9,8 @@ import PixelTest from '@/components/PixelTest';
 import Conversions from '@/components/Conversions';
 import WebhookManager from '@/components/WebhookManager';
 import Analytics from '@/components/Analytics';
+import ThemeToggle from '@/components/ThemeToggle';
+import { useTheme } from '@/components/ThemeProvider';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface DashboardStats {
@@ -182,33 +184,33 @@ function PayoutReportsSectionComponent({
   return (
     <div className="space-y-6">
       {/* Filters */}
-      <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">Payout Reports</h2>
+      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-800 p-6">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">Payout Reports</h2>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Start Date</label>
             <input
               type="date"
               value={filters.start_date}
               onChange={(e) => setFilters({ ...filters, start_date: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">End Date</label>
             <input
               type="date"
               value={filters.end_date}
               onChange={(e) => setFilters({ ...filters, end_date: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Affiliate</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Affiliate</label>
             <select
               value={filters.affiliate_id}
               onChange={(e) => setFilters({ ...filters, affiliate_id: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="">All Affiliates</option>
               {affiliates.map(aff => (
@@ -238,26 +240,26 @@ function PayoutReportsSectionComponent({
 
       {/* Report Summary */}
       {reportData?.summary && (
-        <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Summary</h3>
+        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-800 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Summary</h3>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-blue-50 rounded-lg p-4">
-              <div className="text-sm text-gray-600">Total Payouts</div>
-              <div className="text-2xl font-bold text-blue-700">{reportData.summary.total_payouts}</div>
+            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+              <div className="text-sm text-gray-600 dark:text-gray-400">Total Payouts</div>
+              <div className="text-2xl font-bold text-blue-700 dark:text-blue-400">{reportData.summary.total_payouts}</div>
             </div>
-            <div className="bg-green-50 rounded-lg p-4">
-              <div className="text-sm text-gray-600">Total Amount</div>
-              <div className="text-2xl font-bold text-green-700">
+            <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
+              <div className="text-sm text-gray-600 dark:text-gray-400">Total Amount</div>
+              <div className="text-2xl font-bold text-green-700 dark:text-green-400">
                 {formatCurrency(reportData.summary.total_amount, reportData.summary.currency)}
               </div>
             </div>
-            <div className="bg-purple-50 rounded-lg p-4">
-              <div className="text-sm text-gray-600">Total Commissions</div>
-              <div className="text-2xl font-bold text-purple-700">{reportData.summary.total_commissions}</div>
+            <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4">
+              <div className="text-sm text-gray-600 dark:text-gray-400">Total Commissions</div>
+              <div className="text-2xl font-bold text-purple-700 dark:text-purple-400">{reportData.summary.total_commissions}</div>
             </div>
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="text-sm text-gray-600">Date Range</div>
-              <div className="text-sm font-medium text-gray-700">
+            <div className="bg-gray-50 dark:bg-gray-950 rounded-lg p-4">
+              <div className="text-sm text-gray-600 dark:text-gray-400">Date Range</div>
+              <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 {reportData.summary.date_range.start ? formatDate(reportData.summary.date_range.start) : 'All time'} - {reportData.summary.date_range.end ? formatDate(reportData.summary.date_range.end) : 'Today'}
               </div>
             </div>
@@ -267,36 +269,36 @@ function PayoutReportsSectionComponent({
 
       {/* Report Details */}
       {reportData?.payouts && reportData.payouts.length > 0 && (
-        <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
-          <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
-            <h3 className="text-lg font-semibold text-gray-900">Payout Details</h3>
+        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg overflow-hidden border border-gray-200 dark:border-gray-800">
+          <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 dark:from-gray-800 dark:to-gray-900">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Payout Details</h3>
           </div>
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
+              <thead className="bg-gray-50 dark:bg-gray-800">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Affiliate</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Commissions</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">PayPal Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reference</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Affiliate</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Amount</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Commissions</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">PayPal Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Reference</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
                 {reportData.payouts.map((payout: any) => (
-                  <tr key={payout.payout_id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <tr key={payout.payout_id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                       {formatDate(payout.payout_date)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{payout.affiliate_name}</div>
-                      <div className="text-sm text-gray-500">{payout.affiliate_email}</div>
+                      <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{payout.affiliate_name}</div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400">{payout.affiliate_email}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-green-700">
                       {formatCurrency(payout.total_amount, payout.currency)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       {payout.commission_count}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -309,12 +311,12 @@ function PayoutReportsSectionComponent({
                           {payout.paypal_status || 'PENDING'}
                         </span>
                       ) : (
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 dark:bg-gray-800 text-gray-800">
                           Manual
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       {payout.payout_reference || payout.paypal_batch_id || '—'}
                     </td>
                   </tr>
@@ -326,9 +328,9 @@ function PayoutReportsSectionComponent({
       )}
 
       {reportData && (!reportData.payouts || reportData.payouts.length === 0) && (
-        <div className="bg-white rounded-xl shadow-lg p-12 text-center border border-gray-200">
-          <p className="text-lg font-medium text-gray-900">No payouts found</p>
-          <p className="text-sm text-gray-500">Try adjusting your filters</p>
+        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg p-12 text-center border border-gray-200 dark:border-gray-800">
+          <p className="text-lg font-medium text-gray-900 dark:text-gray-100">No payouts found</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Try adjusting your filters</p>
         </div>
       )}
     </div>
@@ -337,6 +339,7 @@ function PayoutReportsSectionComponent({
 
 export default function AdminDashboard() {
   const router = useRouter();
+  const { theme } = useTheme();
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [pendingCommissions, setPendingCommissions] = useState<PendingCommission[]>([]);
@@ -607,7 +610,7 @@ export default function AdminDashboard() {
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-gray-300 border-t-indigo-600 mb-4"></div>
-          <p className="text-gray-600 font-medium">Loading dashboard...</p>
+          <p className="text-gray-600 dark:text-gray-400 font-medium">Loading dashboard...</p>
         </div>
       </div>
     );
@@ -701,18 +704,19 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 dark:bg-gray-950">
       {/* Header */}
-      <header className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-200 z-20 flex items-center px-4 sm:px-6 gap-3">
+      <header className="fixed top-0 left-0 right-0 h-16 bg-white dark:bg-gray-900 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 dark:border-gray-800 z-20 flex items-center px-4 sm:px-6 gap-3">
         <button
           type="button"
           onClick={() => setMobileMenuOpen((o) => !o)}
-          className="md:hidden p-2 -ml-2 rounded-lg text-gray-600 hover:bg-gray-100"
+          className="md:hidden p-2 -ml-2 rounded-lg text-gray-600 dark:text-gray-400 dark:text-gray-300 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-800"
           aria-label="Toggle menu"
         >
           {icons.menu}
         </button>
-        <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">Affiliate Dashboard</h1>
+        <h1 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100 dark:text-white truncate flex-1">Affiliate Dashboard</h1>
+        <ThemeToggle />
       </header>
 
       {/* Mobile backdrop */}
@@ -783,11 +787,11 @@ export default function AdminDashboard() {
 
       {/* Main */}
       <main
-        className={`bg-gray-50 min-h-screen pt-16 transition-[margin] duration-200 ml-0 ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-64'}`}
+        className={`bg-gray-50 dark:bg-gray-950 min-h-screen pt-16 transition-[margin] duration-200 ml-0 ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-64'}`}
       >
-        <div className="bg-white border-b border-gray-200 sticky top-16 z-10">
+        <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 sticky top-16 z-10">
           <div className="px-4 sm:px-6 py-3 sm:py-4">
-            <h2 className="text-xl sm:text-2xl font-semibold text-gray-900">
+            <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-gray-100">
               {activeTab === 'overview' && 'Overview'}
               {activeTab === 'pending' && 'Pending Approvals'}
               {activeTab === 'fraud' && 'Fraud Queue'}
@@ -809,27 +813,34 @@ export default function AdminDashboard() {
           {activeTab === 'overview' && (
             <div className="space-y-8">
             {/* Performance Graph */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-4 sm:p-6">
               <div className="mb-6">
-                <h2 className="text-lg font-semibold text-gray-900">Performance</h2>
-                <p className="text-sm text-gray-500 mt-1">Revenue over time</p>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Performance</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Revenue over time</p>
               </div>
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={generateChartData()}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:stroke-gray-700" />
                     <XAxis 
                       dataKey="date" 
                       stroke="#6b7280"
+                      className="dark:stroke-gray-400"
                       style={{ fontSize: '12px' }}
                     />
                     <YAxis 
                       stroke="#6b7280"
+                      className="dark:stroke-gray-400"
                       style={{ fontSize: '12px' }}
                       tickFormatter={(value) => `$${value}`}
                     />
                     <Tooltip 
-                      contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px' }}
+                      contentStyle={{ 
+                        backgroundColor: theme === 'dark' ? '#1f2937' : '#fff', 
+                        border: `1px solid ${theme === 'dark' ? '#374151' : '#e5e7eb'}`, 
+                        borderRadius: '6px',
+                        color: theme === 'dark' ? '#f3f4f6' : '#000'
+                      }}
                       formatter={(value: any) => [`$${value}`, 'Revenue']}
                     />
                     <Line 
@@ -848,21 +859,21 @@ export default function AdminDashboard() {
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Total Revenue */}
-              <div className="bg-gray-100 rounded-lg p-6">
-                <h3 className="text-sm font-medium text-gray-600 mb-2">Total Revenue</h3>
-                <p className="text-3xl font-bold text-gray-900 mb-4">
+              <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-6">
+                <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Total Revenue</h3>
+                <p className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4">
                   {formatCurrency(stats?.totalRevenue || '0')}
                 </p>
-                <div className="space-y-2 pt-4 border-t border-gray-200">
+                <div className="space-y-2 pt-4 border-t border-gray-200 dark:border-gray-800">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Profit</span>
-                    <span className="text-sm font-semibold text-gray-900">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Profit</span>
+                    <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                       {formatCurrency(String(parseFloat(stats?.totalRevenue || '0') - parseFloat(stats?.totalCommissionsAmount || '0')))}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Commissions</span>
-                    <span className="text-sm font-semibold text-gray-500">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Commissions</span>
+                    <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">
                       {formatCurrency(stats?.totalCommissionsAmount || '0')}
                     </span>
                   </div>
@@ -870,21 +881,21 @@ export default function AdminDashboard() {
               </div>
 
               {/* Total Commissions */}
-              <div className="bg-gray-100 rounded-lg p-6">
-                <h3 className="text-sm font-medium text-gray-600 mb-2">Total Commissions</h3>
-                <p className="text-3xl font-bold text-gray-900 mb-4">
+              <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-6">
+                <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Total Commissions</h3>
+                <p className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4">
                   {formatCurrency(stats?.totalCommissionsAmount || '0')}
                 </p>
-                <div className="space-y-2 pt-4 border-t border-gray-200">
+                <div className="space-y-2 pt-4 border-t border-gray-200 dark:border-gray-800">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Paid</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Paid</span>
                     <span className="text-sm font-semibold text-green-600">
                       {formatCurrency(stats?.paidCommissions || '0')}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Owed</span>
-                    <span className="text-sm font-semibold text-gray-500">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Owed</span>
+                    <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">
                       {formatCurrency(stats?.owedCommissions || '0')}
                     </span>
                   </div>
@@ -892,8 +903,8 @@ export default function AdminDashboard() {
               </div>
 
               {/* Conversion Rate */}
-              <div className="bg-gray-100 rounded-lg p-6">
-                <h3 className="text-sm font-medium text-gray-600 mb-2">Conversion Rate</h3>
+              <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-6">
+                <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Conversion Rate</h3>
                 <div className="mb-4">
                   <div className="relative w-24 h-24 mx-auto">
                     <svg className="transform -rotate-90 w-24 h-24">
@@ -917,22 +928,22 @@ export default function AdminDashboard() {
                       />
                     </svg>
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-2xl font-bold text-gray-900">
+                      <span className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                         {parseFloat(stats?.conversionRate || '0').toFixed(1)}%
                       </span>
                     </div>
                   </div>
                 </div>
-                <div className="space-y-2 pt-4 border-t border-gray-200">
+                <div className="space-y-2 pt-4 border-t border-gray-200 dark:border-gray-800">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Clicks</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Clicks</span>
                     <span className="text-sm font-semibold text-green-600">
                       {stats?.totalClicks || 0}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Conversions</span>
-                    <span className="text-sm font-semibold text-gray-500">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Conversions</span>
+                    <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">
                       {stats?.totalConversions || 0}
                     </span>
                   </div>
@@ -941,68 +952,68 @@ export default function AdminDashboard() {
             </div>
 
             {/* Top Affiliates Table */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-              <div className="px-4 sm:px-6 py-4 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <h2 className="text-lg font-semibold text-gray-900">Top Affiliates</h2>
+            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
+              <div className="px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Top Affiliates</h2>
                 <div className="flex items-center gap-4">
-                  <select className="text-sm border border-gray-300 rounded px-3 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  <select className="text-sm border border-gray-300 dark:border-gray-700 dark:bg-gray-800 rounded px-3 py-1.5 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500">
                     <option>All Offers</option>
                   </select>
-                  <div className="text-sm text-gray-600">
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
                     {new Date(new Date().setMonth(new Date().getMonth() - 1)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                   </div>
                 </div>
               </div>
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
+                  <thead className="bg-gray-50 dark:bg-gray-800">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                         Affiliate Name
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                         Clicks
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                         Conversions
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                         Revenue
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                         Commission
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                         Last Conversion
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                         Last Payment
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200">
                     {affiliatePerformance.length > 0 ? (
                       affiliatePerformance.slice(0, 10).map((affiliate) => (
-                        <tr key={affiliate.affiliate_id} className="hover:bg-gray-50">
+                        <tr key={affiliate.affiliate_id} className="hover:bg-gray-50 dark:bg-gray-950">
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">{affiliate.name}</div>
-                            <div className="text-sm text-gray-500">{affiliate.email}</div>
+                            <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{affiliate.name}</div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400">{affiliate.email}</div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{affiliate.clicks}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{affiliate.orders}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{affiliate.clicks}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{affiliate.orders}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">
                             {formatCurrency(affiliate.total_commission)}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">
                             {formatCurrency(affiliate.total_commission)}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">—</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">—</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">—</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">—</td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={7} className="px-6 py-8 text-center text-sm text-gray-500">
+                        <td colSpan={7} className="px-6 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
                           No affiliate data available
                         </td>
                       </tr>
@@ -1016,15 +1027,15 @@ export default function AdminDashboard() {
 
           {/* Pending Approvals Tab */}
           {activeTab === 'pending' && (
-          <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
-            <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex justify-between items-center">
+          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg overflow-hidden border border-gray-200 dark:border-gray-800">
+            <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 flex justify-between items-center">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">Pending Approvals</h2>
-                <p className="text-sm text-gray-500 mt-1">Review and approve eligible commissions</p>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Pending Approvals</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Review and approve eligible commissions</p>
               </div>
               <button
                 onClick={() => handleExport('eligible')}
-                className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors shadow-sm hover:shadow"
+                className="px-4 py-2 text-sm font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 transition-colors shadow-sm hover:shadow"
               >
                 Export CSV
               </button>
@@ -1032,40 +1043,40 @@ export default function AdminDashboard() {
             {loading ? (
               <div className="p-12 text-center">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-indigo-600 mb-4"></div>
-                <p className="text-gray-500">Loading...</p>
+                <p className="text-gray-500 dark:text-gray-400">Loading...</p>
               </div>
             ) : pendingCommissions.length === 0 ? (
-              <div className="p-12 text-center text-gray-500">
+              <div className="p-12 text-center text-gray-500 dark:text-gray-400">
                 <p className="text-lg font-medium">No pending approvals</p>
                 <p className="text-sm">All eligible commissions have been reviewed</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
+                  <thead className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-800">
                     <tr>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Order #</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Affiliate</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Amount</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Eligible Date</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Order #</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Affiliate</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Amount</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Eligible Date</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-100">
+                  <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-100 dark:divide-gray-800">
                     {pendingCommissions.map((commission) => (
-                      <tr key={commission.id} className={`hover:bg-gray-50 transition-colors ${commission.has_fraud_flags ? 'bg-red-50 border-l-4 border-red-400' : ''}`}>
+                      <tr key={commission.id} className={`hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${commission.has_fraud_flags ? 'bg-red-50 dark:bg-red-900/20 border-l-4 border-red-400' : ''}`}>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm font-semibold text-gray-900">#{commission.order_number}</span>
+                          <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">#{commission.order_number}</span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">{commission.affiliate_name}</div>
-                          <div className="text-sm text-gray-500">{commission.affiliate_email}</div>
+                          <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{commission.affiliate_name}</div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">{commission.affiliate_email}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm font-bold text-gray-900">{formatCurrency(commission.amount, commission.currency)}</span>
+                          <span className="text-sm font-bold text-gray-900 dark:text-gray-100">{formatCurrency(commission.amount, commission.currency)}</span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{formatDate(commission.eligible_date)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">{formatDate(commission.eligible_date)}</td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex flex-col gap-1">
                             {commission.status === 'pending' && (
@@ -1116,41 +1127,41 @@ export default function AdminDashboard() {
 
           {/* Fraud Queue Tab */}
           {activeTab === 'fraud' && (
-          <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
-            <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-red-50 to-white">
-              <h2 className="text-2xl font-bold text-gray-900">Fraud Queue</h2>
-              <p className="text-sm text-gray-500 mt-1">Review and resolve fraud flags</p>
+          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg overflow-hidden border border-gray-200 dark:border-gray-800">
+            <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-red-50 to-white dark:from-gray-800 dark:to-gray-900 dark:from-gray-800 dark:to-gray-900">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Fraud Queue</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Review and resolve fraud flags</p>
             </div>
             {loading ? (
               <div className="p-12 text-center">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-red-600 mb-4"></div>
-                <p className="text-gray-500">Loading...</p>
+                <p className="text-gray-500 dark:text-gray-400">Loading...</p>
               </div>
             ) : fraudFlags.length === 0 ? (
-              <div className="p-12 text-center text-gray-500">
+              <div className="p-12 text-center text-gray-500 dark:text-gray-400">
                 <p className="text-lg font-medium">No unresolved fraud flags</p>
                 <p className="text-sm">All fraud flags have been resolved</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
+                  <thead className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-800">
                     <tr>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Risk Score</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Flag Type</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Order #</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Affiliate</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Commission</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Reason</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Risk Score</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Flag Type</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Order #</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Affiliate</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Commission</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Reason</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-100">
+                  <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-100 dark:divide-gray-800">
                     {fraudFlags.map((flag) => (
-                      <tr key={flag.id} className={`hover:bg-gray-50 transition-colors border-l-4 ${
-                        flag.score > 70 ? 'bg-red-50 border-red-400' : 
-                        flag.score > 50 ? 'bg-yellow-50 border-yellow-400' : 
-                        'bg-gray-50 border-gray-300'
+                      <tr key={flag.id} className={`hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border-l-4 ${
+                        flag.score > 70 ? 'bg-red-50 dark:bg-red-900/20 border-red-400' : 
+                        flag.score > 50 ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-400' : 
+                        'bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-700'
                       }`}>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`px-3 py-1.5 text-xs rounded-full font-bold ${
@@ -1161,16 +1172,16 @@ export default function AdminDashboard() {
                             {flag.score}/100
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium capitalize">{flag.flag_type.replace('_', ' ')}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">#{flag.commission.order_number}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium capitalize text-gray-900 dark:text-gray-100">{flag.flag_type.replace('_', ' ')}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900 dark:text-gray-100">#{flag.commission.order_number}</td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">{flag.affiliate.name}</div>
-                          <div className="text-sm text-gray-500">{flag.affiliate.email}</div>
+                          <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{flag.affiliate.name}</div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">{flag.affiliate.email}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm font-bold text-gray-900">{formatCurrency(flag.commission.amount, flag.commission.currency)}</span>
+                          <span className="text-sm font-bold text-gray-900 dark:text-gray-100">{formatCurrency(flag.commission.amount, flag.commission.currency)}</span>
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">{flag.reason}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400 max-w-xs">{flag.reason}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           <button
                             onClick={() => handleResolveFraud(flag.id)}
@@ -1194,28 +1205,28 @@ export default function AdminDashboard() {
           <div className="space-y-6">
 
             {loading ? (
-              <div className="bg-white rounded-xl shadow-lg p-12 text-center border border-gray-200">
+              <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg p-12 text-center border border-gray-200 dark:border-gray-800">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-green-600 mb-4"></div>
-                <p className="text-gray-500">Loading...</p>
+                <p className="text-gray-500 dark:text-gray-400">Loading...</p>
               </div>
             ) : payoutObligations.length === 0 ? (
-              <div className="bg-white rounded-xl shadow-lg p-12 text-center border border-gray-200">
-                <p className="text-lg font-medium text-gray-900">No upcoming payout obligations</p>
-                <p className="text-sm text-gray-500">All payouts are up to date</p>
+              <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg p-12 text-center border border-gray-200 dark:border-gray-800">
+                <p className="text-lg font-medium text-gray-900 dark:text-gray-100">No upcoming payout obligations</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">All payouts are up to date</p>
               </div>
             ) : (
               payoutObligations.map((payout) => (
-                <div key={payout.affiliate_id} className="bg-gradient-to-br from-white to-green-50 rounded-xl shadow-lg overflow-hidden border border-gray-200 hover:shadow-xl transition-shadow">
-                  <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-green-50 to-white">
+                <div key={payout.affiliate_id} className="bg-gradient-to-br from-white to-green-50 dark:from-gray-900 dark:to-gray-800 rounded-xl shadow-lg overflow-hidden border border-gray-200 dark:border-gray-800 hover:shadow-xl transition-shadow">
+                  <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-green-50 to-white dark:from-gray-800 dark:to-gray-900 dark:from-gray-800 dark:to-gray-900">
                     <div className="flex justify-between items-center">
                       <div>
-                        <h3 className="text-xl font-bold text-gray-900">{payout.affiliate_name}</h3>
-                        <p className="text-sm text-gray-600 mt-1">{payout.affiliate_email}</p>
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">{payout.affiliate_name}</h3>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{payout.affiliate_email}</p>
                         {payout.payout_method && (
-                          <div className="mt-2 text-sm text-gray-600">
+                          <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
                             <span className="font-medium">Payout Method:</span> {payout.payout_method}
                             {payout.payout_identifier && (
-                              <span className="ml-2 px-2 py-0.5 bg-gray-100 rounded text-xs">{payout.payout_identifier}</span>
+                              <span className="ml-2 px-2 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-xs">{payout.payout_identifier}</span>
                             )}
                           </div>
                         )}
@@ -1224,13 +1235,13 @@ export default function AdminDashboard() {
                         <div className="text-3xl font-bold bg-gradient-to-r from-green-600 to-green-700 bg-clip-text text-transparent">
                           {formatCurrency(payout.total_amount, payout.currency)}
                         </div>
-                        <div className="text-sm text-gray-600 mt-1">{payout.commission_count} commission(s)</div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">{payout.commission_count} commission(s)</div>
                       </div>
                     </div>
                   </div>
-                  <div className="px-6 py-4 bg-white">
+                  <div className="px-6 py-4 bg-white dark:bg-gray-900">
                     <div className="flex justify-between items-center mb-3">
-                      <div className="text-sm font-semibold text-gray-700">
+                      <div className="text-sm font-semibold text-gray-700 dark:text-gray-300">
                         Commissions ({payout.commission_count}):
                       </div>
                       <button
@@ -1246,15 +1257,15 @@ export default function AdminDashboard() {
                     </div>
                     <div className="space-y-2">
                       {payout.commissions.slice(0, 5).map((comm) => (
-                        <div key={comm.id} className="flex justify-between items-center text-sm py-4 px-4 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
-                          <span className="font-medium text-gray-700">
+                        <div key={comm.id} className="flex justify-between items-center text-sm py-4 px-4 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                          <span className="font-medium text-gray-700 dark:text-gray-300">
                             Order #{comm.order_number || comm.order_id.split('/').pop()}
                           </span>
-                          <span className="font-bold text-green-700">{formatCurrency(comm.amount, payout.currency)}</span>
+                          <span className="font-bold text-green-700 dark:text-green-400">{formatCurrency(comm.amount, payout.currency)}</span>
                         </div>
                       ))}
                       {payout.commissions.length > 5 && (
-                        <div className="text-sm text-gray-500 italic text-center py-2">
+                        <div className="text-sm text-gray-500 dark:text-gray-400 italic text-center py-2">
                           ... and {payout.commissions.length - 5} more commission(s)
                         </div>
                       )}
@@ -1267,37 +1278,37 @@ export default function AdminDashboard() {
             {/* Recent Paid Payouts Section */}
             {paidPayouts.length > 0 && (
               <div className="mt-8">
-                <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
-                  <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-white">
-                    <h2 className="text-2xl font-bold text-gray-900">Recent Paid Payouts</h2>
-                    <p className="text-sm text-gray-600 mt-1">Payment history for completed payouts</p>
+                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg overflow-hidden border border-gray-200 dark:border-gray-800">
+                  <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-blue-50 to-white dark:from-gray-800 dark:to-gray-900 dark:from-gray-800 dark:to-gray-900">
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Recent Paid Payouts</h2>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Payment history for completed payouts</p>
                   </div>
                   <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
+                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
+                      <thead className="bg-gray-50 dark:bg-gray-800">
                         <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Affiliate</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Commissions</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PayPal Status</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reference</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Affiliate</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Amount</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Commissions</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">PayPal Status</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Reference</th>
                         </tr>
                       </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
+                      <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
                         {paidPayouts.map((payout) => (
-                          <tr key={payout.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <tr key={payout.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                               {formatDate(payout.created_at)}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm font-medium text-gray-900">{payout.affiliate_name}</div>
-                              <div className="text-sm text-gray-500">{payout.affiliate_email}</div>
+                              <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{payout.affiliate_name}</div>
+                              <div className="text-sm text-gray-500 dark:text-gray-400">{payout.affiliate_email}</div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-green-700">
                               {formatCurrency(payout.total_amount, payout.currency)}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                               {payout.commission_count}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
@@ -1310,12 +1321,12 @@ export default function AdminDashboard() {
                                   {payout.paypal_status || 'PENDING'}
                                 </span>
                               ) : (
-                                <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 dark:bg-gray-800 text-gray-800">
                                   Manual
                                 </span>
                               )}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                               {payout.payout_reference || payout.paypal_batch_id || '—'}
                             </td>
                           </tr>
@@ -1330,36 +1341,36 @@ export default function AdminDashboard() {
             {/* Payment Confirmation Modal */}
             {showPaymentModal && selectedPayout && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-                  <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-green-50 to-white">
-                    <h3 className="text-2xl font-bold text-gray-900">Confirm Payout</h3>
-                    <p className="text-sm text-gray-600 mt-1">Review transaction history before processing payment</p>
+                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+                  <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-green-50 to-white dark:from-gray-800 dark:to-gray-900">
+                    <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Confirm Payout</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Review transaction history before processing payment</p>
                   </div>
                   
                   <div className="px-6 py-4 overflow-y-auto flex-1">
                     <div className="mb-6">
-                      <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                      <div className="bg-gray-50 dark:bg-gray-950 rounded-lg p-4 mb-4">
                         <div className="grid grid-cols-2 gap-4">
                           <div>
-                            <div className="text-sm text-gray-600">Affiliate</div>
-                            <div className="font-semibold text-gray-900">{selectedPayout.affiliate_name}</div>
-                            <div className="text-sm text-gray-500">{selectedPayout.affiliate_email}</div>
+                            <div className="text-sm text-gray-600 dark:text-gray-400">Affiliate</div>
+                            <div className="font-semibold text-gray-900 dark:text-gray-100">{selectedPayout.affiliate_name}</div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400">{selectedPayout.affiliate_email}</div>
                           </div>
                           <div>
-                            <div className="text-sm text-gray-600">Total Amount</div>
+                            <div className="text-sm text-gray-600 dark:text-gray-400">Total Amount</div>
                             <div className="text-2xl font-bold text-green-600">
                               {formatCurrency(selectedPayout.total_amount, selectedPayout.currency)}
                             </div>
-                            <div className="text-sm text-gray-500">{selectedPayout.commission_count} commission(s)</div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400">{selectedPayout.commission_count} commission(s)</div>
                           </div>
                         </div>
                         {selectedPayout.payout_method && (
-                          <div className="mt-3 pt-3 border-t border-gray-200">
-                            <div className="text-sm text-gray-600">Payout Method</div>
-                            <div className="font-medium text-gray-900">
+                          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-800">
+                            <div className="text-sm text-gray-600 dark:text-gray-400">Payout Method</div>
+                            <div className="font-medium text-gray-900 dark:text-gray-100">
                               {selectedPayout.payout_method}
                               {selectedPayout.payout_identifier && (
-                                <span className="ml-2 text-sm text-gray-600">({selectedPayout.payout_identifier})</span>
+                                <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">({selectedPayout.payout_identifier})</span>
                               )}
                             </div>
                           </div>
@@ -1367,7 +1378,7 @@ export default function AdminDashboard() {
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                           Payout Reference (Optional)
                         </label>
                         <input
@@ -1375,33 +1386,33 @@ export default function AdminDashboard() {
                           value={payoutReference}
                           onChange={(e) => setPayoutReference(e.target.value)}
                           placeholder="e.g., Payment ID, Transaction #, etc."
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
                         />
                       </div>
                     </div>
 
                     <div>
-                      <h4 className="text-lg font-semibold text-gray-900 mb-3">Transaction History</h4>
-                      <div className="border border-gray-200 rounded-lg overflow-hidden">
+                      <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">Transaction History</h4>
+                      <div className="border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
                         <div className="max-h-96 overflow-y-auto">
-                          <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50 sticky top-0">
+                          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
+                            <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0">
                               <tr>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order #</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Eligible Date</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Order #</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Amount</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Eligible Date</th>
                               </tr>
                             </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
+                            <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
                               {selectedPayout.commissions.map((comm) => (
-                                <tr key={comm.id} className="hover:bg-gray-50">
-                                  <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                                <tr key={comm.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                                  <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
                                     {comm.order_number || comm.order_id.split('/').pop()}
                                   </td>
                                   <td className="px-4 py-3 text-sm font-bold text-green-700">
                                     {formatCurrency(comm.amount, selectedPayout.currency)}
                                   </td>
-                                  <td className="px-4 py-3 text-sm text-gray-500">
+                                  <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
                                     {formatDate(comm.eligible_date)}
                                   </td>
                                 </tr>
@@ -1413,7 +1424,7 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
-                  <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
+                  <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950 flex justify-end gap-3">
                     <button
                       onClick={() => {
                         setShowPaymentModal(false);
@@ -1423,7 +1434,7 @@ export default function AdminDashboard() {
                         setPaymentSuccess(null);
                       }}
                       disabled={processingPayment || !!paymentSuccess}
-                      className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {paymentSuccess ? 'Close' : 'Cancel'}
                     </button>
@@ -1485,14 +1496,14 @@ export default function AdminDashboard() {
           {activeTab === 'performance' && (
           <div className="space-y-6">
             {/* Sub-tab Navigation */}
-            <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-4">
-              <div className="flex gap-2 border-b border-gray-200 pb-4">
+            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-800 p-4">
+              <div className="flex gap-2 border-b border-gray-200 dark:border-gray-800 pb-4">
                 <button
                   onClick={() => setReportSubTab('performance')}
                   className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                     reportSubTab === 'performance'
                       ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
                   }`}
                 >
                   Performance Ranking
@@ -1513,7 +1524,7 @@ export default function AdminDashboard() {
                   className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                     reportSubTab === 'payouts'
                       ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
                   }`}
                 >
                   Payout Reports
@@ -1523,53 +1534,53 @@ export default function AdminDashboard() {
 
             {/* Performance Ranking Sub-tab */}
             {reportSubTab === 'performance' && (
-              <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
-                <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-white">
-                  <h2 className="text-2xl font-bold text-gray-900">Affiliate Performance Ranking</h2>
-                  <p className="text-sm text-gray-500 mt-1">Top performing affiliates by total commission earned</p>
+              <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg overflow-hidden border border-gray-200 dark:border-gray-800">
+                <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-blue-50 to-white dark:from-gray-800 dark:to-gray-900">
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Affiliate Performance Ranking</h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Top performing affiliates by total commission earned</p>
                 </div>
             {loading ? (
               <div className="p-12 text-center">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-blue-600 mb-4"></div>
-                <p className="text-gray-500">Loading...</p>
+                <p className="text-gray-500 dark:text-gray-400">Loading...</p>
               </div>
             ) : affiliatePerformance.length === 0 ? (
-              <div className="p-12 text-center text-gray-500">
+              <div className="p-12 text-center text-gray-500 dark:text-gray-400">
                 <p className="text-lg font-medium">No affiliate performance data</p>
                 <p className="text-sm">Performance metrics will appear here once affiliates generate commissions</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
+                  <thead className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-800">
                     <tr>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Rank</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Affiliate</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Clicks</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Orders</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Conv. Rate</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Total Earned</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Paid</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Pending</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Rank</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Affiliate</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Clicks</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Orders</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Conv. Rate</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Total Earned</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Paid</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Pending</th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-100">
+                  <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-100 dark:divide-gray-800">
                     {affiliatePerformance.map((affiliate, index) => (
-                      <tr key={affiliate.affiliate_id} className="hover:bg-gray-50 transition-colors">
+                      <tr key={affiliate.affiliate_id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm font-bold text-gray-700">#{index + 1}</span>
+                          <span className="text-sm font-bold text-gray-700 dark:text-gray-300">#{index + 1}</span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-semibold text-gray-900">{affiliate.name}</div>
-                          <div className="text-sm text-gray-500">{affiliate.email}</div>
+                          <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">{affiliate.name}</div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">{affiliate.email}</div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{affiliate.clicks}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{affiliate.orders}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{affiliate.clicks}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{affiliate.orders}</td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className="text-sm font-semibold text-blue-700">{affiliate.conversion_rate}%</span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm font-bold text-gray-900">{formatCurrency(affiliate.total_commission)}</span>
+                          <span className="text-sm font-bold text-gray-900 dark:text-gray-100">{formatCurrency(affiliate.total_commission)}</span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className="text-sm font-semibold text-green-700">{formatCurrency(affiliate.paid_commission)}</span>

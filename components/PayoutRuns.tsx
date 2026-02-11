@@ -181,12 +181,12 @@ export default function PayoutRuns() {
 
       {/* Create Form */}
       {showCreateForm && (
-        <div className="bg-white p-6 rounded-lg shadow">
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-lg shadow">
           <h3 className="text-lg font-semibold mb-4">Create Payout Run</h3>
           <form onSubmit={handleCreate} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Period Start *
                 </label>
                 <input
@@ -194,12 +194,12 @@ export default function PayoutRuns() {
                   required
                   value={formData.period_start}
                   onChange={(e) => setFormData({ ...formData, period_start: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Period End *
                 </label>
                 <input
@@ -207,23 +207,23 @@ export default function PayoutRuns() {
                   required
                   value={formData.period_end}
                   onChange={(e) => setFormData({ ...formData, period_end: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Select Commissions ({formData.commission_ids.length} selected)
               </label>
-              <div className="border border-gray-300 rounded-md max-h-64 overflow-y-auto">
+              <div className="border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-md max-h-64 overflow-y-auto">
                 {eligibileCommissions.length === 0 ? (
-                  <div className="p-4 text-center text-gray-500">No eligible commissions</div>
+                  <div className="p-4 text-center text-gray-500 dark:text-gray-400">No eligible commissions</div>
                 ) : (
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50 sticky top-0">
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
+                    <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0">
                       <tr>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase w-12">
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase w-12">
                           <input
                             type="checkbox"
                             checked={formData.commission_ids.length === eligibileCommissions.length}
@@ -240,13 +240,13 @@ export default function PayoutRuns() {
                             className="rounded"
                           />
                         </th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Affiliate</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Order</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Eligible Date</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Affiliate</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Order</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Amount</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Eligible Date</th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
                       {eligibileCommissions.map((commission: any) => (
                         <tr key={commission.id}>
                           <td className="px-4 py-2 whitespace-nowrap">
@@ -264,7 +264,7 @@ export default function PayoutRuns() {
                           <td className="px-4 py-2 whitespace-nowrap text-sm font-semibold">
                             {formatCurrency(commission.amount, commission.currency)}
                           </td>
-                          <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
+                          <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                             {formatDate(commission.eligible_date)}
                           </td>
                         </tr>
@@ -286,23 +286,23 @@ export default function PayoutRuns() {
       )}
 
       {/* Payout Runs List */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow overflow-hidden">
         {payoutRuns.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">No payout runs yet</div>
+          <div className="p-8 text-center text-gray-500 dark:text-gray-400">No payout runs yet</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
+              <thead className="bg-gray-50 dark:bg-gray-800">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Period</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Commissions</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reference</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Period</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Commissions</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Reference</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Created</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Actions</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
                 {payoutRuns.map((run) => (
                   <tr key={run.id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -318,10 +318,10 @@ export default function PayoutRuns() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">{run.commission_count}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       {run.payout_reference || '-'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       {formatDate(run.created_at)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">

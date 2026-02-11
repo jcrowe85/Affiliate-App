@@ -84,16 +84,16 @@ export default function PixelTest() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">Pixel Test Tool</h2>
-        <p className="mt-2 text-sm text-gray-600">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Pixel Test Tool</h2>
+        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
           Test if the affiliate tracking script is active on a target page
         </p>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-6">
         <div className="space-y-4">
           <div>
-            <label htmlFor="test-url" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="test-url" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Enter URL to Test
             </label>
             <div className="flex gap-2">
@@ -103,7 +103,7 @@ export default function PixelTest() {
                 value={testUrl}
                 onChange={(e) => setTestUrl(e.target.value)}
                 placeholder="https://tryfleur.com/?ref=30483"
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 onKeyPress={(e) => {
                   if (e.key === 'Enter') {
                     testPixel();
@@ -118,7 +118,7 @@ export default function PixelTest() {
                 {testing ? 'Testing...' : 'Test Pixel'}
               </button>
             </div>
-            <p className="mt-2 text-xs text-gray-500">
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
               Enter any URL from your store (e.g., homepage, product page, blog post)
             </p>
           </div>
@@ -153,37 +153,37 @@ export default function PixelTest() {
                     </>
                   )}
                 </div>
-                <p className="mt-2 text-sm text-gray-700">
+                <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
                   Tested: <span className="font-mono text-xs">{result.url}</span>
                 </p>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   Tested at: {result.timestamp.toLocaleString()}
                 </p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <h4 className="font-semibold text-gray-900 mb-2">Script Detection</h4>
+                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 dark:border-gray-800">
+                  <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">Script Detection</h4>
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       {result.scriptFound ? (
                         <>
                           <span className="text-green-600">✓</span>
-                          <span className="text-sm text-gray-700">Tracking script found</span>
+                          <span className="text-sm text-gray-700 dark:text-gray-300">Tracking script found</span>
                         </>
                       ) : (
                         <>
                           <span className="text-red-600">✗</span>
-                          <span className="text-sm text-gray-700">Tracking script not found</span>
+                          <span className="text-sm text-gray-700 dark:text-gray-300">Tracking script not found</span>
                         </>
                       )}
                     </div>
                     {result.scriptContent && (
                       <details className="mt-2">
-                        <summary className="text-xs text-gray-600 cursor-pointer hover:text-gray-800">
+                        <summary className="text-xs text-gray-600 dark:text-gray-400 cursor-pointer hover:text-gray-800">
                           View script preview
                         </summary>
-                        <pre className="mt-2 p-2 bg-white border border-gray-200 rounded text-xs overflow-auto max-h-40">
+                        <pre className="mt-2 p-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded text-xs overflow-auto max-h-40">
                           {formatScriptPreview(result.scriptContent)}
                         </pre>
                       </details>
@@ -191,18 +191,18 @@ export default function PixelTest() {
                   </div>
                 </div>
 
-                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <h4 className="font-semibold text-gray-900 mb-2">Cookies Detected</h4>
+                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 dark:border-gray-800">
+                  <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">Cookies Detected</h4>
                   {result.cookiesDetected.length > 0 ? (
                     <ul className="space-y-1">
                       {result.cookiesDetected.map((cookie, idx) => (
-                        <li key={idx} className="text-sm text-gray-700">
-                          <span className="font-mono text-xs bg-white px-1 rounded">{cookie}</span>
+                        <li key={idx} className="text-sm text-gray-700 dark:text-gray-300">
+                          <span className="font-mono text-xs bg-white dark:bg-gray-900 px-1 rounded">{cookie}</span>
                         </li>
                       ))}
                     </ul>
                   ) : (
-                    <p className="text-sm text-gray-500">No tracking cookies detected</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">No tracking cookies detected</p>
                   )}
                 </div>
               </div>
@@ -221,9 +221,9 @@ export default function PixelTest() {
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <h4 className="font-semibold text-blue-900 mb-2">What to Check</h4>
                 <ul className="list-disc list-inside space-y-1 text-sm text-blue-800">
-                  <li>Script should contain <code className="bg-white px-1 rounded">TRACKING_API_URL</code></li>
-                  <li>Script should detect <code className="bg-white px-1 rounded">?ref=</code> parameter</li>
-                  <li>Script should set cookies: <code className="bg-white px-1 rounded">affiliate_click_id</code> and <code className="bg-white px-1 rounded">affiliate_id</code></li>
+                  <li>Script should contain <code className="bg-white dark:bg-gray-900 px-1 rounded">TRACKING_API_URL</code></li>
+                  <li>Script should detect <code className="bg-white dark:bg-gray-900 px-1 rounded">?ref=</code> parameter</li>
+                  <li>Script should set cookies: <code className="bg-white dark:bg-gray-900 px-1 rounded">affiliate_click_id</code> and <code className="bg-white dark:bg-gray-900 px-1 rounded">affiliate_id</code></li>
                   <li>Script should update cart attributes for checkout</li>
                 </ul>
               </div>
@@ -233,8 +233,8 @@ export default function PixelTest() {
       </div>
 
       <div className="mt-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">Browser-Side Tracking Debug</h2>
-        <p className="mb-4 text-sm text-gray-600">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">Browser-Side Tracking Debug</h2>
+        <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
           Check cookies, sessionStorage, and cart attributes in your current browser session.
           <strong className="block mt-2">Note:</strong> This only works when viewing this page from your Shopify store.
         </p>

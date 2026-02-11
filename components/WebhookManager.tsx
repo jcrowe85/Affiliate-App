@@ -58,15 +58,15 @@ export default function WebhookManager() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+      <div className="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800">
         <h2 className="text-lg font-semibold mb-4">Update Webhook URLs</h2>
-        <p className="text-sm text-gray-600 mb-4">
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
           After restarting Cloudflare Tunnel, update your webhook URLs with the new tunnel URL.
         </p>
         
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               New Webhook URL (e.g., https://abc123.trycloudflare.com)
             </label>
             <input
@@ -74,9 +74,9 @@ export default function WebhookManager() {
               value={webhookUrl}
               onChange={(e) => setWebhookUrl(e.target.value)}
               placeholder="https://your-tunnel-url.trycloudflare.com"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               Or set CLOUDFLARE_TUNNEL_URL in .env and leave empty to use that
             </p>
           </div>
@@ -123,28 +123,28 @@ export default function WebhookManager() {
         </div>
       </div>
 
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+      <div className="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">Current Webhooks</h2>
           <button
             onClick={fetchWebhooks}
             disabled={loadingWebhooks}
-            className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 disabled:opacity-50"
+            className="px-3 py-1 text-sm bg-gray-100 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 disabled:opacity-50"
           >
             {loadingWebhooks ? 'Loading...' : 'Refresh'}
           </button>
         </div>
 
         {currentWebhooks.length === 0 ? (
-          <p className="text-gray-500 text-sm">No webhooks found. Click Refresh to load.</p>
+          <p className="text-gray-500 dark:text-gray-400 text-sm">No webhooks found. Click Refresh to load.</p>
         ) : (
           <div className="space-y-2">
             {currentWebhooks.map((webhook: any) => (
               <div key={webhook.id} className="p-3 bg-gray-50 rounded-md">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <div className="font-medium text-gray-900">{webhook.topic}</div>
-                    <div className="text-sm text-gray-600 mt-1 break-all">{webhook.address}</div>
+                    <div className="font-medium text-gray-900 dark:text-gray-100">{webhook.topic}</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400 mt-1 break-all">{webhook.address}</div>
                   </div>
                 </div>
               </div>
