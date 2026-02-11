@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get sessions for this specific affiliate only
-    let sessionsList;
+    let sessionsList: Awaited<ReturnType<typeof prisma.visitorSession.findMany>>;
     
     if (viewMode === 'realtime') {
       const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
