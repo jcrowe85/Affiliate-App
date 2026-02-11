@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
 
     // Determine which sessions to show based on view mode
     type SessionWithAffiliate = Awaited<ReturnType<typeof prisma.visitorSession.findMany>>[0] & {
-      affiliate: {
+      affiliate?: {
         id: string;
         affiliate_number: number | null;
         name: string;
