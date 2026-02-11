@@ -250,7 +250,7 @@ export async function GET(request: NextRequest) {
         affiliateSessionsWithoutTimeFilter: affiliateSessionsWithoutTimeFilter.map(s => ({
           id: s.id,
           start_time: s.start_time && !isNaN(s.start_time.getTime()) ? s.start_time.toISOString() : 'invalid',
-          isAfterStartTime: s.start_time && !isNaN(s.start_time.getTime()) ? s.start_time >= startTimeDate : false,
+          isAfterStartTime: s.start_time && !isNaN(s.start_time.getTime()) && startTimeDate && !isNaN(startTimeDate.getTime()) ? s.start_time >= startTimeDate : false,
         })),
       });
       // Get sample session dates to understand the data
