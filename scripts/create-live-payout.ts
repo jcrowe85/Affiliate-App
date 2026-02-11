@@ -158,7 +158,6 @@ async function createLivePayout() {
     // Create payout run record
     const payoutRun = await prisma.payoutRun.create({
       data: {
-        affiliate_id: affiliate.id,
         period_start: commission.created_at,
         period_end: commission.created_at,
         status: 'paid',
