@@ -36,10 +36,32 @@ export async function GET(request: NextRequest) {
 
     const shopifyShopId = admin.shopify_shop_id;
     const searchParams = request.nextUrl.searchParams;
-    const timeRange = searchParams.get('timeRange') || '30d'; // Default to 30 days to show more data
-    const viewMode = searchParams.get('viewMode') || 'historical'; // Default to historical
-    const startTime = Date.now() - getTimeRangeMs(timeRange);
-    const startTimeDate = new Date(startTime);
+    const viewMode = searchParams.get('viewMode') || 'realtime'; // Default to realtime
+    
+    // Only calculate timeRange and startTimeDate for historical mode
+    let timeRange = '30d';
+    let startTimeDate: Date | null = null;
+    
+    if (viewMode === 'historical') {
+      timeRange = searchParams.get('timeRange') || '30d';
+      const timeRangeMs = getTimeRangeMs(timeRange);
+      const startTime = Date.now() - timeRangeMs;
+      startTimeDate = new Date(startTime);
+      
+      // Validate date
+      if (isNaN(startTimeDate.getTime())) {
+        console.error('[Analytics Stats] Invalid startTimeDate:', {
+          timeRange,
+          timeRangeMs,
+          startTime,
+          startTimeDate,
+        });
+        return NextResponse.json(
+          { error: `Invalid time range: ${timeRange}` },
+          { status: 400 }
+        );
+      }
+    }
 
     // Determine which sessions to show based on view mode
     type SessionWithAffiliate = Awaited<ReturnType<typeof prisma.visitorSession.findMany>>[0] & {
@@ -121,11 +143,18 @@ export async function GET(request: NextRequest) {
             },
           })
         : [];
-      const affiliateMap = new Map(affiliatesData.map(a => [a.id, a]));
+      type AffiliateData = {
+        id: string;
+        affiliate_number: number | null;
+        name: string;
+        first_name: string | null;
+        last_name: string | null;
+      };
+      const affiliateMap = new Map<string, AffiliateData>(affiliatesData.map(a => [a.id, a]));
       
       // Add affiliate data to sessions (matching old structure)
       sessionsList = sessionsList.map(session => {
-        const affiliate = session.affiliate_id ? affiliateMap.get(session.affiliate_id) || null : null;
+        const affiliate: AffiliateData | null = session.affiliate_id ? affiliateMap.get(session.affiliate_id) || null : null;
         return {
           ...session,
           affiliate,
@@ -213,12 +242,12 @@ export async function GET(request: NextRequest) {
       
       console.log('[Analytics Stats] Pre-query debug:', {
         shopifyShopId,
-        startTimeDate: startTimeDate.toISOString(),
+        startTimeDate: startTimeDate && !isNaN(startTimeDate.getTime()) ? startTimeDate.toISOString() : 'invalid',
         timeRangeSessionsCount,
         affiliateSessionsWithoutTimeFilter: affiliateSessionsWithoutTimeFilter.map(s => ({
           id: s.id,
-          start_time: s.start_time.toISOString(),
-          isAfterStartTime: s.start_time >= startTimeDate,
+          start_time: s.start_time && !isNaN(s.start_time.getTime()) ? s.start_time.toISOString() : 'invalid',
+          isAfterStartTime: s.start_time && !isNaN(s.start_time.getTime()) ? s.start_time >= startTimeDate : false,
         })),
       });
       // Get sample session dates to understand the data
@@ -275,23 +304,29 @@ export async function GET(request: NextRequest) {
         allSessions: allSessionsCount,
         affiliateSessions: affiliateSessionsCount,
         timeRangeAffiliateSessions: timeRangeSessionsCount,
-        startTimeDate: startTimeDate.toISOString(),
+        startTimeDate: startTimeDate && !isNaN(startTimeDate.getTime()) ? startTimeDate.toISOString() : 'invalid',
         timeRange,
         now: new Date().toISOString(),
         testQuerySessions: testQuerySessions.map(s => ({
           id: s.id,
-          start_time: s.start_time.toISOString(),
-          updated_at: s.updated_at.toISOString(),
+          start_time: s.start_time && !isNaN(s.start_time.getTime()) ? s.start_time.toISOString() : 'invalid',
+          updated_at: s.updated_at && !isNaN(s.updated_at.getTime()) ? s.updated_at.toISOString() : 'invalid',
         })),
         sampleRecentSessions: sampleSessions.map(s => ({
-          start_time: s.start_time.toISOString(),
-          updated_at: s.updated_at.toISOString(),
+          start_time: s.start_time && !isNaN(s.start_time.getTime()) ? s.start_time.toISOString() : 'invalid',
+          updated_at: s.updated_at && !isNaN(s.updated_at.getTime()) ? s.updated_at.toISOString() : 'invalid',
         })),
-        oldestSession: oldestSession ? oldestSession.start_time.toISOString() : 'none',
+        oldestSession: oldestSession && oldestSession.start_time && !isNaN(oldestSession.start_time.getTime()) 
+          ? oldestSession.start_time.toISOString() 
+          : 'none',
         dateComparison: {
-          sampleStartTime: sampleSessions[0]?.start_time?.toISOString(),
-          startTimeDate: startTimeDate.toISOString(),
-          isSampleAfterStart: sampleSessions[0]?.start_time ? sampleSessions[0].start_time >= startTimeDate : 'N/A',
+          sampleStartTime: sampleSessions[0]?.start_time && !isNaN(sampleSessions[0].start_time.getTime())
+            ? sampleSessions[0].start_time.toISOString()
+            : 'invalid',
+          startTimeDate: startTimeDate && !isNaN(startTimeDate.getTime()) ? startTimeDate.toISOString() : 'invalid',
+          isSampleAfterStart: sampleSessions[0]?.start_time && !isNaN(sampleSessions[0].start_time.getTime())
+            ? sampleSessions[0].start_time >= startTimeDate
+            : 'N/A',
         },
       });
       
@@ -309,14 +344,24 @@ export async function GET(request: NextRequest) {
       });
       
       // Filter in memory by time range (Prisma date filter was excluding valid sessions)
-      const filteredSessions = sessionsList.filter(s => s.start_time >= startTimeDate);
+      // Only filter sessions with valid dates
+      const filteredSessions = sessionsList.filter(s => {
+        if (!s.start_time || isNaN(s.start_time.getTime())) {
+          return false; // Skip sessions with invalid dates
+        }
+        return s.start_time >= startTimeDate;
+      });
       sessionsList = filteredSessions as SessionWithAffiliate[];
       
       console.log('[Analytics Stats] Historical query result:', {
         sessionsFound: sessionsList.length,
-        firstSessionStartTime: sessionsList[0]?.start_time?.toISOString(),
-        lastSessionStartTime: sessionsList[sessionsList.length - 1]?.start_time?.toISOString(),
-        startTimeDate: startTimeDate.toISOString(),
+        firstSessionStartTime: sessionsList[0]?.start_time && !isNaN(sessionsList[0].start_time.getTime())
+          ? sessionsList[0].start_time.toISOString()
+          : 'invalid',
+        lastSessionStartTime: sessionsList[sessionsList.length - 1]?.start_time && !isNaN(sessionsList[sessionsList.length - 1].start_time.getTime())
+          ? sessionsList[sessionsList.length - 1].start_time.toISOString()
+          : 'invalid',
+        startTimeDate: startTimeDate && !isNaN(startTimeDate.getTime()) ? startTimeDate.toISOString() : 'invalid',
       });
       
       // Fetch affiliate data separately since VisitorSession doesn't have affiliate relation
@@ -336,11 +381,18 @@ export async function GET(request: NextRequest) {
             },
           })
         : [];
-      const affiliateMap = new Map(affiliatesData.map(a => [a.id, a]));
+      type AffiliateData = {
+        id: string;
+        affiliate_number: number | null;
+        name: string;
+        first_name: string | null;
+        last_name: string | null;
+      };
+      const affiliateMap = new Map<string, AffiliateData>(affiliatesData.map(a => [a.id, a]));
       
       // Add affiliate data to sessions (matching old structure)
       sessionsList = sessionsList.map(session => {
-        const affiliate = session.affiliate_id ? affiliateMap.get(session.affiliate_id) || null : null;
+        const affiliate: AffiliateData | null = session.affiliate_id ? affiliateMap.get(session.affiliate_id) || null : null;
         return {
           ...session,
           affiliate,
@@ -645,7 +697,9 @@ export async function GET(request: NextRequest) {
           currentPage: currentPage,
           device: session.device_type || 'Unknown',
           location: session.location_country || 'Unknown',
-          lastSeen: Number(session.updated_at.getTime()),
+          lastSeen: session.updated_at && !isNaN(session.updated_at.getTime()) 
+            ? Number(session.updated_at.getTime()) 
+            : Date.now(),
           affiliate_id: session.affiliate_id,
           affiliate_number: session.affiliate_number || session.affiliate?.affiliate_number || null,
           affiliate_name: session.affiliate?.name || 
@@ -796,7 +850,9 @@ export async function GET(request: NextRequest) {
         currentPage: currentPage,
         device: session.device_type || 'Unknown',
         location: session.location_country || 'Unknown',
-        lastSeen: Number(session.updated_at.getTime()),
+        lastSeen: session.updated_at && !isNaN(session.updated_at.getTime()) 
+          ? Number(session.updated_at.getTime()) 
+          : Date.now(),
         url_params: finalUrlParams, // Always include url_params, even if empty
       });
       
@@ -868,8 +924,17 @@ export async function GET(request: NextRequest) {
     });
   } catch (error: any) {
     console.error('Analytics stats error:', error);
+    console.error('Error stack:', error?.stack);
+    console.error('Error details:', {
+      message: error?.message,
+      name: error?.name,
+      code: error?.code,
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch stats' },
+      { 
+        error: error?.message || 'Failed to fetch stats',
+        details: process.env.NODE_ENV === 'development' ? error?.stack : undefined,
+      },
       { status: 500 }
     );
   }
