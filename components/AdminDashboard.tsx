@@ -364,6 +364,28 @@ export default function AdminDashboard() {
   const [payoutReference, setPayoutReference] = useState('');
   const [processingPayment, setProcessingPayment] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState<{ message: string; details?: any } | null>(null);
+  const [chartData, setChartData] = useState<Array<{ date: string; revenue: number; commissions: number }>>([]);
+  const [chartTimeRange, setChartTimeRange] = useState<string>('30d');
+  const [chartLoading, setChartLoading] = useState(false);
+
+  const fetchChartData = useCallback(async (timeRange: string) => {
+    try {
+      setChartLoading(true);
+      const response = await fetch(`/api/admin/chart-data?timeRange=${timeRange}`);
+      if (response.ok) {
+        const result = await response.json();
+        setChartData(result.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching chart data:', error);
+    } finally {
+      setChartLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchChartData(chartTimeRange);
+  }, [chartTimeRange, fetchChartData]);
 
   const fetchDashboardData = useCallback(async () => {
     try {
@@ -590,20 +612,6 @@ export default function AdminDashboard() {
     });
   };
 
-  const generateChartData = () => {
-    // Generate last 30 days of data
-    const data = [];
-    const today = new Date();
-    for (let i = 29; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
-      data.push({
-        date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        value: 0, // This would come from actual API data in a real implementation
-      });
-    }
-    return data;
-  };
 
   if (loading && !stats) {
     return (
@@ -639,7 +647,7 @@ export default function AdminDashboard() {
         <span className={`text-sm font-medium flex items-center min-w-0 ${collapsed ? 'max-md:flex md:hidden' : 'flex'}`}>
           <span className="truncate">{label}</span>
           {badge != null && badge > 0 && (
-            <span className="ml-auto bg-red-600 text-white text-xs px-2 py-0.5 rounded-full shrink-0">{badge}</span>
+            <span className="ml-2 bg-red-600 text-white text-xs px-2 py-0.5 rounded-full shrink-0">{badge}</span>
           )}
         </span>
         {collapsed && badge != null && badge > 0 && (
@@ -715,6 +723,14 @@ export default function AdminDashboard() {
         >
           {icons.menu}
         </button>
+        <button
+          type="button"
+          onClick={() => setSidebarCollapsed((c) => !c)}
+          className="hidden md:flex p-2 rounded-lg text-gray-600 dark:text-gray-400 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {sidebarCollapsed ? icons.chevronRight : icons.chevronLeft}
+        </button>
         <h1 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100 dark:text-white truncate flex-1">Affiliate Dashboard</h1>
         <ThemeToggle />
       </header>
@@ -774,14 +790,6 @@ export default function AdminDashboard() {
             <span className="shrink-0 w-6 h-6 flex items-center justify-center">{icons.logout}</span>
             <span className={`text-sm font-medium ${sidebarCollapsed ? 'max-md:inline md:hidden' : ''}`}>Logout</span>
           </button>
-          <button
-            type="button"
-            onClick={() => setSidebarCollapsed((c) => !c)}
-            className="hidden md:flex w-full mt-2 items-center justify-center px-2 py-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
-            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            {sidebarCollapsed ? icons.chevronRight : icons.chevronLeft}
-          </button>
         </div>
       </aside>
 
@@ -815,44 +823,93 @@ export default function AdminDashboard() {
             {/* Performance Graph */}
             <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-4 sm:p-6">
               <div className="mb-6">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Performance</h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Revenue over time</p>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Performance</h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Revenue and commissions over time</p>
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    {['1h', '24h', '7d', '30d', '90d'].map((range) => (
+                      <button
+                        key={range}
+                        type="button"
+                        onClick={() => setChartTimeRange(range)}
+                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                          chartTimeRange === range
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                        }`}
+                      >
+                        {range === '1h' ? '1 Hour' : range === '24h' ? '24 Hours' : range === '7d' ? '7 Days' : range === '30d' ? '30 Days' : '90 Days'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
               <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={generateChartData()}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:stroke-gray-700" />
-                    <XAxis 
-                      dataKey="date" 
-                      stroke="#6b7280"
-                      className="dark:stroke-gray-400"
-                      style={{ fontSize: '12px' }}
-                    />
-                    <YAxis 
-                      stroke="#6b7280"
-                      className="dark:stroke-gray-400"
-                      style={{ fontSize: '12px' }}
-                      tickFormatter={(value) => `$${value}`}
-                    />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: theme === 'dark' ? '#1f2937' : '#fff', 
-                        border: `1px solid ${theme === 'dark' ? '#374151' : '#e5e7eb'}`, 
-                        borderRadius: '6px',
-                        color: theme === 'dark' ? '#f3f4f6' : '#000'
-                      }}
-                      formatter={(value: any) => [`$${value}`, 'Revenue']}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="value" 
-                      stroke="#10b981" 
-                      strokeWidth={2}
-                      dot={{ fill: '#10b981', r: 4 }}
-                      activeDot={{ r: 6 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+                {chartLoading ? (
+                  <div className="h-full flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-indigo-600 mb-2"></div>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Loading chart data...</p>
+                    </div>
+                  </div>
+                ) : chartData.length === 0 ? (
+                  <div className="h-full flex items-center justify-center">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">No data available for this time range</p>
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:stroke-gray-700" />
+                      <XAxis 
+                        dataKey="date" 
+                        stroke="#6b7280"
+                        className="dark:stroke-gray-400"
+                        style={{ fontSize: '12px' }}
+                        angle={-45}
+                        textAnchor="end"
+                        height={60}
+                      />
+                      <YAxis 
+                        stroke="#6b7280"
+                        className="dark:stroke-gray-400"
+                        style={{ fontSize: '12px' }}
+                        tickFormatter={(value) => `$${value}`}
+                      />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: theme === 'dark' ? '#1f2937' : '#fff', 
+                          border: `1px solid ${theme === 'dark' ? '#374151' : '#e5e7eb'}`, 
+                          borderRadius: '6px',
+                          color: theme === 'dark' ? '#f3f4f6' : '#000'
+                        }}
+                        formatter={(value: any, name: string) => {
+                          const label = name === 'revenue' ? 'Revenue' : 'Commissions Paid';
+                          return [`$${parseFloat(value).toFixed(2)}`, label];
+                        }}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="revenue" 
+                        stroke="#10b981" 
+                        strokeWidth={2}
+                        dot={{ fill: '#10b981', r: 3 }}
+                        activeDot={{ r: 5 }}
+                        name="revenue"
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="commissions" 
+                        stroke="#3b82f6" 
+                        strokeWidth={2}
+                        dot={{ fill: '#3b82f6', r: 3 }}
+                        activeDot={{ r: 5 }}
+                        name="commissions"
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
               </div>
             </div>
 

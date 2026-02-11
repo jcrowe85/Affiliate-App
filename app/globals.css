@@ -32,3 +32,52 @@ a {
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* Sleek Apple-style scrollbars */
+/* Webkit browsers (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.3);
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.5);
+}
+
+/* Dark mode scrollbar */
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(75, 85, 99, 0.4);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(75, 85, 99, 0.6);
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.3) transparent;
+}
+
+.dark * {
+  scrollbar-color: rgba(75, 85, 99, 0.4) transparent;
+}
+
+/* Smooth scrollbar appearance on hover */
+*:hover {
+  scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+}
+
+.dark *:hover {
+  scrollbar-color: rgba(75, 85, 99, 0.6) transparent;
+}
