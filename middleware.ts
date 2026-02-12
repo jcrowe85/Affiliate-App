@@ -12,8 +12,12 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Always allow login pages
-  if (pathname.startsWith('/login') || pathname.startsWith('/affiliate/login') || pathname.startsWith('/affiliates/login')) {
+  // Always allow login pages and public marketing pages
+  if (pathname.startsWith('/login') || 
+      pathname.startsWith('/affiliate/login') || 
+      pathname.startsWith('/affiliates/login') ||
+      pathname === '/affiliates' ||
+      pathname === '/affiliate') {
     return NextResponse.next();
   }
 
@@ -46,9 +50,9 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  // Protect affiliate routes (everything under /affiliate or /affiliates except login)
-  if ((pathname.startsWith('/affiliate') && !pathname.startsWith('/affiliate/login')) ||
-      (pathname.startsWith('/affiliates') && !pathname.startsWith('/affiliates/login'))) {
+  // Protect affiliate routes (everything under /affiliate or /affiliates except public pages)
+  // Public pages are already handled above: /affiliates, /affiliate, and login pages
+  if (pathname.startsWith('/affiliate') || pathname.startsWith('/affiliates')) {
     const sessionToken = request.cookies.get('affiliate_session')?.value;
 
     // If no session, redirect to affiliate login
