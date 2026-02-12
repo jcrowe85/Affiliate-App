@@ -20,8 +20,21 @@ export async function GET(request: NextRequest) {
     }
 
     const shopifyShopId = admin.shopify_shop_id;
+    const searchParams = request.nextUrl.searchParams;
+    const period = searchParams.get('period') || '30d'; // 7d, 30d, 90d, max
 
-    // Get pending approvals
+    // Calculate date range based on period
+    let startDate: Date | null = null;
+    if (period !== 'max') {
+      const now = new Date();
+      const days = period === '7d' ? 7 : period === '30d' ? 30 : period === '90d' ? 90 : 30;
+      startDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+    }
+
+    // Build date filter
+    const dateFilter = startDate ? { created_at: { gte: startDate } } : {};
+
+    // Get pending approvals (always all time)
     const pendingApprovals = await prisma.commission.count({
       where: {
         shopify_shop_id: shopifyShopId,
@@ -29,7 +42,7 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Get unresolved fraud flags
+    // Get unresolved fraud flags (always all time)
     const fraudFlags = await prisma.fraudFlag.count({
       where: {
         shopify_shop_id: shopifyShopId,
@@ -37,7 +50,7 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Get upcoming payouts (eligible commissions)
+    // Get upcoming payouts (always all time)
     const upcomingPayouts = await prisma.commission.count({
       where: {
         shopify_shop_id: shopifyShopId,
@@ -48,17 +61,19 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Get total commissions count
+    // Get total commissions count for the period
     const totalCommissions = await prisma.commission.count({
       where: {
         shopify_shop_id: shopifyShopId,
+        ...dateFilter,
       },
     });
 
-    // Get all commissions for commission calculations
+    // Get all commissions for the period
     const allCommissions = await prisma.commission.findMany({
       where: {
         shopify_shop_id: shopifyShopId,
+        ...dateFilter,
       },
       select: {
         amount: true,
@@ -66,10 +81,11 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Get all order attributions for revenue calculations (revenue = total sales, not commissions)
+    // Get all order attributions for the period
     const allOrderAttributions = await prisma.orderAttribution.findMany({
       where: {
         shopify_shop_id: shopifyShopId,
+        ...dateFilter,
       },
       select: {
         order_total: true,
@@ -99,16 +115,18 @@ export async function GET(request: NextRequest) {
       .filter(c => c.status === 'eligible' || c.status === 'approved')
       .reduce((sum, c) => sum + parseFloat(c.amount.toString()), 0);
 
-    // Get clicks and conversions
+    // Get clicks and conversions for the period
     const totalClicks = await prisma.click.count({
       where: {
         shopify_shop_id: shopifyShopId,
+        ...dateFilter,
       },
     });
 
     const totalConversions = await prisma.orderAttribution.count({
       where: {
         shopify_shop_id: shopifyShopId,
+        ...dateFilter,
       },
     });
 

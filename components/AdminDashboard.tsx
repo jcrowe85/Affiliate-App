@@ -69,10 +69,11 @@ interface AffiliatePerformance {
   clicks: number;
   orders: number;
   conversion_rate: string;
+  revenue?: string;
   total_commission: string;
   paid_commission: string;
   pending_commission: string;
-  total_commissions_count: number;
+  total_commissions_count?: number;
 }
 
 interface PayoutObligation {
@@ -304,9 +305,9 @@ function PayoutReportsSectionComponent({
                     <td className="px-6 py-4 whitespace-nowrap">
                       {payout.paypal_batch_id ? (
                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          payout.paypal_status === 'SUCCESS' ? 'bg-green-100 text-green-800' :
-                          payout.paypal_status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-red-100 text-red-800'
+                          payout.paypal_status === 'SUCCESS' ? 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300' :
+                          payout.paypal_status === 'PENDING' ? 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300' :
+                          'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300'
                         }`}>
                           {payout.paypal_status || 'PENDING'}
                         </span>
@@ -367,6 +368,7 @@ export default function AdminDashboard() {
   const [chartData, setChartData] = useState<Array<{ date: string; revenue: number; commissions: number }>>([]);
   const [chartTimeRange, setChartTimeRange] = useState<string>('30d');
   const [chartLoading, setChartLoading] = useState(false);
+  const [performancePeriod, setPerformancePeriod] = useState<string>('30d'); // Shared period for performance tab and overview stats/top affiliates
 
   const fetchChartData = useCallback(async (timeRange: string) => {
     try {
@@ -389,8 +391,11 @@ export default function AdminDashboard() {
 
   const fetchDashboardData = useCallback(async () => {
     try {
-      // Always fetch stats
-      const statsRes = await fetch('/api/admin/stats');
+      // Fetch stats with period filter for overview tab
+      const statsUrl = activeTab === 'overview' 
+        ? `/api/admin/stats?period=${performancePeriod}`
+        : '/api/admin/stats';
+      const statsRes = await fetch(statsUrl);
       if (statsRes.status === 401) {
         router.push('/login');
         return;
@@ -418,7 +423,10 @@ export default function AdminDashboard() {
         setPaidPayouts(paidData.payouts || []);
         
       } else if (activeTab === 'performance' || activeTab === 'overview') {
-        const perfRes = await fetch('/api/admin/affiliates/performance');
+        const perfUrl = activeTab === 'overview'
+          ? `/api/admin/affiliates/performance?limit=10&period=${performancePeriod}`
+          : `/api/admin/affiliates/performance?period=${performancePeriod}`;
+        const perfRes = await fetch(perfUrl);
         const perfData = await perfRes.json();
         setAffiliatePerformance(perfData.affiliates || []);
       }
@@ -428,7 +436,7 @@ export default function AdminDashboard() {
       console.error('Error fetching dashboard data:', err);
       setLoading(false);
     }
-  }, [activeTab, router]);
+  }, [activeTab, router, performancePeriod]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -440,7 +448,7 @@ export default function AdminDashboard() {
     
     // Cleanup interval on unmount
     return () => clearInterval(interval);
-  }, [fetchDashboardData]);
+  }, [fetchDashboardData, performancePeriod]);
 
   const handleValidate = async (commissionId: string) => {
     setActionLoading(commissionId);
@@ -1010,16 +1018,11 @@ export default function AdminDashboard() {
 
             {/* Top Affiliates Table */}
             <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
-              <div className="px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div className="px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-800">
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Top Affiliates</h2>
-                <div className="flex items-center gap-4">
-                  <select className="text-sm border border-gray-300 dark:border-gray-700 dark:bg-gray-800 rounded px-3 py-1.5 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    <option>All Offers</option>
-                  </select>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">
-                    {new Date(new Date().setMonth(new Date().getMonth() - 1)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                  </div>
-                </div>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  Data filtered by Performance tab period selector
+                </p>
               </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
@@ -1059,7 +1062,7 @@ export default function AdminDashboard() {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{affiliate.clicks}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{affiliate.orders}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">
-                            {formatCurrency(affiliate.total_commission)}
+                            {formatCurrency(affiliate.revenue || '0')}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">
                             {formatCurrency(affiliate.total_commission)}
@@ -1137,13 +1140,13 @@ export default function AdminDashboard() {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex flex-col gap-1">
                             {commission.status === 'pending' && (
-                              <span className="px-2.5 py-1 text-xs font-semibold bg-yellow-100 text-yellow-800 rounded-full w-fit">Pending Validation</span>
+                              <span className="px-2.5 py-1 text-xs font-semibold bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300 rounded-full w-fit">Pending Validation</span>
                             )}
                             {commission.status === 'eligible' && (
-                              <span className="px-2.5 py-1 text-xs font-semibold bg-blue-100 text-blue-800 rounded-full w-fit">Eligible</span>
+                              <span className="px-2.5 py-1 text-xs font-semibold bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 rounded-full w-fit">Eligible</span>
                             )}
                             {commission.has_fraud_flags && (
-                              <span className="px-2.5 py-1 text-xs font-semibold bg-red-100 text-red-800 rounded-full w-fit">Fraud Flagged</span>
+                              <span className="px-2.5 py-1 text-xs font-semibold bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 rounded-full w-fit">Fraud Flagged</span>
                             )}
                           </div>
                         </td>
@@ -1371,9 +1374,9 @@ export default function AdminDashboard() {
                             <td className="px-6 py-4 whitespace-nowrap">
                               {payout.paypal_batch_id ? (
                                 <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                  payout.paypal_status === 'SUCCESS' ? 'bg-green-100 text-green-800' :
-                                  payout.paypal_status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
-                                  'bg-red-100 text-red-800'
+                                  payout.paypal_status === 'SUCCESS' ? 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300' :
+                                  payout.paypal_status === 'PENDING' ? 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300' :
+                                  'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300'
                                 }`}>
                                   {payout.paypal_status || 'PENDING'}
                                 </span>
@@ -1593,8 +1596,24 @@ export default function AdminDashboard() {
             {reportSubTab === 'performance' && (
               <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg overflow-hidden border border-gray-200 dark:border-gray-800">
                 <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-blue-50 to-white dark:from-gray-800 dark:to-gray-900">
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Affiliate Performance Ranking</h2>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Top performing affiliates by total commission earned</p>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                      <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Affiliate Performance Ranking</h2>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Top performing affiliates by total commission earned</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <select 
+                        value={performancePeriod}
+                        onChange={(e) => setPerformancePeriod(e.target.value)}
+                        className="text-sm border border-gray-300 dark:border-gray-700 dark:bg-gray-800 rounded px-3 py-1.5 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      >
+                        <option value="7d">Last 7 Days</option>
+                        <option value="30d">Last 30 Days</option>
+                        <option value="90d">Last 90 Days</option>
+                        <option value="max">All Time</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
             {loading ? (
               <div className="p-12 text-center">

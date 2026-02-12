@@ -17,6 +17,18 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams;
     const limit = parseInt(searchParams.get('limit') || '10');
+    const period = searchParams.get('period') || '30d'; // 7d, 30d, 90d, max
+
+    // Calculate date range based on period
+    let startDate: Date | null = null;
+    if (period !== 'max') {
+      const now = new Date();
+      const days = period === '7d' ? 7 : period === '30d' ? 30 : period === '90d' ? 90 : 30;
+      startDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+    }
+
+    // Build date filter for commissions and orders
+    const dateFilter = startDate ? { created_at: { gte: startDate } } : {};
 
     // Get affiliate performance stats
     const affiliateStats = await prisma.affiliate.findMany({
@@ -28,24 +40,55 @@ export async function GET(request: NextRequest) {
         id: true,
         name: true,
         email: true,
-        _count: {
-          select: {
-            clicks: true,
-            orders: true,
-            commissions: true,
-          },
-        },
       },
     });
 
-    // Get commission aggregates for all affiliates in one query
     const affiliateIds = affiliateStats.map(a => a.id);
+
+    // Get clicks count for the period
+    const clicksData = affiliateIds.length > 0
+      ? await prisma.click.groupBy({
+          by: ['affiliate_id'],
+          where: {
+            affiliate_id: { in: affiliateIds },
+            shopify_shop_id: admin.shopify_shop_id,
+            ...dateFilter,
+          },
+          _count: {
+            id: true,
+          },
+        })
+      : [];
+
+    // Get order attributions for the period (for revenue calculation)
+    const orderAttributions = affiliateIds.length > 0
+      ? await prisma.orderAttribution.findMany({
+          where: {
+            affiliate_id: { in: affiliateIds },
+            shopify_shop_id: admin.shopify_shop_id,
+            ...dateFilter,
+          },
+          select: {
+            affiliate_id: true,
+            order_total: true,
+            order_currency: true,
+            commissions: {
+              select: {
+                status: true,
+              },
+            },
+          },
+        })
+      : [];
+
+    // Get commission aggregates for the period
     const commissionAggregates = affiliateIds.length > 0
       ? await prisma.commission.groupBy({
           by: ['affiliate_id', 'status'],
           where: {
             affiliate_id: { in: affiliateIds },
             shopify_shop_id: admin.shopify_shop_id,
+            ...dateFilter,
           },
           _sum: {
             amount: true,
@@ -54,43 +97,90 @@ export async function GET(request: NextRequest) {
       : [];
 
     // Group aggregates by affiliate_id
-    const aggregatesByAffiliate = new Map<string, { total: number; paid: number; pending: number }>();
+    const aggregatesByAffiliate = new Map<string, { 
+      total: number; 
+      paid: number; 
+      pending: number;
+      revenue: number;
+      clicks: number;
+      orders: number;
+    }>();
+
+    // Initialize all affiliates
+    affiliateStats.forEach(affiliate => {
+      aggregatesByAffiliate.set(affiliate.id, {
+        total: 0,
+        paid: 0,
+        pending: 0,
+        revenue: 0,
+        clicks: 0,
+        orders: 0,
+      });
+    });
+
+    // Add clicks
+    clicksData.forEach(click => {
+      const existing = aggregatesByAffiliate.get(click.affiliate_id);
+      if (existing) {
+        existing.clicks = click._count.id;
+      }
+    });
+
+    // Add revenue from order totals (what customers paid)
+    orderAttributions.forEach(oa => {
+      const existing = aggregatesByAffiliate.get(oa.affiliate_id);
+      if (existing) {
+        // Only count orders with non-reversed commissions
+        const hasNonReversedCommission = oa.commissions.some(c => c.status !== 'reversed');
+        if (hasNonReversedCommission) {
+          existing.revenue += parseFloat(oa.order_total?.toString() || '0');
+          existing.orders += 1;
+        }
+      }
+    });
+
+    // Add commission aggregates
     commissionAggregates.forEach(agg => {
-      const existing = aggregatesByAffiliate.get(agg.affiliate_id) || { total: 0, paid: 0, pending: 0 };
-      const amount = parseFloat(agg._sum.amount?.toString() || '0');
-      
-      if (agg.status !== 'reversed') {
-        existing.total += amount;
+      const existing = aggregatesByAffiliate.get(agg.affiliate_id);
+      if (existing) {
+        const amount = parseFloat(agg._sum.amount?.toString() || '0');
+        
+        if (agg.status !== 'reversed') {
+          existing.total += amount;
+        }
+        if (agg.status === 'paid') {
+          existing.paid += amount;
+        }
+        if (agg.status === 'eligible' || agg.status === 'approved') {
+          existing.pending += amount;
+        }
       }
-      if (agg.status === 'paid') {
-        existing.paid += amount;
-      }
-      if (agg.status === 'eligible' || agg.status === 'approved') {
-        existing.pending += amount;
-      }
-      
-      aggregatesByAffiliate.set(agg.affiliate_id, existing);
     });
 
     // Calculate performance metrics for each affiliate
     const performance = affiliateStats.map(affiliate => {
-      const aggregates = aggregatesByAffiliate.get(affiliate.id) || { total: 0, paid: 0, pending: 0 };
+      const aggregates = aggregatesByAffiliate.get(affiliate.id) || { 
+        total: 0, 
+        paid: 0, 
+        pending: 0,
+        revenue: 0,
+        clicks: 0,
+        orders: 0,
+      };
 
-      const orders = affiliate._count.orders;
-      const clicks = affiliate._count.clicks;
-      const conversionRate = clicks > 0 ? (orders / clicks) * 100 : 0;
+      const conversionRate = aggregates.clicks > 0 ? (aggregates.orders / aggregates.clicks) * 100 : 0;
 
       return {
         affiliate_id: affiliate.id,
         name: affiliate.name,
         email: affiliate.email,
-        clicks,
-        orders,
+        clicks: aggregates.clicks,
+        orders: aggregates.orders,
         conversion_rate: conversionRate.toFixed(2),
+        revenue: aggregates.revenue.toFixed(2),
         total_commission: aggregates.total.toFixed(2),
         paid_commission: aggregates.paid.toFixed(2),
         pending_commission: aggregates.pending.toFixed(2),
-        total_commissions_count: affiliate._count.commissions,
       };
     });
 

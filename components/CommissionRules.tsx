@@ -354,7 +354,7 @@ export default function CommissionRules() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <span className={`px-2 py-1 text-xs rounded ${
-                        rule.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                        rule.active ? 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300' : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-300'
                       }`}>
                         {rule.active ? 'Active' : 'Inactive'}
                       </span>

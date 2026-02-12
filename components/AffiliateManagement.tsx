@@ -1990,10 +1990,10 @@ export default function AffiliateManagement() {
                         <span
                           className={`px-2 py-1 text-xs rounded ${
                             a.status === 'active'
-                              ? 'bg-green-100 text-green-800'
+                              ? 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300'
                               : a.status === 'suspended'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-red-100 text-red-800'
+                              ? 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300'
+                              : 'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300'
                           }`}
                         >
                           {a.status}
