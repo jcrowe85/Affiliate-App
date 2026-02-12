@@ -576,7 +576,7 @@ export default function OffersManagement() {
                 </thead>
                 <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
                   {offers.map((offer) => (
-                    <tr key={offer.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800">
+                    <tr key={offer.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">{offer.name}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-sm font-mono text-gray-600 dark:text-gray-400" title={offer.id}>{offerIdDisplay(offer)}</span>

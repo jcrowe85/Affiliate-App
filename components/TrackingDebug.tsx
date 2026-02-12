@@ -82,73 +82,73 @@ export default function TrackingDebug() {
   }, []);
 
   if (!debugInfo) {
-    return <div className="p-4">Loading debug info...</div>;
+    return <div className="p-4 text-gray-900 dark:text-gray-100">Loading debug info...</div>;
   }
 
   return (
-    <div className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
-      <h3 className="text-lg font-semibold mb-4">Tracking Debug Info</h3>
+    <div className="p-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-sm">
+      <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Tracking Debug Info</h3>
       
       <div className="space-y-4">
         <div>
-          <h4 className="font-medium text-sm text-gray-700 mb-2">Current URL</h4>
-          <code className="text-xs bg-gray-100 p-2 rounded block break-all">
+          <h4 className="font-medium text-sm text-gray-700 dark:text-gray-300 mb-2">Current URL</h4>
+          <code className="text-xs bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 p-2 rounded block break-all">
             {debugInfo.currentUrl}
           </code>
         </div>
 
         <div>
-          <h4 className="font-medium text-sm text-gray-700 mb-2">URL Parameters</h4>
+          <h4 className="font-medium text-sm text-gray-700 dark:text-gray-300 mb-2">URL Parameters</h4>
           {Object.keys(debugInfo.urlParams).length > 0 ? (
-            <pre className="text-xs bg-gray-100 p-2 rounded">
+            <pre className="text-xs bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 p-2 rounded">
               {JSON.stringify(debugInfo.urlParams, null, 2)}
             </pre>
           ) : (
-            <p className="text-sm text-gray-500">No URL parameters found</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">No URL parameters found</p>
           )}
         </div>
 
         <div>
-          <h4 className="font-medium text-sm text-gray-700 mb-2">Cookies</h4>
+          <h4 className="font-medium text-sm text-gray-700 dark:text-gray-300 mb-2">Cookies</h4>
           {debugInfo.cookies.affiliate_click_id || debugInfo.cookies.affiliate_id ? (
-            <pre className="text-xs bg-gray-100 p-2 rounded">
+            <pre className="text-xs bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 p-2 rounded">
               {JSON.stringify(debugInfo.cookies, null, 2)}
             </pre>
           ) : (
-            <p className="text-sm text-gray-500">No affiliate tracking cookies found</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">No affiliate tracking cookies found</p>
           )}
         </div>
 
         <div>
-          <h4 className="font-medium text-sm text-gray-700 mb-2">Session Storage</h4>
+          <h4 className="font-medium text-sm text-gray-700 dark:text-gray-300 mb-2">Session Storage</h4>
           {debugInfo.sessionStorage.affiliate_click_id || debugInfo.sessionStorage.affiliate_id ? (
-            <pre className="text-xs bg-gray-100 p-2 rounded">
+            <pre className="text-xs bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 p-2 rounded">
               {JSON.stringify(debugInfo.sessionStorage, null, 2)}
             </pre>
           ) : (
-            <p className="text-sm text-gray-500">No affiliate tracking in sessionStorage</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">No affiliate tracking in sessionStorage</p>
           )}
         </div>
 
         <div>
-          <h4 className="font-medium text-sm text-gray-700 mb-2">Cart Attributes</h4>
+          <h4 className="font-medium text-sm text-gray-700 dark:text-gray-300 mb-2">Cart Attributes</h4>
           {debugInfo.cartAttributes ? (
             Object.keys(debugInfo.cartAttributes).length > 0 ? (
-              <pre className="text-xs bg-gray-100 p-2 rounded">
+              <pre className="text-xs bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 p-2 rounded">
                 {JSON.stringify(debugInfo.cartAttributes, null, 2)}
               </pre>
             ) : (
-              <p className="text-sm text-gray-500">No cart attributes found</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">No cart attributes found</p>
             )
           ) : (
-            <p className="text-sm text-gray-500">Cart not accessible (not on Shopify store)</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Cart not accessible (not on Shopify store)</p>
           )}
         </div>
       </div>
 
-      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
-        <p className="text-sm text-blue-800">
-          <strong>How to use:</strong> Add <code className="bg-blue-100 px-1 rounded">?ref=YOUR_AFFILIATE_NUMBER</code> to any URL (e.g., <code className="bg-blue-100 px-1 rounded">https://tryfleur.com/?ref=30843</code>)
+      <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded">
+        <p className="text-sm text-blue-800 dark:text-blue-300">
+          <strong>How to use:</strong> Add <code className="bg-blue-100 dark:bg-blue-900/50 text-blue-900 dark:text-blue-200 px-1 rounded">?ref=YOUR_AFFILIATE_NUMBER</code> to any URL (e.g., <code className="bg-blue-100 dark:bg-blue-900/50 text-blue-900 dark:text-blue-200 px-1 rounded">https://tryfleur.com/?ref=30843</code>)
         </p>
       </div>
     </div>

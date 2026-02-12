@@ -1952,7 +1952,7 @@ export default function AffiliateManagement() {
                   const primaryOffer = a.offer?.name || '—';
 
                   return (
-                    <tr key={a.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800">
+                    <tr key={a.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
                           {a.first_name && a.last_name ? `${a.first_name} ${a.last_name}` : a.name}

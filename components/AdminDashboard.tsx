@@ -841,9 +841,12 @@ export default function AdminDashboard() {
                       <button
                         key={range}
                         type="button"
-                        onClick={() => setChartTimeRange(range)}
+                        onClick={() => {
+                          setChartTimeRange(range);
+                          setPerformancePeriod(range);
+                        }}
                         className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                          chartTimeRange === range
+                          performancePeriod === range
                             ? 'bg-indigo-600 text-white'
                             : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
                         }`}
@@ -1051,10 +1054,10 @@ export default function AdminDashboard() {
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200">
+                  <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
                     {affiliatePerformance.length > 0 ? (
                       affiliatePerformance.slice(0, 10).map((affiliate) => (
-                        <tr key={affiliate.affiliate_id} className="hover:bg-gray-50 dark:bg-gray-950">
+                        <tr key={affiliate.affiliate_id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{affiliate.name}</div>
                             <div className="text-sm text-gray-500 dark:text-gray-400">{affiliate.email}</div>
@@ -1640,7 +1643,7 @@ export default function AdminDashboard() {
                       <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Pending</th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-100 dark:divide-gray-800">
+                  <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
                     {affiliatePerformance.map((affiliate, index) => (
                       <tr key={affiliate.affiliate_id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                         <td className="px-6 py-4 whitespace-nowrap">

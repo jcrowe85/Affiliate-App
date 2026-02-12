@@ -21,14 +21,27 @@ export async function GET(request: NextRequest) {
 
     const shopifyShopId = admin.shopify_shop_id;
     const searchParams = request.nextUrl.searchParams;
-    const period = searchParams.get('period') || '30d'; // 7d, 30d, 90d, max
+    const period = searchParams.get('period') || '30d'; // 1h, 24h, 7d, 30d, 90d, max
 
     // Calculate date range based on period
     let startDate: Date | null = null;
     if (period !== 'max') {
       const now = new Date();
-      const days = period === '7d' ? 7 : period === '30d' ? 30 : period === '90d' ? 90 : 30;
-      startDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+      let timeMs: number;
+      if (period === '1h') {
+        timeMs = 60 * 60 * 1000; // 1 hour
+      } else if (period === '24h') {
+        timeMs = 24 * 60 * 60 * 1000; // 24 hours
+      } else if (period === '7d') {
+        timeMs = 7 * 24 * 60 * 60 * 1000; // 7 days
+      } else if (period === '30d') {
+        timeMs = 30 * 24 * 60 * 60 * 1000; // 30 days
+      } else if (period === '90d') {
+        timeMs = 90 * 24 * 60 * 60 * 1000; // 90 days
+      } else {
+        timeMs = 30 * 24 * 60 * 60 * 1000; // default to 30 days
+      }
+      startDate = new Date(now.getTime() - timeMs);
     }
 
     // Build date filter

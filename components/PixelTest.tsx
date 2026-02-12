@@ -162,7 +162,7 @@ export default function PixelTest() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 dark:border-gray-800">
+                <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
                   <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">Script Detection</h4>
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
@@ -180,10 +180,10 @@ export default function PixelTest() {
                     </div>
                     {result.scriptContent && (
                       <details className="mt-2">
-                        <summary className="text-xs text-gray-600 dark:text-gray-400 cursor-pointer hover:text-gray-800">
+                        <summary className="text-xs text-gray-600 dark:text-gray-400 cursor-pointer hover:text-gray-800 dark:hover:text-gray-200">
                           View script preview
                         </summary>
-                        <pre className="mt-2 p-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded text-xs overflow-auto max-h-40">
+                        <pre className="mt-2 p-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700 rounded text-xs overflow-auto max-h-40">
                           {formatScriptPreview(result.scriptContent)}
                         </pre>
                       </details>
@@ -191,13 +191,13 @@ export default function PixelTest() {
                   </div>
                 </div>
 
-                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 dark:border-gray-800">
+                <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
                   <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">Cookies Detected</h4>
                   {result.cookiesDetected.length > 0 ? (
                     <ul className="space-y-1">
                       {result.cookiesDetected.map((cookie, idx) => (
                         <li key={idx} className="text-sm text-gray-700 dark:text-gray-300">
-                          <span className="font-mono text-xs bg-white dark:bg-gray-900 px-1 rounded">{cookie}</span>
+                          <span className="font-mono text-xs bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-1 rounded">{cookie}</span>
                         </li>
                       ))}
                     </ul>
