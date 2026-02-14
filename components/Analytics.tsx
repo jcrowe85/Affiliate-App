@@ -134,6 +134,21 @@ export default function Analytics({ apiEndpoint, redirectOn401 = '/login' }: Ana
         return;
       }
       const analyticsData = await response.json();
+      
+      // Debug logging for historical mode
+      if (viewMode === 'historical') {
+        console.log('[Analytics] Historical mode fetch:', {
+          url,
+          timeRange,
+          responseStatus: response.status,
+          hasData: !!analyticsData,
+          hasMetrics: !!analyticsData.metrics,
+          hasAffiliates: !!analyticsData.affiliates,
+          affiliatesCount: analyticsData.affiliates?.length || 0,
+          sessionsCount: analyticsData.metrics?.sessions || 0,
+        });
+      }
+      
       // Validate that the response has the expected structure
       if (analyticsData.error) {
         console.error('Analytics API returned error:', analyticsData.error);
@@ -144,6 +159,7 @@ export default function Analytics({ apiEndpoint, redirectOn401 = '/login' }: Ana
       }
       // Ensure metrics exist with default values if missing
       if (!analyticsData.metrics) {
+        console.warn('[Analytics] Missing metrics in response, using defaults');
         analyticsData.metrics = {
           total_visitors: 0,
           unique_visitors: 0,
@@ -153,6 +169,17 @@ export default function Analytics({ apiEndpoint, redirectOn401 = '/login' }: Ana
           pages_per_session: 0,
         };
       }
+      // Ensure other required arrays exist
+      if (!analyticsData.affiliates) analyticsData.affiliates = [];
+      if (!analyticsData.topPages) analyticsData.topPages = [];
+      if (!analyticsData.entryPages) analyticsData.entryPages = [];
+      if (!analyticsData.exitPages) analyticsData.exitPages = [];
+      if (!analyticsData.trafficSources) analyticsData.trafficSources = [];
+      if (!analyticsData.devices) analyticsData.devices = [];
+      if (!analyticsData.browsers) analyticsData.browsers = [];
+      if (!analyticsData.geography) analyticsData.geography = [];
+      if (!analyticsData.activeVisitors) analyticsData.activeVisitors = [];
+      
       // Only update data if we got a valid response (prevents clearing data on empty results)
       setData(analyticsData);
       if (isInitialLoad) {
@@ -177,13 +204,20 @@ export default function Analytics({ apiEndpoint, redirectOn401 = '/login' }: Ana
     let isMounted = true;
     
     // Initial fetch - mark as initial load to show loading state
-    if (fetchAnalyticsRef.current) {
-      fetchAnalyticsRef.current(true);
-    }
+    // Use a small timeout to ensure refs are set
+    const initialFetch = setTimeout(() => {
+      if (fetchAnalyticsRef.current) {
+        fetchAnalyticsRef.current(true);
+      }
+    }, 0);
 
     // Only set up SSE connection and polling for real-time mode
     if (viewMode !== 'realtime') {
-      return; // No cleanup needed in historical mode
+      // For historical mode, just return (no SSE/polling needed)
+      // The fetch was already triggered above
+      return () => {
+        clearTimeout(initialFetch);
+      };
     }
 
     // For affiliate context (custom endpoint), skip SSE and use polling only
@@ -254,11 +288,29 @@ export default function Analytics({ apiEndpoint, redirectOn401 = '/login' }: Ana
 
     return () => {
       isMounted = false;
+      clearTimeout(initialFetch);
       eventSource.close();
       clearInterval(interval);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewMode, refreshInterval]); // Only depend on viewMode and refreshInterval, not fetchAnalytics
+
+  // Separate effect to handle historical mode changes (timeRange or viewMode)
+  // This ensures data is fetched when switching to historical or changing time range
+  useEffect(() => {
+    // Only trigger fetch for historical mode
+    if (viewMode === 'historical') {
+      // Use a small delay to ensure the ref is set and avoid double-fetching
+      const timeoutId = setTimeout(() => {
+        if (fetchAnalyticsRef.current) {
+          console.log('[Analytics] Fetching historical data for timeRange:', timeRange);
+          fetchAnalyticsRef.current(true);
+        }
+      }, 100);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [viewMode, timeRange]); // Trigger when viewMode or timeRange changes
 
   const formatTime = (seconds: number) => {
     if (seconds < 60) return `${Math.round(seconds)}s`;
@@ -298,7 +350,15 @@ export default function Analytics({ apiEndpoint, redirectOn401 = '/login' }: Ana
             {/* View Mode Toggle */}
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setViewMode('realtime')}
+                onClick={() => {
+                  setViewMode('realtime');
+                  // Trigger fetch immediately when switching modes
+                  setTimeout(() => {
+                    if (fetchAnalyticsRef.current) {
+                      fetchAnalyticsRef.current(true);
+                    }
+                  }, 0);
+                }}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
                   viewMode === 'realtime'
                     ? 'bg-indigo-600 text-white'
@@ -309,7 +369,15 @@ export default function Analytics({ apiEndpoint, redirectOn401 = '/login' }: Ana
                 Real-Time
               </button>
               <button
-                onClick={() => setViewMode('historical')}
+                onClick={() => {
+                  setViewMode('historical');
+                  // Trigger fetch immediately when switching modes
+                  setTimeout(() => {
+                    if (fetchAnalyticsRef.current) {
+                      fetchAnalyticsRef.current(true);
+                    }
+                  }, 0);
+                }}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                   viewMode === 'historical'
                     ? 'bg-indigo-600 text-white'
@@ -326,7 +394,15 @@ export default function Analytics({ apiEndpoint, redirectOn401 = '/login' }: Ana
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Time Range:</label>
                 <select
                   value={timeRange}
-                  onChange={(e) => setTimeRange(e.target.value)}
+                  onChange={(e) => {
+                    setTimeRange(e.target.value);
+                    // Trigger fetch when time range changes
+                    setTimeout(() => {
+                      if (fetchAnalyticsRef.current) {
+                        fetchAnalyticsRef.current(true);
+                      }
+                    }, 0);
+                  }}
                   className="border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
                   <option value="1h">Last Hour</option>

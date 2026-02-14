@@ -1683,7 +1683,8 @@ export default function AdminDashboard() {
                       <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Conv. Rate</th>
                       <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Total Earned</th>
                       <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Paid</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Pending</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Outstanding</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Due Date</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
@@ -1708,7 +1709,16 @@ export default function AdminDashboard() {
                           <span className="text-sm font-semibold text-green-700">{formatCurrency(affiliate.paid_commission)}</span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm font-semibold text-orange-600">{formatCurrency(affiliate.pending_commission)}</span>
+                          <span className="text-sm font-semibold text-orange-600 dark:text-orange-400">{formatCurrency(affiliate.outstanding_commission || '0')}</span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">
+                          {affiliate.earliest_due_date ? (
+                            <span className={new Date(affiliate.earliest_due_date) < new Date() ? 'text-red-600 dark:text-red-400 font-semibold' : ''}>
+                              {formatDate(affiliate.earliest_due_date)}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
                         </td>
                       </tr>
                     ))}

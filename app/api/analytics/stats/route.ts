@@ -4,6 +4,18 @@ import { getCurrentAdmin } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
+// Helper function to safely convert dates to ISO strings
+function safeToISOString(date: any): string {
+  if (!date) return 'invalid';
+  try {
+    const d = date instanceof Date ? date : new Date(date);
+    if (isNaN(d.getTime())) return 'invalid';
+    return d.toISOString();
+  } catch {
+    return 'invalid';
+  }
+}
+
 function getTimeRangeMs(timeRange: string): number {
   const ranges: Record<string, number> = {
     '1h': 60 * 60 * 1000,
@@ -109,6 +121,7 @@ export async function GET(request: NextRequest) {
         recentEventsFound: recentEvents.length,
         activeSessionIds: activeSessionIds.length,
         fiveMinutesAgo: fiveMinutesAgo.toISOString(),
+        shopifyShopId,
       });
       
       // Get sessions for these active session IDs (only affiliate traffic)
@@ -129,6 +142,12 @@ export async function GET(request: NextRequest) {
             take: 50,
           })
         : [];
+      
+      console.log('[Analytics Stats] Real-time mode - Sessions found:', {
+        activeSessionIdsCount: activeSessionIds.length,
+        sessionsListCount: sessionsList.length,
+        sessionsWithAffiliateId: sessionsList.filter(s => s.affiliate_id).length,
+      });
       
       // Fetch affiliate data separately since VisitorSession doesn't have affiliate relation
       const affiliateIds = Array.from(new Set(sessionsList.map(s => s.affiliate_id).filter(Boolean)));
@@ -254,8 +273,8 @@ export async function GET(request: NextRequest) {
         timeRangeSessionsCount,
         affiliateSessionsWithoutTimeFilter: affiliateSessionsWithoutTimeFilter.map(s => ({
           id: s.id,
-          start_time: s.start_time && !isNaN(s.start_time.getTime()) ? s.start_time.toISOString() : 'invalid',
-          isAfterStartTime: s.start_time && !isNaN(s.start_time.getTime()) && startTimeDate && !isNaN(startTimeDate.getTime()) ? s.start_time >= startTimeDate : false,
+          start_time: safeToISOString(s.start_time),
+          isAfterStartTime: s.start_time && !isNaN(new Date(s.start_time).getTime()) && startTimeDate && !isNaN(startTimeDate.getTime()) ? new Date(s.start_time) >= startTimeDate : false,
         })),
       });
       // Get sample session dates to understand the data
@@ -319,20 +338,16 @@ export async function GET(request: NextRequest) {
         now: new Date().toISOString(),
         testQuerySessions: testQuerySessions.map(s => ({
           id: s.id,
-          start_time: s.start_time && !isNaN(s.start_time.getTime()) ? s.start_time.toISOString() : 'invalid',
-          updated_at: s.updated_at && !isNaN(s.updated_at.getTime()) ? s.updated_at.toISOString() : 'invalid',
+          start_time: safeToISOString(s.start_time),
+          updated_at: safeToISOString(s.updated_at),
         })),
         sampleRecentSessions: sampleSessions.map(s => ({
-          start_time: s.start_time && !isNaN(s.start_time.getTime()) ? s.start_time.toISOString() : 'invalid',
-          updated_at: s.updated_at && !isNaN(s.updated_at.getTime()) ? s.updated_at.toISOString() : 'invalid',
+          start_time: safeToISOString(s.start_time),
+          updated_at: safeToISOString(s.updated_at),
         })),
-        oldestSession: oldestSession && oldestSession.start_time && !isNaN(oldestSession.start_time.getTime()) 
-          ? oldestSession.start_time.toISOString() 
-          : 'none',
+        oldestSession: safeToISOString(oldestSession?.start_time) || 'none',
         dateComparison: {
-          sampleStartTime: sampleSessions[0]?.start_time && !isNaN(sampleSessions[0].start_time.getTime())
-            ? sampleSessions[0].start_time.toISOString()
-            : 'invalid',
+          sampleStartTime: safeToISOString(sampleSessions[0]?.start_time),
           startTimeDate: startTimeDate && !isNaN(startTimeDate.getTime()) ? startTimeDate.toISOString() : 'invalid',
           isSampleAfterStart: sampleSessions[0]?.start_time && !isNaN(sampleSessions[0].start_time.getTime()) && startTimeDate && !isNaN(startTimeDate.getTime())
             ? sampleSessions[0].start_time >= startTimeDate
@@ -341,20 +356,111 @@ export async function GET(request: NextRequest) {
       });
       
       // Query sessions with time filter
-      // Note: Using in-memory filtering as fallback since Prisma date comparison seems to have issues
-      sessionsList = await prisma.visitorSession.findMany({
+      // For historical mode, we need to get ALL sessions within the time range
+      // Use Prisma date filter if possible, but also do in-memory filtering as fallback
+      // Note: We use start_time to match when the session was created/started
+      const whereClause: any = {
+        shopify_shop_id: shopifyShopId,
+        affiliate_id: { not: null }, // Only affiliate traffic
+      };
+      
+      // Add date filter to Prisma query if we have a valid startTimeDate
+      // Use start_time for historical queries (when session started)
+      // This matches how real-time works - it uses updated_at for recent activity
+      if (startTimeDate && !isNaN(startTimeDate.getTime())) {
+        whereClause.start_time = {
+          gte: startTimeDate,
+        };
+      }
+      
+      // First, let's check how many total sessions exist (for debugging)
+      const totalSessionsCount = await prisma.visitorSession.count({
         where: {
           shopify_shop_id: shopifyShopId,
-          affiliate_id: { not: null }, // Only affiliate traffic
+          affiliate_id: { not: null },
         },
+      });
+      
+      const sessionsWithTimeFilterCount = await prisma.visitorSession.count({
+        where: whereClause,
+      });
+      
+      // Also check how many sessions exist without affiliate filter
+      const totalSessionsAny = await prisma.visitorSession.count({
+        where: {
+          shopify_shop_id: shopifyShopId,
+        },
+      });
+      
+      // Check sessions in the last 30 days without affiliate filter
+      const sessionsLast30Days = await prisma.visitorSession.count({
+        where: {
+          shopify_shop_id: shopifyShopId,
+          start_time: {
+            gte: startTimeDate && !isNaN(startTimeDate.getTime()) ? startTimeDate : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+          },
+        },
+      });
+      
+      console.log('[Analytics Stats] Historical mode - Session counts:', {
+        totalSessionsAny: totalSessionsAny,
+        totalSessionsWithAffiliate: totalSessionsCount,
+        sessionsLast30DaysAny: sessionsLast30Days,
+        sessionsWithTimeFilter: sessionsWithTimeFilterCount,
+        startTimeDate: startTimeDate && !isNaN(startTimeDate.getTime()) ? startTimeDate.toISOString() : 'invalid',
+        timeRange,
+        now: new Date().toISOString(),
+        shopifyShopId,
+      });
+      
+      sessionsList = await prisma.visitorSession.findMany({
+        where: whereClause,
         orderBy: {
           start_time: 'desc',
         },
-        take: 1000,
+        take: 10000, // Increased limit for historical data
       });
       
-      // Filter in memory by time range (Prisma date filter was excluding valid sessions)
-      // Only filter sessions with valid dates
+      // Check if sessions exist without affiliate filter (for debugging)
+      const sessionsWithoutAffiliateFilter = await prisma.visitorSession.findMany({
+        where: {
+          shopify_shop_id: shopifyShopId,
+          ...(startTimeDate && !isNaN(startTimeDate.getTime()) ? {
+            start_time: {
+              gte: startTimeDate,
+            },
+          } : {}),
+        },
+        select: {
+          id: true,
+          affiliate_id: true,
+          start_time: true,
+          updated_at: true,
+        },
+        take: 5,
+        orderBy: {
+          start_time: 'desc',
+        },
+      });
+      
+      console.log('[Analytics Stats] Historical mode - Raw query result:', {
+        sessionsReturned: sessionsList.length,
+        sessionsWithoutAffiliateFilter: sessionsWithoutAffiliateFilter.length,
+        sampleSession: sessionsList[0] ? {
+          id: sessionsList[0].id,
+          affiliate_id: sessionsList[0].affiliate_id,
+          start_time: safeToISOString(sessionsList[0].start_time),
+          updated_at: safeToISOString(sessionsList[0].updated_at),
+        } : null,
+        sampleSessionsWithoutFilter: sessionsWithoutAffiliateFilter.map(s => ({
+          id: s.id,
+          affiliate_id: s.affiliate_id,
+          hasAffiliateId: !!s.affiliate_id,
+          start_time: safeToISOString(s.start_time),
+        })),
+      });
+      
+      // Additional in-memory filtering as safety check (Prisma date filter might miss some)
       const filteredSessions = sessionsList.filter(s => {
         if (!s.start_time || isNaN(s.start_time.getTime())) {
           return false; // Skip sessions with invalid dates
@@ -368,13 +474,13 @@ export async function GET(request: NextRequest) {
       
       console.log('[Analytics Stats] Historical query result:', {
         sessionsFound: sessionsList.length,
-        firstSessionStartTime: sessionsList[0]?.start_time && !isNaN(sessionsList[0].start_time.getTime())
-          ? sessionsList[0].start_time.toISOString()
-          : 'invalid',
-        lastSessionStartTime: sessionsList[sessionsList.length - 1]?.start_time && !isNaN(sessionsList[sessionsList.length - 1].start_time.getTime())
-          ? sessionsList[sessionsList.length - 1].start_time.toISOString()
-          : 'invalid',
+        filteredSessionsCount: filteredSessions.length,
+        firstSessionStartTime: safeToISOString(sessionsList[0]?.start_time),
+        lastSessionStartTime: safeToISOString(sessionsList[sessionsList.length - 1]?.start_time),
         startTimeDate: startTimeDate && !isNaN(startTimeDate.getTime()) ? startTimeDate.toISOString() : 'invalid',
+        timeRange,
+        sessionsWithAffiliateId: sessionsList.filter(s => s.affiliate_id).length,
+        sampleAffiliateIds: Array.from(new Set(sessionsList.map(s => s.affiliate_id).filter(Boolean))).slice(0, 5),
       });
       
       // Fetch affiliate data separately since VisitorSession doesn't have affiliate relation
@@ -493,9 +599,18 @@ export async function GET(request: NextRequest) {
     const sessions = sessionsList;
 
     // Debug: Log session count and affiliate IDs
-    console.log('[Analytics Stats] Sessions found:', sessions.length);
-    console.log('[Analytics Stats] Sessions with affiliate_id:', sessions.filter(s => s.affiliate_id).length);
-    console.log('[Analytics Stats] Sample affiliate_ids:', sessions.slice(0, 5).map(s => s.affiliate_id));
+    console.log('[Analytics Stats] Final sessions for metrics:', {
+      viewMode,
+      sessionsCount: sessions.length,
+      sessionsWithAffiliateId: sessions.filter(s => s.affiliate_id).length,
+      sampleAffiliateIds: sessions.slice(0, 5).map(s => s.affiliate_id),
+      sampleSessions: sessions.slice(0, 3).map(s => ({
+        id: s.id,
+        affiliate_id: s.affiliate_id,
+        start_time: safeToISOString(s.start_time),
+        updated_at: safeToISOString(s.updated_at),
+      })),
+    });
 
     // Calculate metrics
     const totalVisitors = sessions.length;
@@ -769,9 +884,15 @@ export async function GET(request: NextRequest) {
           currentPage: currentPage,
           device: session.device_type || 'Unknown',
           location: session.location_country || 'Unknown',
-          lastSeen: session.updated_at && !isNaN(session.updated_at.getTime()) 
-            ? Number(session.updated_at.getTime()) 
-            : Date.now(),
+          lastSeen: (() => {
+            try {
+              if (!session.updated_at) return Date.now();
+              const d = session.updated_at instanceof Date ? session.updated_at : new Date(session.updated_at);
+              return !isNaN(d.getTime()) ? Number(d.getTime()) : Date.now();
+            } catch {
+              return Date.now();
+            }
+          })(),
           affiliate_id: session.affiliate_id,
           affiliate_number: session.affiliate_number || session.affiliate?.affiliate_number || null,
           affiliate_name: session.affiliate?.name || 
@@ -782,7 +903,7 @@ export async function GET(request: NextRequest) {
         };
       });
 
-    // Group ACTIVE sessions by affiliate (sessions updated in last 30 minutes)
+    // Group sessions by affiliate (all sessions for historical, active sessions for real-time)
     const affiliateMap = new Map<string, {
       affiliate_id: string;
       affiliate_number: number | null;
@@ -985,17 +1106,23 @@ export async function GET(request: NextRequest) {
         currentPage: currentPage,
         device: session.device_type || 'Unknown',
         location: session.location_country || 'Unknown',
-        lastSeen: session.updated_at && !isNaN(session.updated_at.getTime()) 
-          ? Number(session.updated_at.getTime()) 
-          : Date.now(),
+        lastSeen: (() => {
+          try {
+            if (!session.updated_at) return Date.now();
+            const d = session.updated_at instanceof Date ? session.updated_at : new Date(session.updated_at);
+            return !isNaN(d.getTime()) ? Number(d.getTime()) : Date.now();
+          } catch {
+            return Date.now();
+          }
+        })(),
         url_params: finalUrlParams, // Always include url_params, even if empty
       });
       
       affiliateMap.set(key, existing);
     });
 
-    // Calculate metrics per affiliate (only for active sessions)
-    console.log(`[Analytics Stats] Found ${affiliateMap.size} unique affiliates with active sessions`);
+    // Calculate metrics per affiliate (all sessions for historical, active sessions for real-time)
+    console.log(`[Analytics Stats] Found ${affiliateMap.size} unique affiliates with sessions (viewMode: ${viewMode})`);
     const affiliates = Array.from(affiliateMap.values()).map(aff => {
       const activeSessionsForAffiliate = uniqueActiveSessions.filter(item => 
         item.session.affiliate_id === aff.affiliate_id
@@ -1042,6 +1169,20 @@ export async function GET(request: NextRequest) {
       
       return result;
     }).sort((a, b) => b.sessions - a.sessions);
+
+    // Final debug log before returning
+    console.log('[Analytics Stats] Final response data:', {
+      viewMode,
+      metrics: {
+        total_visitors: totalVisitors,
+        unique_visitors: uniqueVisitors,
+        sessions: totalVisitors,
+      },
+      affiliatesCount: affiliates.length,
+      topPagesCount: topPages.length,
+      activeVisitorsCount: activeVisitors.length,
+      sessionsListLength: sessionsList.length,
+    });
 
     return NextResponse.json({
       metrics: {
