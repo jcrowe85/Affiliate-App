@@ -22,6 +22,7 @@ interface DashboardStats {
   totalCommissionsAmount: string;
   paidCommissions: string;
   owedCommissions: string;
+  outstandingCommissions: string;
   totalClicks: number;
   totalConversions: number;
   conversionRate: string;
@@ -73,6 +74,8 @@ interface AffiliatePerformance {
   total_commission: string;
   paid_commission: string;
   pending_commission: string;
+  outstanding_commission?: string;
+  earliest_due_date?: string | null;
   total_commissions_count?: number;
 }
 
@@ -925,7 +928,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {/* Total Revenue */}
               <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-6">
                 <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Total Revenue</h3>
@@ -965,6 +968,28 @@ export default function AdminDashboard() {
                     <span className="text-sm text-gray-600 dark:text-gray-400">Owed</span>
                     <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">
                       {formatCurrency(stats?.owedCommissions || '0')}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Outstanding Commissions */}
+              <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-6">
+                <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Outstanding Commissions</h3>
+                <p className="text-3xl font-bold text-orange-600 dark:text-orange-400 mb-4">
+                  {formatCurrency(stats?.outstandingCommissions || '0')}
+                </p>
+                <div className="space-y-2 pt-4 border-t border-gray-200 dark:border-gray-800">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Yet to be paid</span>
+                    <span className="text-sm font-semibold text-orange-600 dark:text-orange-400">
+                      {formatCurrency(stats?.outstandingCommissions || '0')}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Status</span>
+                    <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">
+                      Pending Payment
                     </span>
                   </div>
                 </div>
@@ -1047,6 +1072,12 @@ export default function AdminDashboard() {
                         Commission
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                        Outstanding
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                        Due Date
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                         Last Conversion
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
@@ -1070,13 +1101,25 @@ export default function AdminDashboard() {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">
                             {formatCurrency(affiliate.total_commission)}
                           </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-orange-600 dark:text-orange-400">
+                            {formatCurrency(affiliate.outstanding_commission || affiliate.pending_commission || '0')}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">
+                            {affiliate.earliest_due_date ? (
+                              <span className={new Date(affiliate.earliest_due_date) < new Date() ? 'text-red-600 dark:text-red-400 font-semibold' : ''}>
+                                {formatDate(affiliate.earliest_due_date)}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">—</span>
+                            )}
+                          </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">—</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">—</td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={7} className="px-6 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                        <td colSpan={9} className="px-6 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
                           No affiliate data available
                         </td>
                       </tr>

@@ -109,14 +109,53 @@ export async function GET(request: NextRequest) {
         })
       : [];
 
+    // Get all-time outstanding commissions (eligible, approved, pending - not yet paid)
+    const allTimeOutstandingCommissions = affiliateIds.length > 0
+      ? await prisma.commission.groupBy({
+          by: ['affiliate_id'],
+          where: {
+            affiliate_id: { in: affiliateIds },
+            shopify_shop_id: admin.shopify_shop_id,
+            status: {
+              in: ['eligible', 'approved', 'pending'],
+            },
+          },
+          _sum: {
+            amount: true,
+          },
+        })
+      : [];
+
+    // Get earliest due date (eligible_date) for outstanding commissions per affiliate
+    const outstandingCommissionsWithDates = affiliateIds.length > 0
+      ? await prisma.commission.findMany({
+          where: {
+            affiliate_id: { in: affiliateIds },
+            shopify_shop_id: admin.shopify_shop_id,
+            status: {
+              in: ['eligible', 'approved', 'pending'],
+            },
+          },
+          select: {
+            affiliate_id: true,
+            eligible_date: true,
+          },
+          orderBy: {
+            eligible_date: 'asc',
+          },
+        })
+      : [];
+
     // Group aggregates by affiliate_id
     const aggregatesByAffiliate = new Map<string, { 
       total: number; 
       paid: number; 
       pending: number;
+      outstanding: number;
       revenue: number;
       clicks: number;
       orders: number;
+      earliest_due_date: Date | null;
     }>();
 
     // Initialize all affiliates
@@ -125,9 +164,11 @@ export async function GET(request: NextRequest) {
         total: 0,
         paid: 0,
         pending: 0,
+        outstanding: 0,
         revenue: 0,
         clicks: 0,
         orders: 0,
+        earliest_due_date: null,
       });
     });
 
@@ -170,15 +211,43 @@ export async function GET(request: NextRequest) {
       }
     });
 
+    // Add all-time outstanding commissions
+    allTimeOutstandingCommissions.forEach(agg => {
+      const existing = aggregatesByAffiliate.get(agg.affiliate_id);
+      if (existing) {
+        existing.outstanding = parseFloat(agg._sum.amount?.toString() || '0');
+      }
+    });
+
+    // Add earliest due date for outstanding commissions
+    // Group by affiliate_id and get the earliest eligible_date
+    const earliestDueDatesByAffiliate = new Map<string, Date>();
+    outstandingCommissionsWithDates.forEach(comm => {
+      const existing = earliestDueDatesByAffiliate.get(comm.affiliate_id);
+      if (!existing || comm.eligible_date < existing) {
+        earliestDueDatesByAffiliate.set(comm.affiliate_id, comm.eligible_date);
+      }
+    });
+
+    // Set earliest due dates in aggregates
+    earliestDueDatesByAffiliate.forEach((date, affiliateId) => {
+      const existing = aggregatesByAffiliate.get(affiliateId);
+      if (existing) {
+        existing.earliest_due_date = date;
+      }
+    });
+
     // Calculate performance metrics for each affiliate
     const performance = affiliateStats.map(affiliate => {
       const aggregates = aggregatesByAffiliate.get(affiliate.id) || { 
         total: 0, 
         paid: 0, 
         pending: 0,
+        outstanding: 0,
         revenue: 0,
         clicks: 0,
         orders: 0,
+        earliest_due_date: null,
       };
 
       const conversionRate = aggregates.clicks > 0 ? (aggregates.orders / aggregates.clicks) * 100 : 0;
@@ -194,6 +263,8 @@ export async function GET(request: NextRequest) {
         total_commission: aggregates.total.toFixed(2),
         paid_commission: aggregates.paid.toFixed(2),
         pending_commission: aggregates.pending.toFixed(2),
+        outstanding_commission: aggregates.outstanding.toFixed(2),
+        earliest_due_date: aggregates.earliest_due_date ? aggregates.earliest_due_date.toISOString() : null,
       };
     });
 

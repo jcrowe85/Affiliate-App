@@ -128,6 +128,24 @@ export async function GET(request: NextRequest) {
       .filter(c => c.status === 'eligible' || c.status === 'approved')
       .reduce((sum, c) => sum + parseFloat(c.amount.toString()), 0);
 
+    // Get all-time outstanding commissions (eligible + approved, not yet paid)
+    // This is all commissions that are not paid or reversed, regardless of period
+    const allTimeOutstandingCommissions = await prisma.commission.findMany({
+      where: {
+        shopify_shop_id: shopifyShopId,
+        status: {
+          in: ['eligible', 'approved', 'pending'],
+        },
+      },
+      select: {
+        amount: true,
+        currency: true,
+      },
+    });
+
+    const outstandingCommissions = allTimeOutstandingCommissions
+      .reduce((sum, c) => sum + parseFloat(c.amount.toString()), 0);
+
     // Get clicks and conversions for the period
     const totalClicks = await prisma.click.count({
       where: {
@@ -154,6 +172,7 @@ export async function GET(request: NextRequest) {
       totalCommissionsAmount: totalCommissionsAmount.toFixed(2),
       paidCommissions: paidCommissions.toFixed(2),
       owedCommissions: owedCommissions.toFixed(2),
+      outstandingCommissions: outstandingCommissions.toFixed(2),
       totalClicks,
       totalConversions,
       conversionRate: conversionRate.toFixed(2),
