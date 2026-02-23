@@ -136,6 +136,7 @@
   
       console.log('🔵 Affiliate tracking: Calling API:', apiUrl);
       console.log('🔵 Affiliate tracking: Data:', { ref: affiliateNumber, shop: SHOP_ID });
+      console.log('🔵 Affiliate tracking: Full payload (ref + URL params):', JSON.stringify(trackingData, null, 2));
   
       // LAST-TOUCH ATTRIBUTION: Always overwrite previous affiliate data
       // This ensures the most recent affiliate click wins, even if cookies/localStorage exist
@@ -512,7 +513,7 @@
           const pagesVisited = JSON.parse(getLocalStorage('analytics_pages_visited') || JSON.stringify([window.location.pathname]));
           
           // Capture URL parameters as key-value pairs
-          const urlParams: Record<string, string> = {};
+          const urlParams = {};
           const urlSearchParams = new URLSearchParams(window.location.search);
           urlSearchParams.forEach((value, key) => {
             urlParams[key] = value;
