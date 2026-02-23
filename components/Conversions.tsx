@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 
 interface Conversion {
   id: string;
@@ -61,6 +61,8 @@ export default function Conversions({ initialAffiliateId, onInitialAffiliateCons
     search: '',
   });
 
+  const consumedInitialAffiliateRef = useRef(false);
+
   useEffect(() => {
     fetchAffiliates();
     fetchOffers();
@@ -69,10 +71,22 @@ export default function Conversions({ initialAffiliateId, onInitialAffiliateCons
   // Apply initial affiliate filter when navigating from Overview → Top Affiliates row click
   useEffect(() => {
     if (initialAffiliateId) {
+      consumedInitialAffiliateRef.current = false; // allow this initial to be consumed
       setFilters((prev) => ({ ...prev, affiliate_id: initialAffiliateId }));
+    }
+  }, [initialAffiliateId]);
+
+  // Clear parent's initial value only after our filter state has committed, so the first fetch uses the filter
+  useEffect(() => {
+    if (
+      initialAffiliateId &&
+      filters.affiliate_id === initialAffiliateId &&
+      !consumedInitialAffiliateRef.current
+    ) {
+      consumedInitialAffiliateRef.current = true;
       onInitialAffiliateConsumed?.();
     }
-  }, [initialAffiliateId]); // Intentionally not depending on onInitialAffiliateConsumed to avoid re-running
+  }, [initialAffiliateId, filters.affiliate_id, onInitialAffiliateConsumed]);
 
   const fetchAffiliates = async () => {
     try {
