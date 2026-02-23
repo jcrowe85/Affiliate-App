@@ -133,10 +133,10 @@ function WebhookLogs({ commissionId, refreshTrigger }: { commissionId: string; r
           key={log.id}
           className={`border rounded-lg p-4 ${
             log.status === 'success'
-              ? 'bg-green-50 border-green-200'
+              ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
               : log.status === 'failed'
-              ? 'bg-red-50 border-red-200'
-              : 'bg-yellow-50 border-yellow-200'
+              ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+              : 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800'
           }`}
         >
           <div className="flex items-start justify-between mb-2">
@@ -145,10 +145,10 @@ function WebhookLogs({ commissionId, refreshTrigger }: { commissionId: string; r
                 <span
                   className={`px-2 py-1 text-xs font-semibold rounded ${
                     log.status === 'success'
-                      ? 'bg-green-200 text-green-800'
+                      ? 'bg-green-200 dark:bg-green-800/60 text-green-800 dark:text-green-200'
                       : log.status === 'failed'
-                      ? 'bg-red-200 text-red-800'
-                      : 'bg-yellow-200 text-yellow-800'
+                      ? 'bg-red-200 dark:bg-red-800/60 text-red-800 dark:text-red-200'
+                      : 'bg-yellow-200 dark:bg-yellow-800/60 text-yellow-800 dark:text-yellow-200'
                   }`}
                 >
                   {log.status.toUpperCase()}
@@ -165,21 +165,21 @@ function WebhookLogs({ commissionId, refreshTrigger }: { commissionId: string; r
               </div>
               {log.request_params && Object.keys(log.request_params).length > 0 && (
                 <details className="mt-2 mb-2">
-                  <summary className="text-sm text-gray-600 dark:text-gray-400 cursor-pointer hover:text-gray-900 dark:text-gray-100">
+                  <summary className="text-sm text-gray-600 dark:text-gray-400 cursor-pointer hover:text-gray-900 dark:hover:text-gray-100">
                     View Request Parameters ({Object.keys(log.request_params).length} parameters)
                   </summary>
-                  <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded">
+                  <div className="mt-2 p-3 bg-blue-50 dark:bg-gray-800/60 border border-blue-200 dark:border-gray-700 rounded">
                     <table className="w-full text-xs">
                       <thead>
-                        <tr className="border-b border-blue-300">
+                        <tr className="border-b border-blue-300 dark:border-gray-600">
                           <th className="text-left py-1 px-2 font-semibold text-gray-700 dark:text-gray-300">Parameter</th>
                           <th className="text-left py-1 px-2 font-semibold text-gray-700 dark:text-gray-300">Value</th>
                         </tr>
                       </thead>
                       <tbody>
                         {Object.entries(log.request_params).map(([key, value]) => (
-                          <tr key={key} className="border-b border-blue-200">
-                            <td className="py-1 px-2 font-mono text-gray-800">{key}</td>
+                          <tr key={key} className="border-b border-blue-200 dark:border-gray-700">
+                            <td className="py-1 px-2 font-mono text-gray-800 dark:text-gray-200">{key}</td>
                             <td className="py-1 px-2 font-mono text-gray-600 dark:text-gray-400 break-all">{String(value)}</td>
                           </tr>
                         ))}
@@ -189,16 +189,16 @@ function WebhookLogs({ commissionId, refreshTrigger }: { commissionId: string; r
                 </details>
               )}
               {log.error_message && (
-                <div className="text-sm text-red-600 mb-2">
+                <div className="text-sm text-red-600 dark:text-red-400 mb-2">
                   <strong>Error:</strong> {log.error_message}
                 </div>
               )}
               {log.response_body && (
                 <details className="mt-2">
-                  <summary className="text-sm text-gray-600 dark:text-gray-400 cursor-pointer hover:text-gray-900 dark:text-gray-100">
+                  <summary className="text-sm text-gray-600 dark:text-gray-400 cursor-pointer hover:text-gray-900 dark:hover:text-gray-100">
                     View Response Body
                   </summary>
-                  <pre className="mt-2 p-2 bg-gray-100 rounded text-xs overflow-auto max-h-40">
+                  <pre className="mt-2 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs overflow-auto max-h-40 text-gray-800 dark:text-gray-300">
                     {log.response_body}
                   </pre>
                 </details>
