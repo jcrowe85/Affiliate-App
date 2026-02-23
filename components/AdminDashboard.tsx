@@ -372,6 +372,7 @@ export default function AdminDashboard() {
   const [chartTimeRange, setChartTimeRange] = useState<string>('30d');
   const [chartLoading, setChartLoading] = useState(false);
   const [performancePeriod, setPerformancePeriod] = useState<string>('30d'); // Shared period for performance tab and overview stats/top affiliates
+  const [conversionsInitialAffiliateId, setConversionsInitialAffiliateId] = useState<string | null>(null);
 
   const fetchChartData = useCallback(async (timeRange: string) => {
     try {
@@ -1088,7 +1089,23 @@ export default function AdminDashboard() {
                   <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
                     {affiliatePerformance.length > 0 ? (
                       affiliatePerformance.slice(0, 10).map((affiliate) => (
-                        <tr key={affiliate.affiliate_id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                        <tr
+                          key={affiliate.affiliate_id}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => {
+                            setConversionsInitialAffiliateId(affiliate.affiliate_id);
+                            setActiveTab('conversions');
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              setConversionsInitialAffiliateId(affiliate.affiliate_id);
+                              setActiveTab('conversions');
+                            }
+                          }}
+                          className="hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
+                        >
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{affiliate.name}</div>
                             <div className="text-sm text-gray-500 dark:text-gray-400">{affiliate.email}</div>
@@ -1760,7 +1777,10 @@ export default function AdminDashboard() {
 
           {/* Conversions Tab */}
           {activeTab === 'conversions' && (
-            <Conversions />
+            <Conversions
+              initialAffiliateId={conversionsInitialAffiliateId}
+              onInitialAffiliateConsumed={() => setConversionsInitialAffiliateId(null)}
+            />
           )}
 
           {/* Pixel Test Tab */}

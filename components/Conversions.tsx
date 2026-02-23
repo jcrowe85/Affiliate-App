@@ -42,7 +42,12 @@ interface Offer {
   name: string;
 }
 
-export default function Conversions() {
+interface ConversionsProps {
+  initialAffiliateId?: string | null;
+  onInitialAffiliateConsumed?: () => void;
+}
+
+export default function Conversions({ initialAffiliateId, onInitialAffiliateConsumed }: ConversionsProps = {}) {
   const [conversions, setConversions] = useState<Conversion[]>([]);
   const [affiliates, setAffiliates] = useState<Affiliate[]>([]);
   const [offers, setOffers] = useState<Offer[]>([]);
@@ -60,6 +65,14 @@ export default function Conversions() {
     fetchAffiliates();
     fetchOffers();
   }, []);
+
+  // Apply initial affiliate filter when navigating from Overview → Top Affiliates row click
+  useEffect(() => {
+    if (initialAffiliateId) {
+      setFilters((prev) => ({ ...prev, affiliate_id: initialAffiliateId }));
+      onInitialAffiliateConsumed?.();
+    }
+  }, [initialAffiliateId]); // Intentionally not depending on onInitialAffiliateConsumed to avoid re-running
 
   const fetchAffiliates = async () => {
     try {
