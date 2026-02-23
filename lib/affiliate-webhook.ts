@@ -242,6 +242,7 @@ export async function fireAffiliateWebhook(
   }
 
   // Create webhook log entry before attempting
+  const now = new Date();
   const webhookLog = await prisma.affiliateWebhookLog.create({
     data: {
       commission_id: commissionId,
@@ -251,6 +252,8 @@ export async function fireAffiliateWebhook(
       request_params: requestParams, // Store the actual parameter values sent
       status: 'pending',
       shopify_shop_id: commission.shopify_shop_id,
+      created_at: now,
+      updated_at: now,
     },
   });
 
@@ -296,6 +299,7 @@ export async function fireAffiliateWebhook(
       response_body: responseBody,
       error_message: errorMessage,
       last_attempt_at: new Date(),
+      updated_at: new Date(),
     },
   });
 

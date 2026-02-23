@@ -267,6 +267,7 @@ model AffiliateWebhookLog {
   last_attempt_at  DateTime @default(now())
   shopify_shop_id  String
   created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
 
   commission Commission @relation(fields: [commission_id], references: [id], onDelete: Cascade)
   affiliate  Affiliate  @relation(fields: [affiliate_id], references: [id], onDelete: Cascade)
