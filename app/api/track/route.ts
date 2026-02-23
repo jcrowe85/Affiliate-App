@@ -160,9 +160,24 @@ export async function POST(request: NextRequest) {
 
     let clickId: string;
     if (recentClick) {
-      // Use existing click ID (deduplication); keep original click's URL params
       clickId = recentClick.id;
       console.log(`Deduplicated click: Using existing click ID ${clickId} (within 5 min window)`);
+      // Update existing click with latest URL params so we don't lose them when deduplicating
+      const hasNewParams = postbackTransactionId || postbackAffiliateId || postbackSub1 || postbackSub2 || postbackSub3 || postbackSub4 || (urlParamsForStorage && Object.keys(urlParamsForStorage).length > 0);
+      if (hasNewParams) {
+        await prisma.click.update({
+          where: { id: clickId },
+          data: {
+            ...(postbackTransactionId && { url_transaction_id: postbackTransactionId }),
+            ...(postbackAffiliateId && { url_affiliate_id: postbackAffiliateId }),
+            ...(postbackSub1 && { url_sub1: postbackSub1 }),
+            ...(postbackSub2 && { url_sub2: postbackSub2 }),
+            ...(postbackSub3 && { url_sub3: postbackSub3 }),
+            ...(postbackSub4 && { url_sub4: postbackSub4 }),
+            ...(urlParamsForStorage && Object.keys(urlParamsForStorage).length > 0 && { url_params: urlParamsForStorage }),
+          },
+        });
+      }
     } else {
       // Generate new click ID
       clickId = generateClickId();
