@@ -341,10 +341,15 @@ function PayoutReportsSectionComponent({
   );
 }
 
-export default function AdminDashboard() {
+const VALID_TABS: Tab[] = ['overview', 'pending', 'fraud', 'payouts', 'performance', 'affiliates', 'offers', 'payout-runs', 'pixel-test', 'conversions', 'webhooks', 'analytics'];
+
+export default function AdminDashboard({ initialTab }: { initialTab?: string | null } = {}) {
   const router = useRouter();
   const { theme } = useTheme();
-  const [activeTab, setActiveTab] = useState<Tab>('overview');
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    if (initialTab && VALID_TABS.includes(initialTab as Tab)) return initialTab as Tab;
+    return 'overview';
+  });
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [pendingCommissions, setPendingCommissions] = useState<PendingCommission[]>([]);
   const [fraudFlags, setFraudFlags] = useState<FraudFlag[]>([]);

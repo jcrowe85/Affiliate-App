@@ -10,9 +10,9 @@ import AdminDashboard from '@/components/AdminDashboard';
 export default async function AppPage({
   searchParams,
 }: {
-  searchParams: { shop?: string; hmac?: string };
+  searchParams: { shop?: string; hmac?: string; tab?: string };
 }) {
-  const { shop, hmac } = searchParams;
+  const { shop, hmac, tab } = searchParams;
 
   // If shop parameter is present (from Shopify redirect), initiate OAuth
   if (shop && shop !== 'null') {
@@ -30,7 +30,7 @@ export default async function AppPage({
         </div>
       </div>
     }>
-      <AdminDashboard />
+      <AdminDashboard initialTab={tab} />
     </Suspense>
   );
 }

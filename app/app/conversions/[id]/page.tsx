@@ -307,25 +307,24 @@ export default function ConversionDetailPage() {
   const isSubscription = conversion.subscription_summary.is_subscription;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-800 pt-16">
-      {/* Header */}
-      <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 sticky top-16 z-10">
-        <div className="px-4 sm:px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <button
-                onClick={() => router.push('/app?tab=conversions')}
-                className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:text-gray-100 mb-2 flex items-center gap-2"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-                Back to Conversions
-              </button>
-              <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
-                Order #{conversion.shopify_order_number}
-              </h1>
-            </div>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-800">
+      {/* Compact header: back + title in one row */}
+      <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-10">
+        <div className="px-4 sm:px-6 py-3">
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => router.push('/app?tab=conversions')}
+              className="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:text-gray-100 shrink-0"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Back to Conversions
+            </button>
+            <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100 truncate">
+              Order #{conversion.shopify_order_number}
+            </h1>
           </div>
         </div>
       </div>
