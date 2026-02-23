@@ -30,6 +30,7 @@ interface Conversion {
   status: string;
   eligible_date: string;
   created_at: string;
+  landing_url_params?: Record<string, string>;
 }
 
 interface Payout {
@@ -335,12 +336,13 @@ export default function AffiliateDashboard() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Eligible Date</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Created</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Link / Campaign params</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
                     {conversions.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                        <td colSpan={6} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                           No conversions found
                         </td>
                       </tr>
@@ -360,6 +362,20 @@ export default function AffiliateDashboard() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{formatDate(conv.eligible_date)}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{formatDate(conv.created_at)}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                            {conv.landing_url_params && Object.keys(conv.landing_url_params).length > 0 ? (
+                              <div className="flex flex-wrap gap-1.5 max-w-xs">
+                                {Object.entries(conv.landing_url_params).map(([key, value]) => (
+                                  <span key={key} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-xs border border-gray-200 dark:border-gray-700">
+                                    <span className="font-medium text-gray-700 dark:text-gray-300">{key}:</span>
+                                    <span className="text-gray-600 dark:text-gray-400 truncate max-w-[120px]" title={String(value)}>{String(value)}</span>
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-gray-400">—</span>
+                            )}
+                          </td>
                         </tr>
                       ))
                     )}

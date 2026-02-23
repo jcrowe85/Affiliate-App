@@ -144,13 +144,14 @@ export async function GET(request: NextRequest) {
 
     const pagesPerSession = totalSessions > 0 ? pageViews / totalSessions : 0;
 
-    // Get active visitors (for real-time mode)
+    // Get active visitors (for real-time mode) - include url_params from session (affiliate link visit params)
     const activeVisitors: Array<{
       session_id: string;
       currentPage: string;
       device: string;
       location: string;
       lastSeen: number;
+      url_params?: Record<string, string>;
     }> = [];
 
     if (viewMode === 'realtime') {
@@ -169,6 +170,7 @@ export async function GET(request: NextRequest) {
               device_type: true,
               location_country: true,
               updated_at: true,
+              url_params: true,
             },
           },
         },
@@ -185,13 +187,25 @@ export async function GET(request: NextRequest) {
         }
       });
 
-      activeVisitors.push(...Array.from(uniqueSessions.values()).map(event => ({
-        session_id: event.session.id,
-        currentPage: event.page_path || event.page_url || '/',
-        device: event.session.device_type || 'Unknown',
-        location: event.session.location_country || 'Unknown',
-        lastSeen: Math.floor((Date.now() - event.session.updated_at.getTime()) / 1000),
-      })));
+      activeVisitors.push(...Array.from(uniqueSessions.values()).map(event => {
+        const session = event.session as { url_params?: unknown };
+        let url_params: Record<string, string> | undefined;
+        if (session.url_params && typeof session.url_params === 'object' && !Array.isArray(session.url_params)) {
+          url_params = {};
+          for (const [k, v] of Object.entries(session.url_params)) {
+            if (v != null && String(v).trim() !== '') url_params[k] = String(v);
+          }
+          if (Object.keys(url_params).length === 0) url_params = undefined;
+        }
+        return {
+          session_id: event.session.id,
+          currentPage: event.page_path || event.page_url || '/',
+          device: event.session.device_type || 'Unknown',
+          location: event.session.location_country || 'Unknown',
+          lastSeen: Math.floor((Date.now() - event.session.updated_at.getTime()) / 1000),
+          ...(url_params && { url_params }),
+        };
+      }));
     }
 
     // Format response similar to admin analytics API
