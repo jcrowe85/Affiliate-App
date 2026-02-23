@@ -144,6 +144,13 @@ export async function GET(
           type: commission.order_attribution.attribution_type,
           click_id: commission.order_attribution.click_id,
         },
+        // UTM and other URL params from the attributed click (for campaign tracking)
+        landing_url_params: (() => {
+          const oa = commission.order_attribution as { landing_url_params?: unknown; click?: { url_params?: unknown } | null };
+          if (oa.landing_url_params && typeof oa.landing_url_params === 'object') return oa.landing_url_params as Record<string, string>;
+          if (oa.click?.url_params && typeof oa.click.url_params === 'object') return oa.click.url_params as Record<string, string>;
+          return null;
+        })(),
         subscription: subscriptionAttribution
           ? {
               id: subscriptionAttribution.id,

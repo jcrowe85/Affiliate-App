@@ -119,6 +119,8 @@ model OrderAttribution {
   order_currency       String?
   shopify_shop_id      String
   created_at           DateTime @default(now())
+  // URL params from the attributed click (UTM, sub params, etc.) for campaign tracking
+  landing_url_params   Json?
 
   affiliate   Affiliate    @relation(fields: [affiliate_id], references: [id], onDelete: Cascade)
   click       Click?       @relation(fields: [click_id], references: [id], onDelete: SetNull)

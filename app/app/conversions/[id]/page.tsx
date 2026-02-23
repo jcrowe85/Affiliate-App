@@ -42,6 +42,8 @@ interface ConversionDetail {
       type: string;
       click_id: string | null;
     };
+    /** UTM and other URL params from the attributed click (campaign tracking) */
+    landing_url_params: Record<string, string> | null;
     subscription: {
       id: string;
       original_order_id: string;
@@ -437,6 +439,49 @@ export default function ConversionDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* Campaign / UTM (from attributed click) */}
+        {(conversion.landing_url_params && Object.keys(conversion.landing_url_params).length > 0) && (
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Campaign / UTM</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              URL parameters from the visit that led to this conversion (which campaign/channel).
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'].map((key) => {
+                const value = conversion.landing_url_params![key];
+                if (value == null || value === '') return null;
+                return (
+                  <div key={key}>
+                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400 capitalize">
+                      {key.replace('utm_', '')}
+                    </label>
+                    <p className="text-sm text-gray-900 dark:text-gray-100 font-mono break-all">{value}</p>
+                  </div>
+                );
+              })}
+            </div>
+            {Object.keys(conversion.landing_url_params).some(
+              (k) => !['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'].includes(k)
+            ) && (
+              <details className="mt-4">
+                <summary className="text-sm text-gray-600 dark:text-gray-400 cursor-pointer hover:text-gray-900 dark:hover:text-gray-100">
+                  Other URL parameters ({Object.keys(conversion.landing_url_params).filter((k) => !k.startsWith('utm_')).length})
+                </summary>
+                <dl className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                  {Object.entries(conversion.landing_url_params)
+                    .filter(([k]) => !['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'].includes(k))
+                    .map(([k, v]) => (
+                      <div key={k} className="flex gap-2">
+                        <dt className="font-mono text-gray-500 dark:text-gray-400 shrink-0">{k}:</dt>
+                        <dd className="font-mono text-gray-900 dark:text-gray-100 break-all">{String(v)}</dd>
+                      </div>
+                    ))}
+                </dl>
+              </details>
+            )}
+          </div>
+        )}
 
         {/* Webhook Logs */}
         <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-6">

@@ -444,32 +444,55 @@ export async function attributeOrderEnhanced(
     }
   }
 
-  // Create or update order attribution with method tracking
+  // Snapshot URL params (UTM, sub params, etc.) from the attributed click for campaign tracking
+  let landingUrlParams: Record<string, string> | null = null;
+  if (clickId) {
+    const click = await prisma.click.findUnique({
+      where: { id: clickId },
+    });
+    if (click) {
+      const c = click as { url_params?: unknown; url_transaction_id?: string | null; url_affiliate_id?: string | null; url_sub1?: string | null; url_sub2?: string | null; url_sub3?: string | null; url_sub4?: string | null };
+      const params = (c.url_params && typeof c.url_params === 'object' && !Array.isArray(c.url_params)
+        ? { ...(c.url_params as Record<string, string>) }
+        : {}) as Record<string, string>;
+      if (c.url_transaction_id) params.transaction_id = c.url_transaction_id;
+      if (c.url_affiliate_id) params.affiliate_id = c.url_affiliate_id;
+      if (c.url_sub1) params.sub1 = c.url_sub1;
+      if (c.url_sub2) params.sub2 = c.url_sub2;
+      if (c.url_sub3) params.sub3 = c.url_sub3;
+      if (c.url_sub4) params.sub4 = c.url_sub4;
+      if (Object.keys(params).length > 0) landingUrlParams = params;
+    }
+  }
+
+  // Create or update order attribution with method tracking (include landing_url_params for campaign/UTM tracking)
+  const createData = {
+    shopify_order_id: data.shopifyOrderId,
+    shopify_order_number: data.shopifyOrderNumber,
+    affiliate_id: affiliateId,
+    click_id: clickId,
+    attribution_type: attributionType,
+    shopify_shop_id: data.shopifyShopId,
+    customer_email: data.orderEmail || null,
+    customer_name: data.customerName || null,
+    order_total: data.orderTotal ? new Decimal(data.orderTotal) : null,
+    order_currency: data.orderCurrency || 'USD',
+    landing_url_params: landingUrlParams,
+  };
+  const updateData = {
+    affiliate_id: affiliateId,
+    click_id: clickId,
+    attribution_type: attributionType,
+    customer_email: data.orderEmail || null,
+    customer_name: data.customerName || null,
+    order_total: data.orderTotal ? new Decimal(data.orderTotal) : null,
+    order_currency: data.orderCurrency || 'USD',
+    landing_url_params: landingUrlParams,
+  };
   const attribution = await prisma.orderAttribution.upsert({
-    where: {
-      shopify_order_id: data.shopifyOrderId,
-    },
-    create: {
-      shopify_order_id: data.shopifyOrderId,
-      shopify_order_number: data.shopifyOrderNumber,
-      affiliate_id: affiliateId,
-      click_id: clickId,
-      attribution_type: attributionType,
-      shopify_shop_id: data.shopifyShopId,
-      customer_email: data.orderEmail || null,
-      customer_name: data.customerName || null,
-      order_total: data.orderTotal ? new Decimal(data.orderTotal) : null,
-      order_currency: data.orderCurrency || 'USD',
-    },
-    update: {
-      affiliate_id: affiliateId,
-      click_id: clickId,
-      attribution_type: attributionType,
-      customer_email: data.orderEmail || null,
-      customer_name: data.customerName || null,
-      order_total: data.orderTotal ? new Decimal(data.orderTotal) : null,
-      order_currency: data.orderCurrency || 'USD',
-    },
+    where: { shopify_order_id: data.shopifyOrderId },
+    create: createData as any,
+    update: updateData as any,
   });
 
   // Log attribution method for audit trail (you may want to add this to OrderAttribution model)
