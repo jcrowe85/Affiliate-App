@@ -183,16 +183,33 @@ export default function AffiliateDashboard() {
         sidebarCollapsed ? 'w-20' : 'w-64'
       } ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <div className="flex flex-col h-full">
-          <div className="p-4 border-b border-slate-800 dark:border-gray-800">
-            <div className="flex items-center justify-between">
-              <h1 className={`text-xl font-bold ${sidebarCollapsed ? 'hidden md:block' : 'block'}`}>
-                Partner Portal
-              </h1>
+          <div className={`border-b border-slate-800 dark:border-gray-800 ${sidebarCollapsed ? 'p-3 flex flex-col items-center gap-2' : 'p-4'}`}>
+            <div className={`flex items-center justify-between w-full ${sidebarCollapsed ? 'flex-col gap-2' : ''}`}>
+              {sidebarCollapsed ? (
+                <span className="flex items-center justify-center w-10 h-10 rounded-lg bg-slate-800 dark:bg-slate-800/80 text-white shrink-0" title="Partner Portal">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+                    <rect x="3" y="3" width="7" height="7" rx="1" />
+                    <rect x="14" y="3" width="7" height="7" rx="1" />
+                    <rect x="3" y="14" width="7" height="7" rx="1" />
+                    <rect x="14" y="14" width="7" height="7" rx="1" />
+                  </svg>
+                </span>
+              ) : (
+                <h1 className="text-xl font-bold truncate">
+                  Partner Portal
+                </h1>
+              )}
               <button
                 onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                className="hidden md:block text-slate-400 hover:text-white"
+                className="hidden md:flex items-center justify-center shrink-0 text-slate-400 hover:text-white w-8 h-8 rounded hover:bg-slate-800 transition-colors"
+                title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               >
-                {sidebarCollapsed ? '→' : '←'}
+                {sidebarCollapsed ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+                )}
               </button>
             </div>
           </div>
