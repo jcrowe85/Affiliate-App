@@ -32,6 +32,10 @@ async function main() {
 
   console.log('=== AFFILIATE ===');
   console.log(JSON.stringify(affiliate, null, 2));
+  console.log('\n>>> STORED WEBHOOK URL (what we use when firing):', affiliate.webhook_url ?? '(null)');
+  if (affiliate.webhook_url && affiliate.webhook_url.includes('tryfleur.com')) {
+    console.log('>>> WARNING: webhook_url points to tryfleur.com (your store). Update it in the affiliate edit screen to the partner postback URL (e.g. https://www.pa1ctrk.com/).');
+  }
 
   const commissions = await prisma.commission.findMany({
     where: { affiliate_id: affiliate.id },
@@ -58,6 +62,7 @@ async function main() {
     if (logs.length) {
       const log = logs[0];
       console.log('  webhook log status:', log.status, '| response_code:', log.response_code);
+      console.log('  webhook URL called:', log.webhook_url);
       console.log('  request_params (what was sent):', JSON.stringify(log.request_params, null, 2));
     } else {
       console.log('  (no webhook log entry)');

@@ -263,8 +263,11 @@ export async function attributeOrderEnhanced(
     }
   }
 
-  // Method 2b: Click ID from cookie/cart attribute (if available)
-  // IMPORTANT: Check for MOST RECENT click within window (last-touch)
+  // Method 2b: Click ID from cart attribute or cookie (if available)
+  // CRITICAL: When the order includes affiliate_click_id (set at checkout from the customer's session),
+  // we MUST use that click for attribution. Do NOT override with "most recent click in the shop" —
+  // that would wrongly attribute to another affiliate (e.g. the merchant's own test click) when the
+  // customer had a different affiliate in their cart.
   if (!affiliateId && data.clickId) {
     const click = await prisma.click.findUnique({
       where: { id: data.clickId },
@@ -276,54 +279,13 @@ export async function attributeOrderEnhanced(
     });
 
     if (click && click.affiliate.status === 'active') {
-      // Check attribution window
       const windowDays = click.affiliate.offer?.attribution_window_days || 90;
       if (isWithinAttributionWindow(click.created_at, orderDate, windowDays)) {
-        // But wait - we need to check if there's a MORE RECENT click from ANY affiliate
-        // This ensures last-touch attribution (most recent click wins)
-        const windowStart = new Date(orderDate);
-        windowStart.setDate(windowStart.getDate() - windowDays);
-        
-        // Find ALL clicks within a reasonable window (use max window: 90 days)
-        // Then check each click's OWN attribution window
-        const maxWindowStart = new Date(orderDate);
-        maxWindowStart.setDate(maxWindowStart.getDate() - 90); // Use max window to find all candidates
-        
-        const candidateClicks = await prisma.click.findMany({
-          where: {
-            shopify_shop_id: data.shopifyShopId,
-            created_at: {
-              gte: maxWindowStart,
-              lte: orderDate,
-            },
-          },
-          include: {
-            affiliate: {
-              include: { offer: true },
-            },
-          },
-          orderBy: {
-            created_at: 'desc', // Most recent first
-          },
-        });
-        
-        // Find the most recent click that's within ITS OWN attribution window
-        for (const candidateClick of candidateClicks) {
-          if (candidateClick.affiliate.status === 'active') {
-            const candidateWindowDays = candidateClick.affiliate.offer?.attribution_window_days || 90;
-            if (isWithinAttributionWindow(candidateClick.created_at, orderDate, candidateWindowDays)) {
-              // This click is valid - use it (most recent valid click wins)
-              affiliateId = candidateClick.affiliate_id;
-              clickId = candidateClick.id;
-              clickDate = candidateClick.created_at;
-              attributionType = 'link';
-              attributionMethod = candidateClick.id === data.clickId 
-                ? 'cookie_click_id' 
-                : 'last_touch_override';
-              break; // Use most recent valid click
-            }
-          }
-        }
+        affiliateId = click.affiliate_id;
+        clickId = click.id;
+        clickDate = click.created_at;
+        attributionType = 'link';
+        attributionMethod = 'cookie_click_id';
       } else {
         console.warn(`Click ${data.clickId} outside attribution window`);
       }

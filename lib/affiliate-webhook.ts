@@ -224,6 +224,34 @@ export async function fireAffiliateWebhook(
     webhookUrl += (webhookUrl.includes('?') ? '&' : '?') + urlParams.toString();
   }
 
+  // Safeguard: never send postbacks to our own store (avoids misconfigured webhook_url)
+  try {
+    const parsed = new URL(webhookUrl);
+    if (parsed.hostname === 'tryfleur.com' || parsed.hostname === 'www.tryfleur.com') {
+      console.error('[AffiliateWebhook] Skipping webhook: URL points to store domain (tryfleur.com). Affiliate id:', affiliateId, '| Stored webhook_url:', affiliate.webhook_url);
+      const now = new Date();
+      await prisma.affiliateWebhookLog.create({
+        data: {
+          commission_id: commissionId,
+          affiliate_id: affiliateId,
+          webhook_url: webhookUrl,
+          request_method: 'GET',
+          request_params: {},
+          status: 'failed',
+          response_code: null,
+          response_body: null,
+          error_message: 'Skipped: webhook URL is tryfleur.com (store domain). Update affiliate webhook URL in admin to the partner postback URL.',
+          shopify_shop_id: commission.shopify_shop_id,
+          created_at: now,
+          updated_at: now,
+        },
+      });
+      return false;
+    }
+  } catch {
+    // URL parse failed; continue and let the fetch fail
+  }
+
   // Send webhook
   let success = false;
   let responseCode: number | null = null;
