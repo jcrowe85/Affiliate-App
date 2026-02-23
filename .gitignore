@@ -35,6 +35,7 @@ next-env.d.ts
 
 # prisma
 /prisma/migrations
+/prisma/backups
 
 # environment variables (CRITICAL - contains secrets)
 .env

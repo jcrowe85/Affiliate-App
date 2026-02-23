@@ -88,6 +88,15 @@ model Click {
   user_agent_hash String
   shopify_shop_id String
   created_at      DateTime @default(now())
+  // Dynamic URL params from the affiliate (can vary per click; used for webhook postback)
+  url_transaction_id String?
+  url_affiliate_id   String?
+  url_sub1           String?
+  url_sub2           String?
+  url_sub3           String?
+  url_sub4           String?
+  // All URL params from affiliate link (JSON object; includes transaction_id, sub1-4, adv4, etc.)
+  url_params         Json?
 
   affiliate          Affiliate          @relation(fields: [affiliate_id], references: [id], onDelete: Cascade)
   link               AffiliateLink?     @relation(fields: [link_id], references: [id], onDelete: SetNull)

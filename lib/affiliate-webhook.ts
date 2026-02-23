@@ -48,6 +48,10 @@ export const AVAILABLE_WEBHOOK_FIELDS = {
   postback_sub2: 'Postback Sub2',
   postback_sub3: 'Postback Sub3',
   postback_sub4: 'Postback Sub4',
+  // Any URL param from the click (all params from affiliate link are stored per click)
+  adv4: 'Adv4 (from URL)',
+  adv5: 'Adv5 (from URL)',
+  nid: 'NID (from URL)',
 } as const;
 
 export type WebhookFieldKey = keyof typeof AVAILABLE_WEBHOOK_FIELDS;
@@ -119,22 +123,27 @@ export async function fireAffiliateWebhook(
     landing_url: click?.landing_url || '',
     offer_id: offer?.id || '',
     offer_name: offer?.name || '',
-    // Postback parameters captured from affiliate redirect URL
-    // transaction_id comes from URL parameter, not Shopify order ID
-    transaction_id: commission.affiliate.postback_transaction_id || '',
-    // Direct sub parameter aliases (for easier mapping in webhook URLs)
-    sub1: commission.affiliate.postback_sub1 || '',
-    sub2: commission.affiliate.postback_sub2 || '',
-    sub3: commission.affiliate.postback_sub3 || '',
-    sub4: commission.affiliate.postback_sub4 || '',
-    // Legacy postback parameter names (for backward compatibility)
-    affiliate_id_url: commission.affiliate.postback_affiliate_id || '',
-    postback_affiliate_id: commission.affiliate.postback_affiliate_id || '',
-    postback_sub1: commission.affiliate.postback_sub1 || '',
-    postback_sub2: commission.affiliate.postback_sub2 || '',
-    postback_sub3: commission.affiliate.postback_sub3 || '',
-    postback_sub4: commission.affiliate.postback_sub4 || '',
+    // Dynamic params (transaction_id, affiliate_id, sub1–sub4): from the converting click’s URL; fall back to affiliate-level for coupon attributions / legacy
+    transaction_id: click?.url_transaction_id ?? commission.affiliate.postback_transaction_id ?? '',
+    affiliate_id_url: click?.url_affiliate_id ?? commission.affiliate.postback_affiliate_id ?? '',
+    postback_affiliate_id: click?.url_affiliate_id ?? commission.affiliate.postback_affiliate_id ?? '',
+    sub1: click?.url_sub1 ?? commission.affiliate.postback_sub1 ?? '',
+    sub2: click?.url_sub2 ?? commission.affiliate.postback_sub2 ?? '',
+    sub3: click?.url_sub3 ?? commission.affiliate.postback_sub3 ?? '',
+    sub4: click?.url_sub4 ?? commission.affiliate.postback_sub4 ?? '',
+    postback_sub1: click?.url_sub1 ?? commission.affiliate.postback_sub1 ?? '',
+    postback_sub2: click?.url_sub2 ?? commission.affiliate.postback_sub2 ?? '',
+    postback_sub3: click?.url_sub3 ?? commission.affiliate.postback_sub3 ?? '',
+    postback_sub4: click?.url_sub4 ?? commission.affiliate.postback_sub4 ?? '',
   };
+
+  // Overlay all URL params from the converting click (e.g. adv4, nid) so they can be mapped in the webhook
+  const clickUrlParams = click?.url_params;
+  if (clickUrlParams && typeof clickUrlParams === 'object' && !Array.isArray(clickUrlParams)) {
+    for (const [k, v] of Object.entries(clickUrlParams)) {
+      if (v != null && String(v).trim() !== '') dataMap[k] = String(v);
+    }
+  }
 
   // Get parameter mapping from affiliate
   // Support both old format (Record<string, string>) and new format (Record<string, { type: 'fixed' | 'dynamic', value: string }>)

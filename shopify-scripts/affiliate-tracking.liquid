@@ -101,13 +101,21 @@
     // Normalize API URL (fix double https:// or other issues)
     const apiUrl = normalizedApiUrl || TRACKING_API_URL.replace(/^https?:\/\/https?:\/\//, 'https://').replace(/\/+$/, '');
     
-    // Capture postback parameters from URL (transaction_id, affiliate_id, sub1, sub2, sub3, sub4)
-    const transactionId = getUrlParameter('transaction_id');
-    const affiliateId = getUrlParameter('affiliate_id');
-    const sub1 = getUrlParameter('sub1');
-    const sub2 = getUrlParameter('sub2');
-    const sub3 = getUrlParameter('sub3');
-    const sub4 = getUrlParameter('sub4');
+    // Capture all URL params from affiliate link (for per-click storage and webhook postback)
+    const urlParams = new URLSearchParams(window.location.search);
+    const url_params = {};
+    urlParams.forEach(function(value, key) {
+      if (key !== 'ref' && key !== 'shop') {
+        url_params[key] = value;
+      }
+    });
+    // Keep top-level fields for backward compatibility
+    const transactionId = url_params.transaction_id || getUrlParameter('transaction_id');
+    const affiliateIdParam = url_params.affiliate_id || getUrlParameter('affiliate_id');
+    const sub1 = url_params.sub1 || getUrlParameter('sub1');
+    const sub2 = url_params.sub2 || getUrlParameter('sub2');
+    const sub3 = url_params.sub3 || getUrlParameter('sub3');
+    const sub4 = url_params.sub4 || getUrlParameter('sub4');
     
     // Call tracking API to record click (POST for better deduplication)
     const trackingData = {
@@ -117,13 +125,13 @@
       referrer: document.referrer || '',
       user_agent_hint: navigator.userAgent.substring(0, 100), // First 100 chars for bot detection
       timestamp: Date.now(),
-      // Postback parameters from affiliate redirect URL
       transaction_id: transactionId || null,
-      affiliate_id: affiliateId || null,
+      affiliate_id: affiliateIdParam || null,
       sub1: sub1 || null,
       sub2: sub2 || null,
       sub3: sub3 || null,
       sub4: sub4 || null,
+      url_params: Object.keys(url_params).length ? url_params : null,
     };
 
     console.log('🔵 Affiliate tracking: Calling API:', apiUrl);

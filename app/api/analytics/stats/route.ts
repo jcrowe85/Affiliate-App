@@ -8,10 +8,16 @@ export const dynamic = 'force-dynamic';
 function safeToISOString(date: any): string {
   if (!date) return 'invalid';
   try {
+    // Prisma returns Date objects, but handle both Date and string/other formats
     const d = date instanceof Date ? date : new Date(date);
-    if (isNaN(d.getTime())) return 'invalid';
+    if (isNaN(d.getTime())) {
+      // Try to see what we actually got
+      console.warn('[safeToISOString] Invalid date:', { date, type: typeof date, value: date });
+      return 'invalid';
+    }
     return d.toISOString();
-  } catch {
+  } catch (e) {
+    console.warn('[safeToISOString] Error converting date:', { date, type: typeof date, error: e });
     return 'invalid';
   }
 }
@@ -57,8 +63,19 @@ export async function GET(request: NextRequest) {
     if (viewMode === 'historical') {
       timeRange = searchParams.get('timeRange') || '30d';
       const timeRangeMs = getTimeRangeMs(timeRange);
-      const startTime = Date.now() - timeRangeMs;
+      const now = Date.now();
+      const startTime = now - timeRangeMs;
       startTimeDate = new Date(startTime);
+      
+      // Log time range calculation for debugging
+      console.log('[Analytics Stats] Time range calculation:', {
+        timeRange,
+        timeRangeMs,
+        now: new Date(now).toISOString(),
+        startTime: new Date(startTime).toISOString(),
+        startTimeDate: startTimeDate.toISOString(),
+        daysAgo: timeRangeMs / (24 * 60 * 60 * 1000),
+      });
       
       // Validate date
       if (isNaN(startTimeDate.getTime())) {
@@ -413,12 +430,36 @@ export async function GET(request: NextRequest) {
         shopifyShopId,
       });
       
+      console.log('[Analytics Stats] Historical query whereClause:', {
+        shopify_shop_id: shopifyShopId,
+        timeRange,
+        timeRangeMs: getTimeRangeMs(timeRange),
+        calculatedStartTime: startTimeDate ? startTimeDate.toISOString() : null,
+        now: new Date().toISOString(),
+        hasAffiliateFilter: true,
+        hasTimeFilter: !!(startTimeDate && !isNaN(startTimeDate.getTime())),
+        startTimeDate: startTimeDate ? startTimeDate.toISOString() : null,
+        whereClause: JSON.stringify(whereClause, null, 2),
+      });
+
       sessionsList = await prisma.visitorSession.findMany({
         where: whereClause,
         orderBy: {
           start_time: 'desc',
         },
         take: 10000, // Increased limit for historical data
+      });
+      
+      console.log('[Analytics Stats] Prisma query returned:', {
+        count: sessionsList.length,
+        firstSession: sessionsList[0] ? {
+          id: sessionsList[0].id,
+          affiliate_id: sessionsList[0].affiliate_id,
+          start_time: sessionsList[0].start_time,
+          start_time_type: typeof sessionsList[0].start_time,
+          start_time_instanceof: sessionsList[0].start_time instanceof Date,
+          start_time_value: sessionsList[0].start_time ? String(sessionsList[0].start_time) : null,
+        } : null,
       });
       
       // Check if sessions exist without affiliate filter (for debugging)
@@ -443,38 +484,91 @@ export async function GET(request: NextRequest) {
         },
       });
       
+      // Debug: Check what Prisma actually returned
+      const sampleSessionRaw = sessionsList[0];
       console.log('[Analytics Stats] Historical mode - Raw query result:', {
         sessionsReturned: sessionsList.length,
         sessionsWithoutAffiliateFilter: sessionsWithoutAffiliateFilter.length,
+        sampleSessionRaw: sampleSessionRaw ? {
+          id: sampleSessionRaw.id,
+          affiliate_id: sampleSessionRaw.affiliate_id,
+          start_time_raw: sampleSessionRaw.start_time,
+          start_time_type: typeof sampleSessionRaw.start_time,
+          start_time_isDate: sampleSessionRaw.start_time instanceof Date,
+          start_time_value: sampleSessionRaw.start_time ? String(sampleSessionRaw.start_time) : null,
+          updated_at_raw: sampleSessionRaw.updated_at,
+          updated_at_type: typeof sampleSessionRaw.updated_at,
+        } : null,
         sampleSession: sessionsList[0] ? {
           id: sessionsList[0].id,
           affiliate_id: sessionsList[0].affiliate_id,
           start_time: safeToISOString(sessionsList[0].start_time),
           updated_at: safeToISOString(sessionsList[0].updated_at),
         } : null,
-        sampleSessionsWithoutFilter: sessionsWithoutAffiliateFilter.map(s => ({
+        sampleSessionsWithoutFilter: sessionsWithoutAffiliateFilter.slice(0, 3).map(s => ({
           id: s.id,
           affiliate_id: s.affiliate_id,
           hasAffiliateId: !!s.affiliate_id,
           start_time: safeToISOString(s.start_time),
+          start_time_raw: s.start_time,
+          start_time_type: typeof s.start_time,
         })),
       });
       
-      // Additional in-memory filtering as safety check (Prisma date filter might miss some)
-      const filteredSessions = sessionsList.filter(s => {
-        if (!s.start_time || isNaN(s.start_time.getTime())) {
-          return false; // Skip sessions with invalid dates
-        }
-        if (!startTimeDate || isNaN(startTimeDate.getTime())) {
-          return true; // If startTimeDate is invalid or null, include all sessions
-        }
-        return s.start_time >= startTimeDate;
+      // Prisma already filtered by start_time >= startTimeDate at the database level
+      // So we can trust that all returned sessions are within the time range
+      // However, if start_time is invalid, we can use updated_at as a fallback for display purposes
+      // But we should still include the session since Prisma's query already validated the date
+      
+      // For historical mode, Prisma's database-level filtering is sufficient
+      // We only need to ensure we have affiliate_id (which Prisma already filtered for)
+      // All sessions returned by Prisma are valid for our time range
+      
+      // Debug: Check a few sample sessions to understand the date issue
+      // Use Prisma's regular query instead of raw SQL to avoid type issues
+      const sampleSessionsForDateCheck = await prisma.visitorSession.findMany({
+        where: {
+          shopify_shop_id: shopifyShopId,
+          affiliate_id: { not: null },
+          ...(startTimeDate && !isNaN(startTimeDate.getTime()) ? {
+            start_time: { gte: startTimeDate }
+          } : {}),
+        },
+        select: {
+          id: true,
+          start_time: true,
+          updated_at: true,
+        },
+        take: 3,
+        orderBy: { start_time: 'desc' },
       });
-      sessionsList = filteredSessions as SessionWithAffiliate[];
+      
+      console.log('[Analytics Stats] Sample sessions date check:', {
+        timeRange,
+        startTimeDate: startTimeDate ? startTimeDate.toISOString() : 'null',
+        sampleCount: sampleSessionsForDateCheck.length,
+        samples: sampleSessionsForDateCheck.map(s => ({
+          id: s.id,
+          start_time_instanceof: s.start_time instanceof Date,
+          start_time_isValid: s.start_time instanceof Date && !isNaN(s.start_time.getTime()),
+          start_time_value: s.start_time instanceof Date ? s.start_time.toISOString() : String(s.start_time),
+          updated_at_value: s.updated_at instanceof Date ? s.updated_at.toISOString() : String(s.updated_at),
+        })),
+      });
+      
+      console.log('[Analytics Stats] Using Prisma-filtered sessions (no additional date filtering needed):', {
+        totalSessions: sessionsList.length,
+        sessionsWithAffiliateId: sessionsList.filter(s => s.affiliate_id).length,
+        startTimeDate: startTimeDate ? startTimeDate.toISOString() : 'null',
+        note: 'Prisma already filtered by start_time >= startTimeDate at database level',
+      });
+      
+      // Keep all sessions - Prisma already filtered them correctly
+      // sessionsList is already filtered by Prisma, no need to filter again
       
       console.log('[Analytics Stats] Historical query result:', {
         sessionsFound: sessionsList.length,
-        filteredSessionsCount: filteredSessions.length,
+        filteredSessionsCount: sessionsList.length, // Prisma already filtered, so all sessions are valid
         firstSessionStartTime: safeToISOString(sessionsList[0]?.start_time),
         lastSessionStartTime: safeToISOString(sessionsList[sessionsList.length - 1]?.start_time),
         startTimeDate: startTimeDate && !isNaN(startTimeDate.getTime()) ? startTimeDate.toISOString() : 'invalid',
@@ -933,6 +1027,15 @@ export async function GET(request: NextRequest) {
     });
     
     // Use uniqueActiveSessions instead of all sessions for affiliate grouping
+    // For historical mode, this includes all sessions in the time range
+    // For real-time mode, this includes only active sessions
+    console.log('[Analytics Stats] Starting affiliate grouping:', {
+      viewMode,
+      uniqueActiveSessionsCount: uniqueActiveSessions.length,
+      sessionsWithAffiliateId: uniqueActiveSessions.filter(item => item.session.affiliate_id).length,
+      sampleAffiliateIds: Array.from(new Set(uniqueActiveSessions.map(item => item.session.affiliate_id).filter(Boolean))).slice(0, 5),
+    });
+    
     uniqueActiveSessions.forEach(item => {
       const session = item.session;
       const event = item.event;
@@ -1123,6 +1226,25 @@ export async function GET(request: NextRequest) {
 
     // Calculate metrics per affiliate (all sessions for historical, active sessions for real-time)
     console.log(`[Analytics Stats] Found ${affiliateMap.size} unique affiliates with sessions (viewMode: ${viewMode})`);
+    
+    // Debug: Check specific affiliate if requested
+    const debugAffiliateNumber = 30485;
+    const debugAffiliate = Array.from(affiliateMap.values()).find(aff => aff.affiliate_number === debugAffiliateNumber);
+    if (debugAffiliate) {
+      const sessionsForDebugAffiliate = uniqueActiveSessions.filter(item => 
+        item.session.affiliate_id === debugAffiliate.affiliate_id
+      );
+      console.log(`[Analytics Stats] Debug - Affiliate #${debugAffiliateNumber} (${debugAffiliate.affiliate_name}):`, {
+        affiliate_id: debugAffiliate.affiliate_id,
+        sessionsCount: debugAffiliate.sessions,
+        uniqueVisitors: debugAffiliate.visitors.size,
+        sessionsInUniqueActiveSessions: sessionsForDebugAffiliate.length,
+        sampleSessionIds: sessionsForDebugAffiliate.slice(0, 5).map(item => item.session.id),
+        viewMode,
+        timeRange: viewMode === 'historical' ? timeRange : 'N/A',
+      });
+    }
+    
     const affiliates = Array.from(affiliateMap.values()).map(aff => {
       const activeSessionsForAffiliate = uniqueActiveSessions.filter(item => 
         item.session.affiliate_id === aff.affiliate_id

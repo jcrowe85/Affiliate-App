@@ -8,17 +8,21 @@ export const dynamic = 'force-dynamic';
 
 /**
  * Track affiliate click via POST with deduplication
- * 
- * Handles: POST with { ref, shop, landing_url, referrer, user_agent_hint, timestamp }
- * 
- * This endpoint is called client-side from the Shopify theme script
- * when ?ref= parameter is detected on any page.
- * 
+ *
+ * URL parameter semantics:
+ * - ref: Constant. Our affiliate_number, created when we set up the affiliate; passed in the URL
+ *        so we know which affiliate the click belongs to.
+ * - transaction_id, affiliate_id, sub1, sub2, sub3, sub4: Dynamic. Passed by the affiliate in the
+ *        URL (e.g. from their network); can be different every click. Stored per click so the
+ *        webhook sends the values from the converting click.
+ *
+ * Handles: POST with { ref, shop, landing_url, referrer, user_agent_hint, timestamp, ... }
+ * This endpoint is called client-side from the Shopify theme script when ?ref= is detected.
+ *
  * Features:
  * - Deduplication: Prevents duplicate clicks from same visitor within short window
  * - Bot detection: Filters obvious bots/link scanners
- * - Works on any page without redirects - perfect for affiliate tracking.
- * 
+ *
  * Note: ?ref=internal and ?ref=direct are handled separately (no tracking).
  */
 export async function POST(request: NextRequest) {
@@ -31,13 +35,21 @@ export async function POST(request: NextRequest) {
     const userAgentHint = body.user_agent_hint || '';
     const timestamp = body.timestamp || Date.now();
     
-    // Capture postback parameters from URL
-    const postbackTransactionId = body.transaction_id || null;
-    const postbackAffiliateId = body.affiliate_id || null;
-    const postbackSub1 = body.sub1 || null;
-    const postbackSub2 = body.sub2 || null;
-    const postbackSub3 = body.sub3 || null;
-    const postbackSub4 = body.sub4 || null;
+    // All URL params from affiliate link (stored per click for webhook postback)
+    const rawUrlParams = body.url_params && typeof body.url_params === 'object' && !Array.isArray(body.url_params) ? body.url_params : null;
+    const postbackTransactionId = rawUrlParams?.transaction_id ?? body.transaction_id ?? null;
+    const postbackAffiliateId = rawUrlParams?.affiliate_id ?? body.affiliate_id ?? null;
+    const postbackSub1 = rawUrlParams?.sub1 ?? body.sub1 ?? null;
+    const postbackSub2 = rawUrlParams?.sub2 ?? body.sub2 ?? null;
+    const postbackSub3 = rawUrlParams?.sub3 ?? body.sub3 ?? null;
+    const postbackSub4 = rawUrlParams?.sub4 ?? body.sub4 ?? null;
+    // Normalize url_params to Record<string, string> for storage (only string values)
+    const urlParamsForStorage: Record<string, string> | null = rawUrlParams
+      ? Object.fromEntries(
+          Object.entries(rawUrlParams).filter(([, v]) => v != null && typeof v === 'string' && v !== '')
+            .map(([k, v]) => [k, v as string])
+        )
+      : null;
     
     // CORS headers for all responses
     const corsHeaders = {
@@ -148,7 +160,7 @@ export async function POST(request: NextRequest) {
 
     let clickId: string;
     if (recentClick) {
-      // Use existing click ID (deduplication)
+      // Use existing click ID (deduplication); keep original click's URL params
       clickId = recentClick.id;
       console.log(`Deduplicated click: Using existing click ID ${clickId} (within 5 min window)`);
     } else {
@@ -156,6 +168,7 @@ export async function POST(request: NextRequest) {
       clickId = generateClickId();
       
       // Record click in database (SERVER-SIDE - always reliable)
+      // Store URL params on this click so webhook sends the params from the converting click
       await recordClick({
         clickId,
         affiliateId: affiliate.id,
@@ -164,6 +177,13 @@ export async function POST(request: NextRequest) {
         ipHash,
         userAgentHash,
         shopifyShopId,
+        urlTransactionId: postbackTransactionId,
+        urlAffiliateId: postbackAffiliateId,
+        urlSub1: postbackSub1,
+        urlSub2: postbackSub2,
+        urlSub3: postbackSub3,
+        urlSub4: postbackSub4,
+        urlParams: Object.keys(urlParamsForStorage || {}).length ? urlParamsForStorage! : undefined,
       });
     }
 
@@ -222,21 +242,26 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Build url_params from all query params except ref, shop (same as Liquid)
+    const url_params: Record<string, string> = {};
+    searchParams.forEach((value, key) => {
+      if (key !== 'ref' && key !== 'shop') url_params[key] = value;
+    });
     // Convert GET to POST format for processing
     const body = {
-      ref: parseInt(affiliateNumberParam, 10),
+      ref: affiliateNumberParam,
       shop,
       landing_url: searchParams.get('url') || request.headers.get('referer') || '/',
       referrer: request.headers.get('referer') || '',
       user_agent_hint: request.headers.get('user-agent')?.substring(0, 100) || '',
       timestamp: Date.now(),
-      // Capture postback parameters from URL query string
       transaction_id: searchParams.get('transaction_id') || null,
       affiliate_id: searchParams.get('affiliate_id') || null,
       sub1: searchParams.get('sub1') || null,
       sub2: searchParams.get('sub2') || null,
       sub3: searchParams.get('sub3') || null,
       sub4: searchParams.get('sub4') || null,
+      url_params: Object.keys(url_params).length ? url_params : null,
     };
 
     // Create a new request-like object for POST handler

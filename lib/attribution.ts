@@ -12,6 +12,15 @@ export interface ClickData {
   ipHash: string;
   userAgentHash: string;
   shopifyShopId: string;
+  /** URL params from affiliate link (per-click; used for webhook postback) */
+  urlTransactionId?: string | null;
+  urlAffiliateId?: string | null;
+  urlSub1?: string | null;
+  urlSub2?: string | null;
+  urlSub3?: string | null;
+  urlSub4?: string | null;
+  /** All URL params from the affiliate link (e.g. adv4, nid); stored as JSON for webhook mapping */
+  urlParams?: Record<string, string> | null;
 }
 
 export interface OrderAttributionData {
@@ -35,6 +44,13 @@ export async function recordClick(data: ClickData): Promise<void> {
       ip_hash: data.ipHash,
       user_agent_hash: data.userAgentHash,
       shopify_shop_id: data.shopifyShopId,
+      url_transaction_id: data.urlTransactionId ?? undefined,
+      url_affiliate_id: data.urlAffiliateId ?? undefined,
+      url_sub1: data.urlSub1 ?? undefined,
+      url_sub2: data.urlSub2 ?? undefined,
+      url_sub3: data.urlSub3 ?? undefined,
+      url_sub4: data.urlSub4 ?? undefined,
+      url_params: data.urlParams ?? undefined,
     },
   });
 }
