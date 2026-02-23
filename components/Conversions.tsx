@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 
 interface Conversion {
   id: string;
@@ -47,46 +47,30 @@ interface ConversionsProps {
   onInitialAffiliateConsumed?: () => void;
 }
 
+const defaultFilterKeys = {
+  offer_id: '',
+  status: '',
+  start_date: '',
+  end_date: '',
+  search: '',
+};
+
 export default function Conversions({ initialAffiliateId, onInitialAffiliateConsumed }: ConversionsProps = {}) {
   const [conversions, setConversions] = useState<Conversion[]>([]);
   const [affiliates, setAffiliates] = useState<Affiliate[]>([]);
   const [offers, setOffers] = useState<Offer[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({
-    affiliate_id: '',
-    offer_id: '',
-    status: '',
-    start_date: '',
-    end_date: '',
-    search: '',
-  });
-
-  const consumedInitialAffiliateRef = useRef(false);
+  // Initialize affiliate_id from prop so first render and first fetch use it (no effect race)
+  const [filters, setFilters] = useState(() => ({
+    ...defaultFilterKeys,
+    affiliate_id: initialAffiliateId || '',
+  }));
 
   useEffect(() => {
     fetchAffiliates();
     fetchOffers();
   }, []);
-
-  // Apply initial affiliate filter when navigating from Overview → Top Affiliates row click
-  useEffect(() => {
-    if (initialAffiliateId) {
-      consumedInitialAffiliateRef.current = false; // allow this initial to be consumed
-      setFilters((prev) => ({ ...prev, affiliate_id: initialAffiliateId }));
-    }
-  }, [initialAffiliateId]);
-
-  // Clear parent's initial value only after our filter state has committed, so the first fetch uses the filter
-  useEffect(() => {
-    if (
-      initialAffiliateId &&
-      filters.affiliate_id === initialAffiliateId &&
-      !consumedInitialAffiliateRef.current
-    ) {
-      consumedInitialAffiliateRef.current = true;
-      onInitialAffiliateConsumed?.();
-    }
-  }, [initialAffiliateId, filters.affiliate_id, onInitialAffiliateConsumed]);
+  // Parent clears initial when user leaves Conversions tab (so we never clear before first fetch)
 
   const fetchAffiliates = async () => {
     try {

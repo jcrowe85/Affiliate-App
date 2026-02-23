@@ -374,6 +374,13 @@ export default function AdminDashboard() {
   const [performancePeriod, setPerformancePeriod] = useState<string>('30d'); // Shared period for performance tab and overview stats/top affiliates
   const [conversionsInitialAffiliateId, setConversionsInitialAffiliateId] = useState<string | null>(null);
 
+  // Clear conversions initial affiliate when leaving Conversions tab so filter doesn't stick on next visit
+  useEffect(() => {
+    if (activeTab !== 'conversions') {
+      setConversionsInitialAffiliateId(null);
+    }
+  }, [activeTab]);
+
   const fetchChartData = useCallback(async (timeRange: string) => {
     try {
       setChartLoading(true);
