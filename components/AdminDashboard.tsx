@@ -653,6 +653,9 @@ export default function AdminDashboard({ initialTab }: { initialTab?: string | n
   const nav = (tab: Tab) => {
     setActiveTab(tab);
     setMobileMenuOpen(false);
+    // Keep URL in sync with current tab so reload shows the right tab (avoids ?tab=conversions persisting when on other screens)
+    const path = tab === 'overview' ? '/app' : `/app?tab=${tab}`;
+    router.replace(path, { scroll: false });
   };
 
   const btn = (tab: Tab, label: string, icon: React.ReactNode, badge?: number) => {
