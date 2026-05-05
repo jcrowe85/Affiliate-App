@@ -27,12 +27,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify commissions belong to this affiliate and shop, and are eligible
+    // Include 'pending' commissions whose eligible_date has passed — the upcoming payout view
+    // surfaces these, so the pay route must accept them too.
     const commissions = await prisma.commission.findMany({
       where: {
         id: { in: commission_ids },
         affiliate_id: affiliate_id,
         shopify_shop_id: admin.shopify_shop_id,
-        status: { in: ['eligible', 'approved'] },
+        status: { in: ['pending', 'eligible', 'approved'] },
         eligible_date: {
           lte: new Date(), // Only pay commissions that are past their eligible date
         },
