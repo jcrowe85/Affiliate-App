@@ -7,6 +7,19 @@ import type { NextRequest } from 'next/server';
 export function middleware(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
 
+  // Debug endpoints expose session and config internals, so they require an
+  // admin session. Enforced here rather than per-route: /api/debug/get-token
+  // called getCurrentAdmin(), ignored the result, and served the shop's full
+  // Shopify access token to anyone who asked. A central gate can't be opted out
+  // of by forgetting to check a return value.
+  // Cookie presence only — routes still validate the session properly.
+  if (pathname.startsWith('/api/debug')) {
+    if (!request.cookies.get('admin_session')?.value) {
+      return new NextResponse(null, { status: 404 });
+    }
+    return NextResponse.next();
+  }
+
   // Always allow API routes (OAuth, webhooks, etc.)
   if (pathname.startsWith('/api')) {
     return NextResponse.next();

@@ -1,16 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getCurrentAdmin } from '@/lib/auth';
 
 /**
  * Debug endpoint to capture raw webhook data from Shopify
  * This helps verify what Shopify is actually sending vs what we're calculating
- * 
- * Usage: Point a test webhook to this endpoint temporarily to capture data
+ *
+ * Requires an admin session — it echoes the full request body and headers back,
+ * so it must never be open. Note this means Shopify can't post here directly;
+ * it's for replaying a captured webhook by hand, not for live traffic.
  */
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
+    const admin = await getCurrentAdmin();
+    if (!admin) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     // Read raw body
     const body = await request.text();
     const hmac = request.headers.get('x-shopify-hmac-sha256');
@@ -64,9 +72,11 @@ export async function POST(request: NextRequest) {
         full: body, // Full body for analysis
       },
       secretInfo: {
+        // Only whether it's configured. The previous `preview` field returned
+        // the first 10 and last 5 characters of SHOPIFY_API_SECRET in the HTTP
+        // response — which told an attacker the signing secret's length and
+        // both ends of it. Whether HMAC matches is the only useful signal here.
         isSet: !!secret,
-        length: secret?.length || 0,
-        preview: secret ? `${secret.substring(0, 10)}...${secret.substring(secret.length - 5)}` : 'NOT SET',
       },
       analysis: {
         isTestWebhook: allHeaders['x-shopify-test'] === 'true',
