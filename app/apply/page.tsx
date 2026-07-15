@@ -24,6 +24,34 @@ const inputClass =
 const labelClass =
   'block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1';
 
+/**
+ * Small "i" that reveals an explanation on hover or keyboard focus. The text is
+ * also the button's aria-label, so screen readers get it without the tooltip.
+ */
+function InfoTip({ text }: { text: string }) {
+  return (
+    <span className="relative inline-flex align-middle ml-1 group">
+      <button
+        type="button"
+        aria-label={text}
+        className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded-full"
+      >
+        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" strokeWidth={2} />
+          <path strokeLinecap="round" strokeWidth={2} d="M12 11v5" />
+          <path strokeLinecap="round" strokeWidth={2} d="M12 7.75v.5" />
+        </svg>
+      </button>
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 w-60 -translate-x-1/2 rounded-md bg-gray-900 px-3 py-2 text-xs font-normal leading-relaxed text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 dark:bg-gray-700"
+      >
+        {text}
+      </span>
+    </span>
+  );
+}
+
 function EyeIcon({ open }: { open: boolean }) {
   return open ? (
     <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -160,8 +188,11 @@ export default function AffiliateApplyPage() {
                 <input id="phone" type="tel" autoComplete="tel" value={formData.phone} onChange={set('phone')} className={inputClass} />
               </div>
               <div className="sm:col-span-2">
-                <label htmlFor="paypal_email" className={labelClass}>PayPal email</label>
-                <input id="paypal_email" type="email" value={formData.paypal_email} onChange={set('paypal_email')} className={inputClass} placeholder="Where we send your commission payouts" />
+                <label htmlFor="paypal_email" className={labelClass}>
+                  PayPal email *
+                  <InfoTip text="We currently pay affiliate commissions through PayPal only, so we need the email address on your PayPal account to send your payouts." />
+                </label>
+                <input id="paypal_email" type="email" required value={formData.paypal_email} onChange={set('paypal_email')} className={inputClass} placeholder="The email on your PayPal account" />
               </div>
             </div>
           </div>

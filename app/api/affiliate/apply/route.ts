@@ -57,6 +57,14 @@ export async function POST(request: NextRequest) {
     if (!email?.trim()) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 });
     }
+    // PayPal is currently the only payout method, so an affiliate we can't pay
+    // isn't worth approving.
+    if (!paypal_email?.trim()) {
+      return NextResponse.json(
+        { error: 'PayPal email is required — we pay commissions through PayPal' },
+        { status: 400 }
+      );
+    }
     if (!password?.trim()) {
       return NextResponse.json({ error: 'Password is required' }, { status: 400 });
     }
