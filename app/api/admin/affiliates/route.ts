@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getCurrentAdmin, hashPassword } from '@/lib/auth';
+import { sendApplicationApprovedEmail } from '@/lib/email';
 
 // Mark route as dynamic to prevent static analysis during build
 export const dynamic = 'force-dynamic';
@@ -231,7 +232,29 @@ export async function POST(request: NextRequest) {
       webhook_url,
       webhook_parameter_mapping,
       redirect_base_url,
+      application_id,
     } = body;
+
+    // When approving a signup from /apply, the applicant already chose a
+    // password. Reuse their hash rather than making the admin invent one.
+    let application = null;
+    if (application_id) {
+      application = await prisma.affiliateApplication.findFirst({
+        where: { id: application_id, shopify_shop_id: admin.shopify_shop_id },
+      });
+      if (!application) {
+        return NextResponse.json(
+          { error: 'Application not found' },
+          { status: 404 }
+        );
+      }
+      if (application.status !== 'pending') {
+        return NextResponse.json(
+          { error: `This application was already ${application.status}` },
+          { status: 400 }
+        );
+      }
+    }
 
     if (!first_name?.trim() || !last_name?.trim()) {
       return NextResponse.json(
@@ -252,7 +275,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    if (!password?.trim()) {
+    // An approved applicant supplies their own password, so the admin only has
+    // to provide one when creating an affiliate from scratch.
+    if (!application && !password?.trim()) {
       return NextResponse.json(
         { error: 'Password is required' },
         { status: 400 }
@@ -285,7 +310,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const password_hash = await hashPassword(password);
+    // A typed password still wins, so an admin can override one on approval.
+    const password_hash = password?.trim()
+      ? await hashPassword(password)
+      : application!.password_hash;
     const name = `${first_name.trim()} ${last_name.trim()}`;
     const shopId = admin.shopify_shop_id;
 
@@ -298,7 +326,7 @@ export async function POST(request: NextRequest) {
       // Start at 30483 if no affiliates exist, otherwise continue from max + 1
       const nextNum = agg._max.affiliate_number != null ? agg._max.affiliate_number + 1 : 30483;
 
-      return tx.affiliate.create({
+      const created = await tx.affiliate.create({
         data: {
           affiliate_number: nextNum,
           name,
@@ -327,7 +355,28 @@ export async function POST(request: NextRequest) {
           shopify_shop_id: shopId,
         },
       });
+
+      // Same transaction, so a failed affiliate insert can't leave an
+      // application marked approved with nothing to show for it.
+      if (application) {
+        await tx.affiliateApplication.update({
+          where: { id: application.id },
+          data: {
+            status: 'approved',
+            reviewed_at: new Date(),
+            affiliate_id: created.id,
+          },
+        });
+      }
+
+      return created;
     });
+
+    // Only after the transaction commits — a rolled-back approval must never
+    // tell someone their account is live.
+    if (application) {
+      await sendApplicationApprovedEmail(affiliate);
+    }
 
     return NextResponse.json({
       success: true,

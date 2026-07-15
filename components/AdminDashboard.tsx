@@ -378,12 +378,32 @@ export default function AdminDashboard({ initialTab }: { initialTab?: string | n
   const [chartLoading, setChartLoading] = useState(false);
   const [performancePeriod, setPerformancePeriod] = useState<string>('30d'); // Shared period for performance tab and overview stats/top affiliates
   const [conversionsInitialAffiliateId, setConversionsInitialAffiliateId] = useState<string | null>(null);
+  const [pendingApplications, setPendingApplications] = useState(0);
 
   // Clear conversions initial affiliate when leaving Conversions tab so filter doesn't stick on next visit
   useEffect(() => {
     if (activeTab !== 'conversions') {
       setConversionsInitialAffiliateId(null);
     }
+  }, [activeTab]);
+
+  // Badge count for new /apply signups. Re-runs on tab change so the badge
+  // clears once they're approved or rejected on the Affiliates tab.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await fetch('/api/admin/applications');
+        if (!response.ok) return;
+        const result = await response.json();
+        if (!cancelled) setPendingApplications(result.count ?? 0);
+      } catch (error) {
+        console.error('Error fetching pending applications:', error);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [activeTab]);
 
   const fetchChartData = useCallback(async (timeRange: string) => {
@@ -790,7 +810,7 @@ export default function AdminDashboard({ initialTab }: { initialTab?: string | n
           {btn('performance', 'Reports', icons.document)}
           {btn('analytics', 'Analytics', icons.chart)}
           {btn('conversions', 'Conversions', icons.target)}
-          {btn('affiliates', 'Affiliates', icons.users)}
+          {btn('affiliates', 'Affiliates', icons.users, pendingApplications)}
           {btn('offers', 'Offers', icons.tag)}
           {btn('payouts', 'Payouts', icons.cash)}
           <div className={`pt-2 px-2 pb-1 ${sidebarCollapsed ? 'md:hidden' : ''}`}>

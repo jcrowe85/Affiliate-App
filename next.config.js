@@ -5,7 +5,13 @@ const nextConfig = {
     SHOPIFY_API_KEY: process.env.SHOPIFY_API_KEY,
     SHOPIFY_API_SECRET: process.env.SHOPIFY_API_SECRET,
     SHOPIFY_SCOPES: process.env.SHOPIFY_SCOPES || 'read_products,write_orders,read_orders,write_metaobjects,read_metaobjects',
-    SHOPIFY_APP_URL: process.env.SHOPIFY_APP_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000',
+    // Parenthesised deliberately: `||` binds tighter than `?:`, so without the
+    // inner parens a set SHOPIFY_APP_URL made the condition true and the
+    // VERCEL_URL branch won — yielding "https://undefined" off Vercel and
+    // ignoring SHOPIFY_APP_URL everywhere.
+    SHOPIFY_APP_URL:
+      process.env.SHOPIFY_APP_URL ||
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
     DATABASE_URL: process.env.DATABASE_URL,
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
     MAGIC_LINK_SECRET: process.env.MAGIC_LINK_SECRET,

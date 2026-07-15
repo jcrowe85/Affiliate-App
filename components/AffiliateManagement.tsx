@@ -38,6 +38,23 @@ interface Offer {
   currency: string;
 }
 
+interface AffiliateApplication {
+  id: string;
+  first_name: string;
+  last_name: string;
+  company: string | null;
+  email: string;
+  paypal_email: string | null;
+  address_line1: string | null;
+  address_line2: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+  phone: string | null;
+  status: string;
+  created_at: string;
+}
+
 interface Affiliate {
   id: string;
   affiliate_number: number | null;
@@ -159,10 +176,16 @@ export default function AffiliateManagement() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
+  const [applications, setApplications] = useState<AffiliateApplication[]>([]);
+  // Set when the open form was prefilled from a /apply signup, so submitting
+  // approves that application instead of creating a bare affiliate.
+  const [approvingApplication, setApprovingApplication] =
+    useState<AffiliateApplication | null>(null);
 
   useEffect(() => {
     fetchAffiliates();
     fetchOffers();
+    fetchApplications();
   }, []);
 
   const fetchAffiliates = async () => {
@@ -187,9 +210,74 @@ export default function AffiliateManagement() {
     }
   };
 
+  const fetchApplications = async () => {
+    try {
+      const res = await fetch('/api/admin/applications');
+      const data = await res.json();
+      setApplications(data.applications || []);
+    } catch (err) {
+      console.error('Error fetching applications:', err);
+    }
+  };
+
+  // Copy an applicant's answers into the create form; the admin still has to
+  // pick the offer and any other admin-only settings before saving.
+  const startFromApplication = (application: AffiliateApplication) => {
+    setFormData({
+      ...defaultForm,
+      first_name: application.first_name,
+      last_name: application.last_name,
+      company: application.company || '',
+      email: application.email,
+      paypal_email: application.paypal_email || '',
+      address_line1: application.address_line1 || '',
+      address_line2: application.address_line2 || '',
+      city: application.city || '',
+      state: application.state || '',
+      zip: application.zip || '',
+      phone: application.phone || '',
+      source: 'Affiliate signup form',
+    });
+    setEditingAffiliate(null);
+    setApprovingApplication(application);
+    setError('');
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleRejectApplication = async (application: AffiliateApplication) => {
+    if (
+      !confirm(
+        `Reject the application from ${application.first_name} ${application.last_name} (${application.email})?`
+      )
+    ) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/admin/applications/${application.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'rejected' }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || 'Failed to reject application');
+        return;
+      }
+      if (approvingApplication?.id === application.id) {
+        setShowForm(false);
+        resetForm();
+      }
+      await fetchApplications();
+    } catch (err) {
+      alert('Failed to reject application');
+    }
+  };
+
   const resetForm = () => {
     setFormData(defaultForm);
     setEditingAffiliate(null);
+    setApprovingApplication(null);
     setError('');
     setShowNetTermsModal(false);
     setPendingPayoutTermsDays(null);
@@ -219,8 +307,10 @@ export default function AffiliateManagement() {
           state: formData.state.trim() || undefined,
           zip: formData.zip.trim() || undefined,
           phone: formData.phone.trim() || undefined,
+          source: formData.source.trim() || undefined,
           offer_id: formData.offer_id,
           password: formData.password,
+          application_id: approvingApplication?.id,
           merchant_id: formData.merchant_id.trim(),
           status: formData.status,
           payout_terms_days: formData.payout_terms_days,
@@ -233,7 +323,7 @@ export default function AffiliateManagement() {
       });
       const data = await res.json();
       if (res.ok) {
-        await fetchAffiliates();
+        await Promise.all([fetchAffiliates(), fetchApplications()]);
         setShowForm(false);
         resetForm();
       } else {
@@ -541,6 +631,56 @@ export default function AffiliateManagement() {
 
   return (
     <div className="space-y-6">
+      {applications.length > 0 && (
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-amber-300 dark:border-amber-700/60 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-amber-50 dark:bg-amber-900/20 flex items-center gap-2">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              Pending applications
+            </h3>
+            <span className="bg-amber-500 text-white text-xs font-medium px-2 py-0.5 rounded-full">
+              {applications.length}
+            </span>
+          </div>
+          <ul className="divide-y divide-gray-200 dark:divide-gray-800">
+            {applications.map((application) => (
+              <li
+                key={application.id}
+                className="px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                    {application.first_name} {application.last_name}
+                    {application.company ? ` · ${application.company}` : ''}
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                    {application.email}
+                    {application.phone ? ` · ${application.phone}` : ''}
+                    {' · applied '}
+                    {new Date(application.created_at).toLocaleDateString()}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => handleRejectApplication(application)}
+                    className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
+                  >
+                    Reject
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => startFromApplication(application)}
+                    className="px-3 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
+                  >
+                    Complete setup
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="flex justify-end">
         <button
           type="button"
@@ -558,8 +698,19 @@ export default function AffiliateManagement() {
         <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              {editingAffiliate ? 'Edit Affiliate' : 'Add New Affiliate'}
+              {editingAffiliate
+                ? 'Edit Affiliate'
+                : approvingApplication
+                ? 'Complete Affiliate Setup'
+                : 'Add New Affiliate'}
           </h3>
+            {approvingApplication && (
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Prefilled from {approvingApplication.first_name}{' '}
+                {approvingApplication.last_name}&apos;s application. Pick an
+                offer and adjust anything else, then create the account.
+              </p>
+            )}
           </div>
           <form
             onSubmit={(e) => {
@@ -726,7 +877,16 @@ export default function AffiliateManagement() {
             <div className="border-t border-gray-200 dark:border-gray-800 pt-6">
               <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">Account Settings</h4>
               <div className="space-y-4">
-                {!editingAffiliate && (
+                {approvingApplication && (
+                  <div className="rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 p-3">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      This applicant already chose their own password when they
+                      signed up. They&apos;ll use it to sign in as soon as you
+                      create the account.
+                    </p>
+                  </div>
+                )}
+                {!editingAffiliate && !approvingApplication && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password *</label>

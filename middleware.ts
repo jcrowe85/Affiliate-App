@@ -12,12 +12,15 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Always allow login pages and public marketing pages
-  if (pathname.startsWith('/login') || 
-      pathname.startsWith('/affiliate/login') || 
+  // Always allow login pages and public marketing pages.
+  // NOTE: /apply must be matched here — it is a public page, but it would
+  // otherwise be caught by the `pathname.startsWith('/app')` admin guard below.
+  if (pathname.startsWith('/login') ||
+      pathname.startsWith('/affiliate/login') ||
       pathname.startsWith('/affiliates/login') ||
       pathname === '/affiliates' ||
-      pathname === '/affiliate') {
+      pathname === '/affiliate' ||
+      pathname === '/apply') {
     return NextResponse.next();
   }
 

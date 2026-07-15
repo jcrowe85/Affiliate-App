@@ -57,6 +57,39 @@ model Affiliate {
   offer                     Offer?                    @relation(fields: [offer_id], references: [id], onDelete: SetNull)
   affiliate_offers          AffiliateOffer[]
   affiliate_webhook_logs    AffiliateWebhookLog[]
+  application               AffiliateApplication?
+
+  @@index([shopify_shop_id, status])
+  @@index([email])
+}
+
+// A self-serve signup from the public /apply form. Kept separate from Affiliate
+// because an application has no offer yet, and Affiliate has no status that
+// hides a row from listings, stats, or login.
+model AffiliateApplication {
+  id              String    @id @default(cuid())
+  first_name      String
+  last_name       String
+  company         String?
+  email           String
+  paypal_email    String?
+  address_line1   String?
+  address_line2   String?
+  city            String?
+  state           String?
+  zip             String?
+  phone           String?
+  // Hashed at intake so the applicant's password is never stored or shown in
+  // plaintext; copied onto the Affiliate verbatim on approval.
+  password_hash   String
+  status          String    @default("pending") // pending | approved | rejected
+  shopify_shop_id String
+  affiliate_id    String?   @unique
+  reviewed_at     DateTime?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+
+  affiliate Affiliate? @relation(fields: [affiliate_id], references: [id], onDelete: SetNull)
 
   @@index([shopify_shop_id, status])
   @@index([email])

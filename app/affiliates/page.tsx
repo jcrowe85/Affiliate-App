@@ -1,11 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
 
 export default function AffiliateMarketingPage() {
-  const [showSignupForm, setShowSignupForm] = useState(false);
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white dark:from-gray-950 dark:to-gray-900">
       {/* Navigation */}
@@ -25,7 +22,7 @@ export default function AffiliateMarketingPage() {
                 Login
               </Link>
               <Link
-                href="/affiliates/login"
+                href="/apply"
                 className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-md text-sm font-medium transition-colors dark:bg-indigo-500 dark:hover:bg-indigo-600"
               >
                 Join Now
@@ -57,7 +54,7 @@ export default function AffiliateMarketingPage() {
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <Link
-                  href="/affiliates/login"
+                  href="/apply"
                   className="inline-flex items-center justify-center px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white text-lg font-semibold rounded-lg transition-colors shadow-lg hover:shadow-xl dark:bg-indigo-500 dark:hover:bg-indigo-600"
                 >
                   Start Earning Today
@@ -412,7 +409,7 @@ export default function AffiliateMarketingPage() {
             paid upfront and build passive income.
           </p>
           <Link
-            href="/affiliates/login"
+            href="/apply"
             className="inline-flex items-center justify-center px-8 py-4 bg-white text-indigo-600 text-lg font-semibold rounded-lg hover:bg-gray-100 transition-colors shadow-lg hover:shadow-xl"
           >
             Join the Program Now
