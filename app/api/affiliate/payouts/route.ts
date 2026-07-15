@@ -48,13 +48,20 @@ export async function GET(request: NextRequest) {
       currency: c.currency,
       status: c.status,
       eligible_date: c.eligible_date.toISOString(),
-      payout_runs: c.payout_run_commissions.map(prc => ({
-        id: prc.payout_run.id,
-        period_start: prc.payout_run.period_start.toISOString(),
-        period_end: prc.payout_run.period_end.toISOString(),
-        status: prc.payout_run.status,
-        payout_reference: prc.payout_run.payout_reference,
-      })),
+      // PayoutRunCommission.commission_id is unique, so a commission belongs to
+      // at most one payout run. Still returned as an array to keep the response
+      // shape stable for existing clients.
+      payout_runs: c.payout_run_commissions
+        ? [
+            {
+              id: c.payout_run_commissions.payout_run.id,
+              period_start: c.payout_run_commissions.payout_run.period_start.toISOString(),
+              period_end: c.payout_run_commissions.payout_run.period_end.toISOString(),
+              status: c.payout_run_commissions.payout_run.status,
+              payout_reference: c.payout_run_commissions.payout_run.payout_reference,
+            },
+          ]
+        : [],
     }));
 
     return NextResponse.json({ payouts: formatted });

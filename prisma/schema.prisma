@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,63 +8,63 @@ datasource db {
 }
 
 model Affiliate {
-  id                          String    @id @default(cuid())
-  affiliate_number            Int?      @unique
+  id                          String                    @id @default(cuid())
   name                        String
-  first_name                  String?
-  last_name                   String?
-  company                     String?
-  email                       String    @unique
-  paypal_email                String?
-  address_line1               String?
-  address_line2               String?
-  city                        String?
-  state                       String?
-  zip                         String?
-  phone                       String?
-  source                      String?
-  status                      String    @default("active")
+  email                       String                    @unique
+  status                      String                    @default("active")
   payout_method               String?
   payout_identifier           String?
-  payout_terms_days           Int       @default(30)
+  payout_terms_days           Int                       @default(30)
+  shopify_shop_id             String
+  created_at                  DateTime                  @default(now())
+  updated_at                  DateTime                  @updatedAt
+  address_line1               String?
+  address_line2               String?
+  affiliate_number            Int?
+  city                        String?
+  company                     String?
+  first_name                  String?
+  last_name                   String?
   merchant_id                 String?
   offer_id                    String?
   password_hash               String?
-  webhook_url                 String?
-  webhook_parameter_mapping   Json?
-  redirect_base_url           String?
-  redirect_parameters_enabled Boolean   @default(false)
-  postback_transaction_id     String?
+  paypal_email                String?
+  phone                       String?
+  postback_affiliate_id       String?
   postback_sub1               String?
   postback_sub2               String?
   postback_sub3               String?
   postback_sub4               String?
-  postback_affiliate_id       String?
-  shopify_shop_id             String
-  created_at                  DateTime  @default(now())
-  updated_at                  DateTime  @updatedAt
+  postback_transaction_id     String?
+  state                       String?
+  webhook_parameter_mapping   Json?
+  webhook_url                 String?
+  zip                         String?
+  redirect_base_url           String?
+  source                      String?
+  redirect_parameters_enabled Boolean?                  @default(false)
+  offer                       Offer?                    @relation(fields: [offer_id], references: [id])
+  application                 AffiliateApplication?
+  links                       AffiliateLink[]
+  affiliate_offers            AffiliateOffer[]
+  sessions                    AffiliateSession[]
+  affiliate_webhook_logs      AffiliateWebhookLog[]
+  clicks                      Click[]
+  commissions                 Commission[]
+  fraud_flags                 FraudFlag[]
+  orders                      OrderAttribution[]
+  subscription_attributions   SubscriptionAttribution[]
+  VisitorSession              VisitorSession[]
 
-  links                     AffiliateLink[]
-  clicks                    Click[]
-  orders                    OrderAttribution[]
-  commissions               Commission[]
-  subscription_attributions SubscriptionAttribution[]
-  fraud_flags               FraudFlag[]
-  sessions                  AffiliateSession[]
-  offer                     Offer?                    @relation(fields: [offer_id], references: [id], onDelete: SetNull)
-  affiliate_offers          AffiliateOffer[]
-  affiliate_webhook_logs    AffiliateWebhookLog[]
-  application               AffiliateApplication?
-
+  @@unique([shopify_shop_id, affiliate_number])
+  @@unique([shopify_shop_id, merchant_id])
   @@index([shopify_shop_id, status])
   @@index([email])
+  @@index([offer_id])
 }
 
-// A self-serve signup from the public /apply form. Kept separate from Affiliate
-// because an application has no offer yet, and Affiliate has no status that
-// hides a row from listings, stats, or login.
 model AffiliateApplication {
-  id              String    @id @default(cuid())
+  id              String     @id @default(cuid())
   first_name      String
   last_name       String
   company         String?
@@ -79,33 +76,29 @@ model AffiliateApplication {
   state           String?
   zip             String?
   phone           String?
-  // Hashed at intake so the applicant's password is never stored or shown in
-  // plaintext; copied onto the Affiliate verbatim on approval.
   password_hash   String
-  status          String    @default("pending") // pending | approved | rejected
+  status          String     @default("pending")
   shopify_shop_id String
-  affiliate_id    String?   @unique
+  affiliate_id    String?    @unique
   reviewed_at     DateTime?
-  created_at      DateTime  @default(now())
-  updated_at      DateTime  @updatedAt
-
-  affiliate Affiliate? @relation(fields: [affiliate_id], references: [id], onDelete: SetNull)
+  created_at      DateTime   @default(now())
+  updated_at      DateTime   @updatedAt
+  affiliate       Affiliate? @relation(fields: [affiliate_id], references: [id])
 
   @@index([shopify_shop_id, status])
   @@index([email])
 }
 
 model AffiliateLink {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   affiliate_id    String
   destination_url String
   campaign_name   String?
   coupon_code     String?
   shopify_shop_id String
-  created_at      DateTime @default(now())
-
-  affiliate Affiliate @relation(fields: [affiliate_id], references: [id], onDelete: Cascade)
-  clicks    Click[]
+  created_at      DateTime  @default(now())
+  affiliate       Affiliate @relation(fields: [affiliate_id], references: [id], onDelete: Cascade)
+  clicks          Click[]
 
   @@index([affiliate_id])
   @@index([shopify_shop_id])
@@ -113,26 +106,23 @@ model AffiliateLink {
 }
 
 model Click {
-  id              String   @id @default(cuid())
-  affiliate_id    String
-  link_id         String?
-  landing_url     String
-  ip_hash         String
-  user_agent_hash String
-  shopify_shop_id String
-  created_at      DateTime @default(now())
-  // Dynamic URL params from the affiliate (can vary per click; used for webhook postback)
+  id                 String             @id @default(cuid())
+  affiliate_id       String
+  link_id            String?
+  landing_url        String
+  ip_hash            String
+  user_agent_hash    String
+  shopify_shop_id    String
+  created_at         DateTime           @default(now())
   url_transaction_id String?
   url_affiliate_id   String?
   url_sub1           String?
   url_sub2           String?
   url_sub3           String?
   url_sub4           String?
-  // All URL params from affiliate link (JSON object; includes transaction_id, sub1-4, adv4, etc.)
   url_params         Json?
-
   affiliate          Affiliate          @relation(fields: [affiliate_id], references: [id], onDelete: Cascade)
-  link               AffiliateLink?     @relation(fields: [link_id], references: [id], onDelete: SetNull)
+  link               AffiliateLink?     @relation(fields: [link_id], references: [id])
   order_attributions OrderAttribution[]
 
   @@index([affiliate_id, created_at])
@@ -140,28 +130,27 @@ model Click {
 }
 
 model OrderAttribution {
-  id                   String   @id @default(cuid())
-  shopify_order_id     String   @unique
+  id                   String       @id @default(cuid())
+  shopify_order_id     String       @unique
   shopify_order_number String
   affiliate_id         String
   click_id             String?
   attribution_type     String
+  shopify_shop_id      String
+  created_at           DateTime     @default(now())
   customer_email       String?
   customer_name        String?
-  order_total          Decimal? @db.Decimal(10, 2)
-  order_currency       String?
-  shopify_shop_id      String
-  created_at           DateTime @default(now())
-  // URL params from the attributed click (UTM, sub params, etc.) for campaign tracking
+  order_currency       String?      @default("USD")
+  order_total          Decimal?     @db.Decimal(10, 2)
   landing_url_params   Json?
-
-  affiliate   Affiliate    @relation(fields: [affiliate_id], references: [id], onDelete: Cascade)
-  click       Click?       @relation(fields: [click_id], references: [id], onDelete: SetNull)
-  commissions Commission[]
+  commissions          Commission[]
+  affiliate            Affiliate    @relation(fields: [affiliate_id], references: [id], onDelete: Cascade)
+  click                Click?       @relation(fields: [click_id], references: [id])
 
   @@index([shopify_order_id])
   @@index([affiliate_id])
   @@index([shopify_shop_id])
+  @@index([customer_email])
 }
 
 model CommissionRule {
@@ -182,25 +171,24 @@ model CommissionRule {
 }
 
 model Commission {
-  id                   String   @id @default(cuid())
-  affiliate_id         String
-  shopify_order_id     String
-  order_attribution_id String
-  amount               Decimal  @db.Decimal(10, 2)
-  currency             String   @default("USD")
-  status               String   @default("pending")
-  eligible_date        DateTime
-  rule_snapshot        Json
-  shopify_shop_id      String
-  created_at           DateTime @default(now())
-  updated_at           DateTime @updatedAt
-
+  id                     String                @id @default(cuid())
+  affiliate_id           String
+  shopify_order_id       String
+  order_attribution_id   String
+  amount                 Decimal               @db.Decimal(10, 2)
+  currency               String                @default("USD")
+  status                 String                @default("pending")
+  eligible_date          DateTime
+  rule_snapshot          Json
+  shopify_shop_id        String
+  created_at             DateTime              @default(now())
+  updated_at             DateTime              @updatedAt
+  affiliate_webhook_logs AffiliateWebhookLog[]
   affiliate              Affiliate             @relation(fields: [affiliate_id], references: [id], onDelete: Cascade)
   order_attribution      OrderAttribution      @relation(fields: [order_attribution_id], references: [id], onDelete: Cascade)
-  payout_run_commissions PayoutRunCommission[]
   fraud_flags            FraudFlag[]
+  payout_run_commissions PayoutRunCommission?
   postback_logs          PostbackLog[]
-  affiliate_webhook_logs AffiliateWebhookLog[]
 
   @@index([affiliate_id, status])
   @@index([shopify_order_id])
@@ -209,19 +197,18 @@ model Commission {
 }
 
 model SubscriptionAttribution {
-  id                String   @id @default(cuid())
+  id                String    @id @default(cuid())
   original_order_id String
   affiliate_id      String
   selling_plan_id   String
   interval_months   Int
   max_payments      Int?
-  payments_made     Int      @default(0)
-  active            Boolean  @default(true)
+  payments_made     Int       @default(0)
+  active            Boolean   @default(true)
   shopify_shop_id   String
-  created_at        DateTime @default(now())
-  updated_at        DateTime @updatedAt
-
-  affiliate Affiliate @relation(fields: [affiliate_id], references: [id], onDelete: Cascade)
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+  affiliate         Affiliate @relation(fields: [affiliate_id], references: [id], onDelete: Cascade)
 
   @@unique([original_order_id, selling_plan_id])
   @@index([affiliate_id])
@@ -229,83 +216,80 @@ model SubscriptionAttribution {
 }
 
 model PayoutRun {
-  id               String   @id @default(cuid())
+  id               String                @id @default(cuid())
   period_start     DateTime
   period_end       DateTime
-  status           String   @default("draft")
+  status           String                @default("draft")
   payout_reference String?
   shopify_shop_id  String
-  created_at       DateTime @default(now())
-  updated_at       DateTime @updatedAt
-
-  commissions PayoutRunCommission[]
+  created_at       DateTime              @default(now())
+  updated_at       DateTime              @updatedAt
+  commissions      PayoutRunCommission[]
 
   @@index([shopify_shop_id, status])
 }
 
 model PayoutRunCommission {
-  id            String   @id @default(cuid())
+  id            String     @id @default(cuid())
   payout_run_id String
-  commission_id String   @unique
-  created_at    DateTime @default(now())
-
-  payout_run PayoutRun  @relation(fields: [payout_run_id], references: [id], onDelete: Cascade)
-  commission Commission @relation(fields: [commission_id], references: [id], onDelete: Cascade)
+  commission_id String     @unique
+  created_at    DateTime   @default(now())
+  commission    Commission @relation(fields: [commission_id], references: [id], onDelete: Cascade)
+  payout_run    PayoutRun  @relation(fields: [payout_run_id], references: [id], onDelete: Cascade)
 }
 
 model PostbackTemplate {
-  id              String   @id @default(cuid())
+  id              String        @id @default(cuid())
   name            String
   base_url        String
   param_mappings  Json
   trigger_event   String
-  active          Boolean  @default(true)
+  active          Boolean       @default(true)
   shopify_shop_id String
-  created_at      DateTime @default(now())
-  updated_at      DateTime @updatedAt
-
-  postback_logs PostbackLog[]
+  created_at      DateTime      @default(now())
+  updated_at      DateTime      @updatedAt
+  postback_logs   PostbackLog[]
 
   @@index([shopify_shop_id, active, trigger_event])
 }
 
 model PostbackLog {
-  id                   String   @id @default(cuid())
+  id                   String           @id @default(cuid())
   commission_id        String
   postback_template_id String
   status               String
   response_code        Int?
   response_body        String?
-  attempts             Int      @default(1)
-  last_attempt_at      DateTime @default(now())
+  attempts             Int              @default(1)
+  last_attempt_at      DateTime         @default(now())
   shopify_shop_id      String
-  created_at           DateTime @default(now())
-
-  commission        Commission       @relation(fields: [commission_id], references: [id], onDelete: Cascade)
-  postback_template PostbackTemplate @relation(fields: [postback_template_id], references: [id], onDelete: Cascade)
+  created_at           DateTime         @default(now())
+  commission           Commission       @relation(fields: [commission_id], references: [id], onDelete: Cascade)
+  postback_template    PostbackTemplate @relation(fields: [postback_template_id], references: [id], onDelete: Cascade)
 
   @@index([commission_id])
   @@index([status, last_attempt_at])
 }
 
 model AffiliateWebhookLog {
-  id               String   @id @default(cuid())
-  commission_id    String
-  affiliate_id     String
-  webhook_url      String
-  request_method   String   @default("GET")
-  request_params   Json?
-  status           String   @default("pending")
-  response_code    Int?
-  response_body    String?
-  error_message    String?
-  last_attempt_at  DateTime @default(now())
-  shopify_shop_id  String
-  created_at       DateTime @default(now())
-  updated_at       DateTime @updatedAt
-
-  commission Commission @relation(fields: [commission_id], references: [id], onDelete: Cascade)
-  affiliate  Affiliate  @relation(fields: [affiliate_id], references: [id], onDelete: Cascade)
+  id              String     @id @default(cuid())
+  commission_id   String
+  affiliate_id    String
+  webhook_url     String
+  request_method  String     @default("GET")
+  request_body    String?
+  response_code   Int?
+  response_body   String?
+  status          String     @default("pending")
+  error_message   String?
+  attempts        Int        @default(1)
+  last_attempt_at DateTime   @default(now())
+  shopify_shop_id String
+  created_at      DateTime   @default(now())
+  updated_at      DateTime   @updatedAt
+  request_params  Json?
+  affiliate       Affiliate  @relation(fields: [affiliate_id], references: [id], onDelete: Cascade)
+  commission      Commission @relation(fields: [commission_id], references: [id], onDelete: Cascade)
 
   @@index([commission_id])
   @@index([affiliate_id])
@@ -314,19 +298,18 @@ model AffiliateWebhookLog {
 }
 
 model FraudFlag {
-  id              String   @id @default(cuid())
+  id              String     @id @default(cuid())
   commission_id   String
   affiliate_id    String
   flag_type       String
-  score           Int      @default(0)
+  score           Int        @default(0)
   reason          String
-  resolved        Boolean  @default(false)
+  resolved        Boolean    @default(false)
   shopify_shop_id String
-  created_at      DateTime @default(now())
-  updated_at      DateTime @updatedAt
-
-  commission Commission @relation(fields: [commission_id], references: [id], onDelete: Cascade)
-  affiliate  Affiliate  @relation(fields: [affiliate_id], references: [id], onDelete: Cascade)
+  created_at      DateTime   @default(now())
+  updated_at      DateTime   @updatedAt
+  affiliate       Affiliate  @relation(fields: [affiliate_id], references: [id], onDelete: Cascade)
+  commission      Commission @relation(fields: [commission_id], references: [id], onDelete: Cascade)
 
   @@index([commission_id])
   @@index([affiliate_id, resolved])
@@ -341,146 +324,146 @@ model ShopifySession {
   scope                   String?
   expires                 DateTime?
   access_token            String?
-  storefront_access_token String?
   created_at              DateTime  @default(now())
+  storefront_access_token String?
   updated_at              DateTime  @updatedAt
 
   @@index([shop])
 }
 
 model AdminUser {
-  id              String    @id @default(cuid())
-  email           String    @unique
+  id              String         @id @default(cuid())
+  email           String         @unique
   password_hash   String
   name            String?
-  role            String    @default("admin")
+  role            String         @default("admin")
   shopify_shop_id String
-  created_at      DateTime  @default(now())
-  updated_at      DateTime  @updatedAt
-
-  sessions AdminSession[]
+  created_at      DateTime       @default(now())
+  updated_at      DateTime       @updatedAt
+  last_login      DateTime?
+  sessions        AdminSession[]
 
   @@index([email])
   @@index([shopify_shop_id])
 }
 
 model AdminSession {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   admin_user_id String
-  token         String   @unique
+  token         String    @unique
   expires_at    DateTime
-  created_at    DateTime @default(now())
-
-  admin_user AdminUser @relation(fields: [admin_user_id], references: [id], onDelete: Cascade)
+  created_at    DateTime  @default(now())
+  admin_user    AdminUser @relation(fields: [admin_user_id], references: [id], onDelete: Cascade)
 
   @@index([token])
   @@index([admin_user_id])
 }
 
 model AffiliateSession {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   affiliate_id String
-  token        String   @unique
+  token        String    @unique
   expires_at   DateTime
-  created_at   DateTime @default(now())
-
-  affiliate Affiliate @relation(fields: [affiliate_id], references: [id], onDelete: Cascade)
+  created_at   DateTime  @default(now())
+  affiliate    Affiliate @relation(fields: [affiliate_id], references: [id], onDelete: Cascade)
 
   @@index([token])
   @@index([affiliate_id])
 }
 
 model Offer {
-  id                                   String   @id @default(cuid())
-  offer_number                         Int?     @unique
+  id                                   String           @id @default(cuid())
+  offer_number                         Int?
   name                                 String
-  commission_type                      String
-  amount                               Decimal  @db.Decimal(10, 2)
-  currency                             String   @default("USD")
+  commission_type                      String           @default("flat_rate")
+  amount                               Decimal          @db.Decimal(10, 2)
+  currency                             String           @default("USD")
   commission_terms                     String?
-  attribution_window_days              Int      @default(90)
-  auto_approve_affiliates              Boolean  @default(false)
-  selling_subscriptions                String?
+  attribution_window_days              Int              @default(90)
+  auto_approve_affiliates              Boolean          @default(false)
+  selling_subscriptions                String           @default("no")
   subscription_max_payments            Int?
   subscription_rebill_commission_type  String?
-  subscription_rebill_commission_value Decimal? @db.Decimal(10, 2)
-  make_private                         Boolean  @default(false)
-  hide_referral_links                  Boolean  @default(false)
-  hide_coupon_promotion                Boolean  @default(false)
-  enable_variable_commission           Boolean  @default(false)
+  subscription_rebill_commission_value Decimal?         @db.Decimal(10, 2)
+  make_private                         Boolean          @default(false)
+  hide_referral_links                  Boolean          @default(false)
+  hide_coupon_promotion                Boolean          @default(false)
+  enable_variable_commission           Boolean          @default(false)
   shopify_shop_id                      String
-  created_at                           DateTime @default(now())
-  updated_at                           DateTime @updatedAt
+  created_at                           DateTime         @default(now())
+  updated_at                           DateTime         @updatedAt
+  affiliates                           Affiliate[]
+  affiliate_offers                     AffiliateOffer[]
 
-  affiliates       Affiliate[]
-  affiliate_offers AffiliateOffer[]
-
+  @@unique([shopify_shop_id, offer_number])
   @@index([shopify_shop_id])
 }
 
 model AffiliateOffer {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   affiliate_id String
   offer_id     String
-  created_at   DateTime @default(now())
-
-  affiliate Affiliate @relation(fields: [affiliate_id], references: [id], onDelete: Cascade)
-  offer     Offer     @relation(fields: [offer_id], references: [id], onDelete: Cascade)
+  created_at   DateTime  @default(now())
+  affiliate    Affiliate @relation(fields: [affiliate_id], references: [id], onDelete: Cascade)
+  offer        Offer     @relation(fields: [offer_id], references: [id], onDelete: Cascade)
 
   @@unique([affiliate_id, offer_id])
+  @@index([affiliate_id])
+  @@index([offer_id])
 }
 
 model VisitorSession {
-  id              String   @id @default(cuid())
-  visitor_id      String
-  session_id      String
-  affiliate_id    String?
-  start_time      DateTime @default(now())
-  updated_at      DateTime @updatedAt
-  referrer_url    String?
-  referrer_domain String?
-  landing_page    String?
-  entry_page      String?
-  exit_page       String?
-  page_views      Int      @default(1)
-  pages_visited   String[] @default([])
-  is_bounce       Boolean  @default(false)
-  total_time      Int?
-  end_time        DateTime?
-  device_type     String?
-  user_agent      String?
-  screen_width    Int?
-  screen_height   Int?
-  language        String?
-  timezone        String?
-  referrer_type   String?
+  id               String         @id @default(cuid())
+  session_id       String         @unique
+  visitor_id       String
+  shopify_shop_id  String
+  entry_page       String
+  exit_page        String?
+  start_time       DateTime       @default(now())
+  end_time         DateTime?
+  page_views       Int            @default(0)
+  pages_visited    String[]
+  total_time       Int?
+  is_bounce        Boolean        @default(false)
+  device_type      String?
+  user_agent       String?
+  screen_width     Int?
+  screen_height    Int?
+  language         String?
+  timezone         String?
+  referrer_type    String?
+  referrer_url     String?
+  referrer_domain  String?
   location_country String?
-  url_params      Json? // Persistent URL parameters from initial visit (stored as key-value pairs)
-  shopify_shop_id String
-
-  events          VisitorEvent[]
+  location_city    String?
+  created_at       DateTime       @default(now())
+  updated_at       DateTime       @updatedAt
+  affiliate_id     String?
+  affiliate_number Int?
+  url_params       Json?
+  landing_page     String?
+  events           VisitorEvent[]
+  Affiliate        Affiliate?     @relation(fields: [affiliate_id], references: [id])
 
   @@index([visitor_id])
-  @@index([session_id])
-  @@index([affiliate_id])
   @@index([shopify_shop_id, start_time])
-  @@index([shopify_shop_id, updated_at])
+  @@index([affiliate_id, start_time])
+  @@index([shopify_shop_id, created_at])
 }
 
 model VisitorEvent {
-  id              String   @id @default(cuid())
+  id                 String         @id @default(cuid())
   visitor_session_id String
-  visitor_id      String
-  event_type      String
-  shopify_shop_id String
-  page_url        String?
-  page_path       String?
-  page_title      String?
-  referrer         String?
-  timestamp       DateTime @default(now())
-  event_data      Json?
-
-  session         VisitorSession @relation(fields: [visitor_session_id], references: [id], onDelete: Cascade)
+  visitor_id         String
+  event_type         String
+  shopify_shop_id    String
+  page_url           String?
+  page_path          String?
+  page_title         String?
+  referrer           String?
+  timestamp          DateTime       @default(now())
+  event_data         Json?
+  session            VisitorSession @relation(fields: [visitor_session_id], references: [id], onDelete: Cascade)
 
   @@index([visitor_session_id])
   @@index([shopify_shop_id, timestamp])
