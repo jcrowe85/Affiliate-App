@@ -34,7 +34,11 @@ yarn-error.log*
 next-env.d.ts
 
 # prisma
-/prisma/migrations
+# NOTE: /prisma/migrations must stay committed — migrations are source code, and
+# the deploy applies them. They were ignored here until 2026-07-15, so 11
+# migrations ran against production and were never checked in; the schema then
+# drifted and `prisma db push` became the only way to apply changes, which
+# silently rewrites production to match schema.prisma. Do not re-add this.
 /prisma/backups
 
 # environment variables (CRITICAL - contains secrets)
