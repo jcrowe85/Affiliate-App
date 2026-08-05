@@ -138,6 +138,62 @@ const defaultForm = {
   source: '',
 };
 
+interface ShopifyVariant {
+  id: string;
+  title: string;
+  sku: string | null;
+  price: string;
+  available: boolean;
+}
+
+interface ShopifyProduct {
+  id: string;
+  title: string;
+  status: string;
+  featuredImage: string | null;
+  variants: ShopifyVariant[];
+}
+
+interface SeedLine {
+  variant_id: string;
+  quantity: number;
+}
+
+interface SeededOrder {
+  id: string;
+  legacyResourceId: string;
+  name: string;
+  totalPrice: string;
+  currency: string;
+  adminUrl: string;
+}
+
+// A single label/value pair in the read-only affiliate details view.
+function DetailField({
+  label,
+  value,
+  mono = false,
+}: {
+  label: string;
+  value: string | null | undefined;
+  mono?: boolean;
+}) {
+  return (
+    <div>
+      <dt className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+        {label}
+      </dt>
+      <dd
+        className={`mt-1 text-sm break-all ${
+          value ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'
+        } ${mono && value ? 'font-mono text-xs' : ''}`}
+      >
+        {value || '—'}
+      </dd>
+    </div>
+  );
+}
+
 export default function AffiliateManagement() {
   const [affiliates, setAffiliates] = useState<Affiliate[]>([]);
   const [offers, setOffers] = useState<Offer[]>([]);
@@ -177,6 +233,18 @@ export default function AffiliateManagement() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
   const [applications, setApplications] = useState<AffiliateApplication[]>([]);
+  // Read-only detail view, opened by clicking an affiliate's name in the table.
+  const [viewingAffiliate, setViewingAffiliate] = useState<Affiliate | null>(null);
+  // "Seed order" panel inside that detail view.
+  const [seedOpen, setSeedOpen] = useState(false);
+  const [products, setProducts] = useState<ShopifyProduct[]>([]);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [productsError, setProductsError] = useState('');
+  const [seedLines, setSeedLines] = useState<SeedLine[]>([{ variant_id: '', quantity: 1 }]);
+  const [seedCountry, setSeedCountry] = useState('US');
+  const [seedSubmitting, setSeedSubmitting] = useState(false);
+  const [seedError, setSeedError] = useState('');
+  const [seedResult, setSeedResult] = useState<SeededOrder | null>(null);
   // Set when the open form was prefilled from a /apply signup, so submitting
   // approves that application instead of creating a bare affiliate.
   const [approvingApplication, setApprovingApplication] =
@@ -442,7 +510,113 @@ export default function AffiliateManagement() {
     }
   };
 
+  // Products are only fetched when the seed panel is first opened — the catalog
+  // call is not needed just to view an affiliate.
+  const fetchProducts = async () => {
+    setProductsLoading(true);
+    setProductsError('');
+    try {
+      const res = await fetch('/api/admin/shopify/products');
+      const data = await res.json();
+      if (!res.ok) {
+        setProductsError(data.error || 'Failed to load products');
+        return;
+      }
+      setProducts(data.products || []);
+    } catch (err) {
+      setProductsError('Failed to load products');
+    } finally {
+      setProductsLoading(false);
+    }
+  };
+
+  const closeSeedPanel = () => {
+    setSeedOpen(false);
+    setSeedLines([{ variant_id: '', quantity: 1 }]);
+    setSeedError('');
+    setSeedResult(null);
+    setSeedCountry('US');
+  };
+
+  const openSeedPanel = () => {
+    setSeedOpen(true);
+    setSeedError('');
+    setSeedResult(null);
+    if (products.length === 0 && !productsLoading) {
+      fetchProducts();
+    }
+  };
+
+  const findVariant = (variantId: string): { product: ShopifyProduct; variant: ShopifyVariant } | null => {
+    for (const product of products) {
+      const variant = product.variants.find((v) => v.id === variantId);
+      if (variant) return { product, variant };
+    }
+    return null;
+  };
+
+  const seedOrderTotal = seedLines.reduce((sum, line) => {
+    const found = findVariant(line.variant_id);
+    if (!found) return sum;
+    return sum + parseFloat(found.variant.price || '0') * line.quantity;
+  }, 0);
+
+  const handleSeedOrder = async (affiliate: Affiliate) => {
+    const lines = seedLines.filter((l) => l.variant_id);
+    if (lines.length === 0) {
+      setSeedError('Pick at least one product');
+      return;
+    }
+
+    const summary = lines
+      .map((l) => {
+        const found = findVariant(l.variant_id);
+        const label = found ? `${found.product.title} — ${found.variant.title}` : l.variant_id;
+        return `  • ${l.quantity} × ${label}`;
+      })
+      .join('\n');
+
+    if (
+      !confirm(
+        `Send free product to ${affiliate.first_name || affiliate.name} at their address on file?\n\n${summary}\n\n` +
+          `This creates a real $0 Shopify order for fulfilment and decrements stock. ` +
+          `They are not charged and earn no commission on it.`
+      )
+    ) {
+      return;
+    }
+
+    setSeedSubmitting(true);
+    setSeedError('');
+    setSeedResult(null);
+    try {
+      const res = await fetch(`/api/admin/affiliates/${affiliate.id}/seed-order`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          line_items: lines,
+          country_code: seedCountry,
+          send_receipt: true,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSeedError(data.error || 'Failed to seed order');
+        return;
+      }
+      setSeedResult(data.order);
+      setSeedLines([{ variant_id: '', quantity: 1 }]);
+      await fetchAffiliates();
+    } catch (err) {
+      setSeedError('Failed to seed order');
+    } finally {
+      setSeedSubmitting(false);
+    }
+  };
+
   const startEdit = (affiliate: Affiliate) => {
+    setViewingAffiliate(null);
+    closeSeedPanel();
     setEditingAffiliate(affiliate);
     const payoutTerms = affiliate.payout_terms_days || 30;
     setOriginalPayoutTermsDays(payoutTerms);
@@ -2114,9 +2288,14 @@ export default function AffiliateManagement() {
                   return (
                     <tr key={a.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                        <button
+                          type="button"
+                          onClick={() => setViewingAffiliate(a)}
+                          className="text-left text-sm font-medium text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 hover:underline"
+                          title="View affiliate details"
+                        >
                           {a.first_name && a.last_name ? `${a.first_name} ${a.last_name}` : a.name}
-                        </div>
+                        </button>
                         {a.company && <div className="text-xs text-gray-500 dark:text-gray-400">{a.company}</div>}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -2192,6 +2371,405 @@ export default function AffiliateManagement() {
           </div>
         )}
       </div>
+
+      {/* Read-only affiliate details */}
+      {viewingAffiliate && (() => {
+        const a = viewingAffiliate;
+        const fullName =
+          a.first_name && a.last_name ? `${a.first_name} ${a.last_name}` : a.name;
+        const formatCurrency = (amount: number, currency: string = 'USD') =>
+          new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
+        const addressLines = [
+          a.address_line1,
+          a.address_line2,
+          [a.city, a.state, a.zip].filter(Boolean).join(', ') || null,
+        ].filter(Boolean) as string[];
+        const webhookMapping = Object.entries(a.webhook_parameter_mapping || {}).map(
+          ([key, value]) => {
+            const normalized =
+              typeof value === 'string' ? { type: 'dynamic' as const, value } : value;
+            return {
+              key,
+              display:
+                normalized.type === 'fixed' ? normalized.value : `{${normalized.value}}`,
+            };
+          }
+        );
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
+            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-3xl w-full my-8 max-h-[90vh] overflow-y-auto">
+              <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-4 z-10 flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 truncate">
+                      {fullName}
+                    </h3>
+                    <span
+                      className={`px-2 py-1 text-xs rounded ${
+                        a.status === 'active'
+                          ? 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300'
+                          : a.status === 'suspended'
+                          ? 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300'
+                          : 'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300'
+                      }`}
+                    >
+                      {a.status}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {a.affiliate_number != null ? `Affiliate #${a.affiliate_number}` : 'No affiliate number assigned'}
+                    {a.company ? ` · ${a.company}` : ''}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setViewingAffiliate(null);
+                    closeSeedPanel();
+                  }}
+                  className="text-gray-400 hover:text-gray-600 dark:text-gray-400 shrink-0"
+                  aria-label="Close"
+                >
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* pb-20 keeps the last row clear of the sticky footer below. */}
+              <div className="p-6 pb-20 space-y-6">
+                <section>
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">Contact</h4>
+                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+                    <DetailField label="Email" value={a.email} />
+                    <DetailField label="PayPal email" value={a.paypal_email} />
+                    <DetailField label="Phone" value={a.phone} />
+                    <DetailField label="Company" value={a.company} />
+                    <div className="sm:col-span-2">
+                      <dt className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Address
+                      </dt>
+                      <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
+                        {addressLines.length > 0
+                          ? addressLines.map((line) => <div key={line}>{line}</div>)
+                          : '—'}
+                      </dd>
+                    </div>
+                  </dl>
+                </section>
+
+                <section className="border-t border-gray-200 dark:border-gray-800 pt-6">
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">Account</h4>
+                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+                    <DetailField label="Offer" value={a.offer?.name} />
+                    <DetailField label="Merchant ID" value={a.merchant_id} />
+                    <DetailField label="Source" value={a.source} />
+                    <DetailField label="Payout terms" value={`Net-${a.payout_terms_days}`} />
+                    <DetailField label="Payout method" value={a.payout_method} />
+                    <DetailField
+                      label="Created"
+                      value={new Date(a.created_at).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                      })}
+                    />
+                  </dl>
+                </section>
+
+                <section className="border-t border-gray-200 dark:border-gray-800 pt-6">
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">Tracking</h4>
+                  <dl className="space-y-3">
+                    <div>
+                      <dt className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Referral URL
+                      </dt>
+                      <dd className="mt-1 text-sm">
+                        {a.affiliate_number != null ? (
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <code className="text-xs bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 break-all">
+                              {getReferralUrl(a.affiliate_number, 'query')}
+                            </code>
+                            <button
+                              type="button"
+                              onClick={() => copyReferralUrl(a.affiliate_number, a.id, 'query')}
+                              className="text-blue-600 hover:text-blue-800 font-medium text-xs px-2 py-1 border border-blue-300 rounded hover:bg-blue-50 dark:hover:bg-blue-900/30"
+                            >
+                              {copiedAffiliateId === a.id ? '✓ Copied' : 'Copy'}
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-gray-500 dark:text-gray-400">—</span>
+                        )}
+                      </dd>
+                    </div>
+                    <DetailField label="Redirect URL" value={a.redirect_base_url} mono />
+                    <DetailField label="Webhook URL" value={a.webhook_url} mono />
+                    {webhookMapping.length > 0 && (
+                      <div>
+                        <dt className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
+                          Webhook parameters
+                        </dt>
+                        <dd className="space-y-1">
+                          {webhookMapping.map((param) => (
+                            <div key={param.key} className="text-sm font-mono text-gray-900 dark:text-gray-100 break-all">
+                              <span className="text-gray-500 dark:text-gray-400">{param.key}</span>
+                              {' = '}
+                              {param.display}
+                            </div>
+                          ))}
+                        </dd>
+                      </div>
+                    )}
+                  </dl>
+                </section>
+
+                <section className="border-t border-gray-200 dark:border-gray-800 pt-6">
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">Performance</h4>
+                  <dl className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-3">
+                    <DetailField label="Revenue" value={formatCurrency(a.stats.revenue, a.stats.currency)} />
+                    {/* stats.commissions is a record count, not an amount. */}
+                    <DetailField label="Commissions" value={String(a.stats.commissions)} />
+                    <DetailField label="Orders" value={String(a.stats.orders)} />
+                    <DetailField
+                      label="AOV"
+                      value={a.stats.aov > 0 ? formatCurrency(a.stats.aov, a.stats.currency) : null}
+                    />
+                    <DetailField label="Clicks" value={String(a.stats.clicks)} />
+                    <DetailField label="Links" value={String(a.stats.links)} />
+                    <DetailField label="Pending conversions" value={String(a.stats.pending_conversions)} />
+                  </dl>
+                </section>
+
+                <section className="border-t border-gray-200 dark:border-gray-800 pt-6">
+                  <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Send product</h4>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Ship free product to this affiliate&apos;s address on file so they can create content.
+                      </p>
+                    </div>
+                    {!seedOpen && (
+                      <button
+                        type="button"
+                        onClick={openSeedPanel}
+                        className="px-3 py-2 text-sm font-medium text-indigo-600 dark:text-indigo-400 border border-indigo-300 dark:border-indigo-700 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/30 shrink-0"
+                      >
+                        Seed affiliate
+                      </button>
+                    )}
+                  </div>
+
+                  {seedOpen && (
+                    <div className="mt-4 space-y-4">
+                      <div className="rounded-lg border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-3">
+                        <p className="text-xs text-amber-800 dark:text-amber-200">
+                          Creates a real <strong>$0 order</strong> in Shopify so the warehouse can pick and ship
+                          it. Stock is decremented and {a.email} gets the confirmation and tracking emails. The
+                          order is tagged <code>gifted</code> and excluded from commission.
+                        </p>
+                      </div>
+
+                      {productsLoading && (
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Loading catalog…</p>
+                      )}
+
+                      {productsError && (
+                        <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-sm">
+                          {productsError}
+                        </div>
+                      )}
+
+                      {!productsLoading && !productsError && products.length === 0 && (
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          No active products found in the catalog.
+                        </p>
+                      )}
+
+                      {products.length > 0 && (
+                        <>
+                          <div className="space-y-2">
+                            {seedLines.map((line, index) => (
+                              <div key={index} className="flex items-center gap-2">
+                                <select
+                                  value={line.variant_id}
+                                  onChange={(e) => {
+                                    const next = [...seedLines];
+                                    next[index] = { ...next[index], variant_id: e.target.value };
+                                    setSeedLines(next);
+                                  }}
+                                  className="flex-1 min-w-0 px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                                >
+                                  <option value="">Select a product…</option>
+                                  {products.map((product) => (
+                                    <optgroup key={product.id} label={product.title}>
+                                      {product.variants.map((variant) => (
+                                        <option key={variant.id} value={variant.id}>
+                                          {variant.title === 'Default Title' ? product.title : variant.title}
+                                          {' — $'}
+                                          {variant.price}
+                                          {variant.sku ? ` (${variant.sku})` : ''}
+                                        </option>
+                                      ))}
+                                    </optgroup>
+                                  ))}
+                                </select>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={100}
+                                  value={line.quantity}
+                                  onChange={(e) => {
+                                    const qty = parseInt(e.target.value, 10);
+                                    const next = [...seedLines];
+                                    next[index] = {
+                                      ...next[index],
+                                      quantity: Number.isNaN(qty) || qty < 1 ? 1 : qty,
+                                    };
+                                    setSeedLines(next);
+                                  }}
+                                  aria-label="Quantity"
+                                  className="w-20 px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setSeedLines(
+                                      seedLines.length === 1
+                                        ? [{ variant_id: '', quantity: 1 }]
+                                        : seedLines.filter((_, i) => i !== index)
+                                    )
+                                  }
+                                  className="px-2 py-2 text-gray-400 hover:text-red-600 shrink-0"
+                                  aria-label="Remove line"
+                                >
+                                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className="flex items-center justify-between gap-4 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => setSeedLines([...seedLines, { variant_id: '', quantity: 1 }])}
+                              className="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800"
+                            >
+                              + Add another product
+                            </button>
+                            {seedOrderTotal > 0 && (
+                              <span className="text-sm text-gray-600 dark:text-gray-400">
+                                Retail value{' '}
+                                <strong className="text-gray-900 dark:text-gray-100">
+                                  {formatCurrency(seedOrderTotal, a.stats.currency)}
+                                </strong>{' '}
+                                · charged <strong className="text-gray-900 dark:text-gray-100">$0.00</strong>
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-end gap-3 flex-wrap">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
+                                Country
+                              </label>
+                              <input
+                                type="text"
+                                maxLength={2}
+                                value={seedCountry}
+                                onChange={(e) => setSeedCountry(e.target.value.toUpperCase())}
+                                className="w-20 px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm font-mono"
+                              />
+                              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                Affiliates have no country on file.
+                              </p>
+                            </div>
+                            <div className="text-sm text-gray-600 dark:text-gray-400 flex-1 min-w-[12rem]">
+                              Ships to{' '}
+                              <span className="text-gray-900 dark:text-gray-100">
+                                {[a.address_line1, a.city, a.state, a.zip].filter(Boolean).join(', ') || 'no address on file'}
+                              </span>
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                      {seedError && (
+                        <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-sm">
+                          {seedError}
+                        </div>
+                      )}
+
+                      {seedResult && (
+                        <div className="p-3 rounded-lg bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 text-sm">
+                          Product on its way — order{' '}
+                          <a
+                            href={seedResult.adminUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-medium underline"
+                          >
+                            {seedResult.name}
+                          </a>{' '}
+                          is in Shopify awaiting fulfilment, at no charge to {a.first_name || a.name}.
+                        </div>
+                      )}
+
+                      <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={closeSeedPanel}
+                          className="px-4 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSeedOrder(a)}
+                          disabled={
+                            seedSubmitting ||
+                            products.length === 0 ||
+                            seedLines.every((l) => !l.variant_id)
+                          }
+                          className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 text-sm"
+                        >
+                          {seedSubmitting ? 'Sending…' : 'Send product'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </section>
+              </div>
+
+              <div className="sticky bottom-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 px-6 py-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setViewingAffiliate(null);
+                    closeSeedPanel();
+                  }}
+                  className="px-4 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    startEdit(a);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                >
+                  Edit
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Net Terms Change Modal */}
       {showNetTermsModal && (
