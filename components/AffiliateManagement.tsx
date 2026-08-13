@@ -235,6 +235,13 @@ export default function AffiliateManagement() {
   const [applications, setApplications] = useState<AffiliateApplication[]>([]);
   // Free-text name filter for the table; applied as the admin types.
   const [search, setSearch] = useState('');
+  // "Add Affiliate" first asks how: fill the form in, or hand out the signup link.
+  const [showAddChoice, setShowAddChoice] = useState(false);
+  const [showSignupLinkModal, setShowSignupLinkModal] = useState(false);
+  const [copiedSignupLink, setCopiedSignupLink] = useState(false);
+  // Resolved on the client so the link carries whatever host the admin is on
+  // (production, preview or localhost) rather than a hardcoded domain.
+  const [origin, setOrigin] = useState('');
   // Read-only detail view, opened by clicking an affiliate's name in the table.
   const [viewingAffiliate, setViewingAffiliate] = useState<Affiliate | null>(null);
   // "Seed order" panel inside that detail view.
@@ -256,6 +263,11 @@ export default function AffiliateManagement() {
     fetchAffiliates();
     fetchOffers();
     fetchApplications();
+  }, []);
+
+  // Read after mount so the server and client render the same markup.
+  useEffect(() => {
+    setOrigin(window.location.origin);
   }, []);
 
   const fetchAffiliates = async () => {
@@ -771,6 +783,20 @@ export default function AffiliateManagement() {
     setSelectedOfferId('');
   };
 
+  // Public application form. Falls back to a relative path until the origin is
+  // known, so the value is never rendered as an empty string.
+  const signupUrl = origin ? `${origin}/apply` : '/apply';
+
+  const copySignupLink = async () => {
+    try {
+      await navigator.clipboard.writeText(signupUrl);
+      setCopiedSignupLink(true);
+      setTimeout(() => setCopiedSignupLink(false), 2000);
+    } catch (err) {
+      setError('Failed to copy link to clipboard');
+    }
+  };
+
   const getReferralUrl = (affiliateNumber: number | null, format: 'query' | 'path' = 'query'): string => {
     if (!affiliateNumber) return '';
     // Query parameter is now the primary/default format
@@ -911,9 +937,22 @@ export default function AffiliateManagement() {
           )}
           <button
             type="button"
+            onClick={() => setShowSignupLinkModal(true)}
+            className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline font-medium"
+          >
+            Signup form link
+          </button>
+          <button
+            type="button"
             onClick={() => {
-              resetForm();
-              setShowForm(!showForm);
+              // While the form is open this button is the cancel action; only
+              // offer the choice when there is nothing in progress.
+              if (showForm) {
+                setShowForm(false);
+                resetForm();
+              } else {
+                setShowAddChoice(true);
+              }
             }}
             className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700"
           >
@@ -921,6 +960,143 @@ export default function AffiliateManagement() {
           </button>
         </div>
       </div>
+
+      {/* How do you want to add this affiliate? */}
+      {showAddChoice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-lg w-full">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Add an affiliate</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  Set them up yourself, or send them the signup form to fill in.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddChoice(false)}
+                className="text-gray-400 hover:text-gray-600 dark:text-gray-400 shrink-0"
+                aria-label="Close"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddChoice(false);
+                  resetForm();
+                  setShowForm(true);
+                }}
+                className="text-left p-4 rounded-lg border border-gray-200 dark:border-gray-800 hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
+              >
+                <span className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
+                  <svg className="h-5 w-5 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  Manually
+                </span>
+                <span className="block mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  Fill in their details and pick an offer yourself. Best when you already have everything on hand.
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddChoice(false);
+                  setShowSignupLinkModal(true);
+                }}
+                className="text-left p-4 rounded-lg border border-gray-200 dark:border-gray-800 hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
+              >
+                <span className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
+                  <svg className="h-5 w-5 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5m6.328-6.328l1.5-1.5a4 4 0 115.656 5.656l-3 3a4 4 0 01-5.656 0" />
+                  </svg>
+                  By link
+                </span>
+                <span className="block mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  Send them the signup form. Their application lands in Pending applications for you to approve.
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Shareable signup form link */}
+      {showSignupLinkModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-xl w-full">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Affiliate signup link</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  Share this with anyone you want to apply.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSignupLinkModal(false)}
+                className="text-gray-400 hover:text-gray-600 dark:text-gray-400 shrink-0"
+                aria-label="Close"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={signupUrl}
+                  onFocus={(e) => e.currentTarget.select()}
+                  aria-label="Affiliate signup form link"
+                  className="flex-1 min-w-0 px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg bg-gray-50 font-mono text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={copySignupLink}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium shrink-0"
+                >
+                  {copiedSignupLink ? '✓ Copied' : 'Copy'}
+                </button>
+              </div>
+
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Applications submitted through this form appear under{' '}
+                <strong>Pending applications</strong> at the top of this page, where you can
+                complete their setup or reject them.
+              </p>
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-800 flex justify-end gap-2">
+              <a
+                href={signupUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm"
+              >
+                Preview form
+              </a>
+              <button
+                type="button"
+                onClick={() => setShowSignupLinkModal(false)}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showForm && (
         <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
