@@ -233,6 +233,8 @@ export default function AffiliateManagement() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
   const [applications, setApplications] = useState<AffiliateApplication[]>([]);
+  // Free-text name filter for the table; applied as the admin types.
+  const [search, setSearch] = useState('');
   // Read-only detail view, opened by clicking an affiliate's name in the table.
   const [viewingAffiliate, setViewingAffiliate] = useState<Affiliate | null>(null);
   // "Seed order" panel inside that detail view.
@@ -795,6 +797,21 @@ export default function AffiliateManagement() {
     }
   };
 
+  // The whole list is already in memory, so filtering is local and instant —
+  // no refetch as the admin types.
+  const searchTerm = search.trim().toLowerCase();
+  const visibleAffiliates = searchTerm
+    ? affiliates.filter((a) => {
+        // Match the name as displayed, so typing "dana whitfield" works even
+        // though the first and last names are separate columns.
+        const displayName =
+          a.first_name && a.last_name ? `${a.first_name} ${a.last_name}` : a.name;
+        return [displayName, a.name, a.first_name, a.last_name]
+          .filter(Boolean)
+          .some((field) => field!.toLowerCase().includes(searchTerm));
+      })
+    : affiliates;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -855,17 +872,54 @@ export default function AffiliateManagement() {
         </div>
       )}
 
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={() => {
-            resetForm();
-            setShowForm(!showForm);
-          }}
-          className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700"
-        >
-          {showForm ? 'Cancel' : 'Add Affiliate'}
-        </button>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="relative w-full sm:max-w-xs">
+          <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
+            </svg>
+          </span>
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search affiliates by name"
+            aria-label="Search affiliates by name"
+            /* The webkit-search-cancel-button reset hides Safari/Chrome's own
+               clear affordance, leaving only the button below, which renders
+               the same in every browser. */
+            className="w-full pl-9 pr-9 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm [&::-webkit-search-cancel-button]:appearance-none"
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              aria-label="Clear search"
+              className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-3 shrink-0">
+          {searchTerm && (
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              {visibleAffiliates.length} of {affiliates.length}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              resetForm();
+              setShowForm(!showForm);
+            }}
+            className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700"
+          >
+            {showForm ? 'Cancel' : 'Add Affiliate'}
+          </button>
+        </div>
       </div>
 
       {showForm && (
@@ -2257,6 +2311,17 @@ export default function AffiliateManagement() {
       <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
         {affiliates.length === 0 ? (
           <div className="p-8 text-center text-gray-500 dark:text-gray-400">No affiliates yet. Add one to get started.</div>
+        ) : visibleAffiliates.length === 0 ? (
+          <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+            No affiliates match &ldquo;{search.trim()}&rdquo;.{' '}
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              className="text-indigo-600 dark:text-indigo-400 hover:underline font-medium"
+            >
+              Clear search
+            </button>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
@@ -2276,7 +2341,7 @@ export default function AffiliateManagement() {
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
-                {affiliates.map((a) => {
+                {visibleAffiliates.map((a) => {
                   const formatCurrency = (amount: number, currency: string = 'USD') => {
                     return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
                   };
