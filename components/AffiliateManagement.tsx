@@ -937,13 +937,6 @@ export default function AffiliateManagement() {
           )}
           <button
             type="button"
-            onClick={() => setShowSignupLinkModal(true)}
-            className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline font-medium"
-          >
-            Signup form link
-          </button>
-          <button
-            type="button"
             onClick={() => {
               // While the form is open this button is the cancel action; only
               // offer the choice when there is nothing in progress.
