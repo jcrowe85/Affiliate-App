@@ -21,12 +21,17 @@ const environment = getPayPalEnvironment();
 export const paypalClient = new paypal.core.PayPalHttpClient(environment);
 
 export interface PayPalPayoutItem {
-  recipient_type: 'EMAIL';
+  /** EMAIL pays a PayPal balance; PHONE is required for Venmo. */
+  recipient_type: 'EMAIL' | 'PHONE';
   amount: {
     value: string;
     currency: string;
   };
-  receiver: string; // PayPal email
+  /** PayPal email for EMAIL, or a 10-digit US mobile for PHONE. */
+  receiver: string;
+  /** Omit for PayPal. VENMO routes the payment to the Venmo account on that number. */
+  recipient_wallet?: 'PAYPAL' | 'VENMO';
+  /** Delivered to the recipient with the payment, and visible to them. */
   note?: string;
   sender_item_id?: string; // Commission ID or order number
 }

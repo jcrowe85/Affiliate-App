@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { getCurrentAdmin } from '@/lib/auth';
 import { firePostbacks } from '@/lib/postback';
 import { createPayPalPayout, PayPalPayoutItem } from '@/lib/paypal';
+import { isPayoutDestinationVerified } from '@/lib/payout-verification';
 
 // Mark route as dynamic to prevent static analysis during build
 export const dynamic = 'force-dynamic';
@@ -77,11 +78,14 @@ export async function POST(request: NextRequest) {
     // Get affiliate details to check for PayPal email
     const affiliate = await prisma.affiliate.findUnique({
       where: { id: affiliate_id },
-      select: { 
-        paypal_email: true, 
-        email: true, 
+      select: {
+        id: true,
+        paypal_email: true,
+        email: true,
         name: true,
         shopify_shop_id: true,
+        payout_method: true,
+        payout_identifier: true,
       },
     });
 
@@ -110,6 +114,33 @@ export async function POST(request: NextRequest) {
         affiliate_email: affiliate.email,
         details: 'To process PayPal payouts, the affiliate must have a PayPal email address configured in their profile.',
       }, { status: 400 });
+    }
+
+    // A payout to a phone number cannot be recalled once claimed, and PayPal
+    // returns no recipient name — a mistyped number succeeds exactly like a
+    // correct one. So a Venmo destination must be proven before money goes to
+    // it. Email payouts are unaffected: a wrong address bounces rather than
+    // silently paying a stranger.
+    if (affiliate.payout_method === 'venmo') {
+      const destinationProven = affiliate.payout_identifier
+        ? await isPayoutDestinationVerified(
+            affiliate.id,
+            'venmo',
+            affiliate.payout_identifier,
+          )
+        : false;
+
+      if (!destinationProven) {
+        return NextResponse.json({
+          success: false,
+          error: 'Payout number not verified',
+          message: `The Venmo number on file for "${affiliate.name || affiliate.email}" has not been verified. Send a verification payment and have them confirm the code before paying commissions.`,
+          affiliate_name: affiliate.name || affiliate.email,
+          affiliate_email: affiliate.email,
+          details:
+            'Venmo payouts are irreversible once claimed and PayPal does not return the recipient name, so the destination must be proven first.',
+        }, { status: 400 });
+      }
     }
 
     // Calculate total amount

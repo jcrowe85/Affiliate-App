@@ -55,6 +55,7 @@ model Affiliate {
   orders                      OrderAttribution[]
   subscription_attributions   SubscriptionAttribution[]
   VisitorSession              VisitorSession[]
+  payout_verifications        PayoutMethodVerification[]
 
   @@unique([shopify_shop_id, affiliate_number])
   @@unique([shopify_shop_id, merchant_id])
@@ -226,6 +227,45 @@ model PayoutRun {
   updated_at       DateTime              @updatedAt
   commissions      PayoutRunCommission[]
 
+  @@index([shopify_shop_id, status])
+}
+
+/// Append-only record of every attempt to prove an affiliate controls the
+/// payout destination on file.
+///
+/// Deliberately not a boolean on Affiliate: a flag can be set by anyone at any
+/// time and carries no history, so it is worthless if an affiliate later
+/// disputes that a number was ever theirs. These rows are the evidence — who
+/// started it, when, which identifier, and the PayPal transaction that carried
+/// the code.
+model PayoutMethodVerification {
+  id              String    @id @default(cuid())
+  affiliate_id    String
+  /// 'venmo' today; the flow is the same for any identifier-based rail.
+  method          String
+  /// The destination exactly as it was sent to PayPal, so a later change to the
+  /// affiliate's record cannot retroactively alter what was verified.
+  identifier      String
+  /// Only a hash is stored — the plaintext code exists solely in the payment
+  /// the recipient can see.
+  code_hash       String
+  /// pending | verified | expired | failed
+  status          String    @default("pending")
+  attempts        Int       @default(0)
+  expires_at      DateTime
+  verified_at     DateTime?
+  /// The micro-payment that delivered the code.
+  paypal_batch_id String?
+  paypal_item_id  String?
+  /// Admin user id, or 'affiliate' when self-served.
+  initiated_by    String
+  initiated_ip    String?
+  shopify_shop_id String
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  affiliate       Affiliate @relation(fields: [affiliate_id], references: [id], onDelete: Cascade)
+
+  @@index([affiliate_id, created_at])
   @@index([shopify_shop_id, status])
 }
 
