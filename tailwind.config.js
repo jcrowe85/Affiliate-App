@@ -11,6 +11,16 @@ module.exports = {
       colors: {
         background: 'var(--background)',
         foreground: 'var(--foreground)',
+        // Fleur brand, taken from the brand kit's visual grammar. Bone is the
+        // canonical backdrop — the brand deliberately avoids pure white.
+        fleur: {
+          bone: '#E4E0D9',
+          bonedeep: '#DCD7CC',
+          ink: '#323C40',
+          oxblood: '#812221',
+          copper: '#E97100',
+          gold: '#FFEFCC',
+        },
       },
     },
   },
