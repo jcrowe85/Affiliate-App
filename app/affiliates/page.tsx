@@ -136,14 +136,14 @@ export default function AffiliateMarketingPage() {
             </p>
           </div>
 
-          {/* The ritual frame from the brand kit — hands mid-gesture in morning
-              window light, which is the grammar's own translation of "ritual".
-              Native 4:5, so it fills the slot without a crop. */}
+          {/* The store's own product photography. Square rather than 4:5 so the
+              packshot is not cropped into — the carton and the bottles are the
+              composition, and trimming either breaks it. */}
           <div className="relative">
-            <div className="relative aspect-[4/5] w-full overflow-hidden rounded-sm bg-fleur-bonedeep dark:bg-[#242b2e]">
+            <div className="relative aspect-square w-full overflow-hidden rounded-sm bg-[#F1EFEC] dark:bg-[#242b2e]">
               <Image
-                src="/brand/hero-ritual.webp"
-                alt="A woman applying the Bloom derma stamp along her part in morning light, with the serum bottle on the counter beside her."
+                src="/brand/bloom-trio.webp"
+                alt="Three bottles of Bloom peptide hair and scalp serum in amber glass beside the oxblood Fleur carton."
                 fill
                 priority
                 sizes="(max-width: 1024px) 100vw, 45vw"
@@ -200,10 +200,10 @@ export default function AffiliateMarketingPage() {
             </p>
           </div>
           <div className="space-y-10">
-            <div className="relative aspect-square w-full overflow-hidden rounded-sm bg-fleur-bonedeep/60 dark:bg-[#242b2e]">
+            <div className="relative aspect-[4/3] w-full overflow-hidden rounded-sm bg-[#F1EFEC] dark:bg-[#242b2e]">
               <Image
-                src="/brand/bloom-bottle.webp"
-                alt="The Bloom peptide hair and scalp serum bottle: amber-red glass with a matte charcoal dropper cap."
+                src="/brand/bloom-single.webp"
+                alt="A single bottle of Bloom peptide hair and scalp serum beside its oxblood carton."
                 fill
                 sizes="(max-width: 1024px) 100vw, 45vw"
                 className="object-cover"
