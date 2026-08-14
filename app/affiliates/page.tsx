@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 
 /**
@@ -135,30 +136,23 @@ export default function AffiliateMarketingPage() {
             </p>
           </div>
 
-          {/* Product-truth panel. Deliberately typographic rather than a stock
-              photo: the brand bible rules out generic beauty imagery, and a
-              wrong image is worse than none. */}
+          {/* The ritual frame from the brand kit — hands mid-gesture in morning
+              window light, which is the grammar's own translation of "ritual".
+              Native 4:5, so it fills the slot without a crop. */}
           <div className="relative">
-            <div className="aspect-[4/5] w-full rounded-sm bg-gradient-to-br from-fleur-bonedeep to-[#cfc9bd] dark:from-[#242b2e] dark:to-[#1f2528] flex items-center justify-center">
-              <div className="px-10 text-center">
-                <p className="text-xs uppercase tracking-[0.26em] text-fleur-ink/45 dark:text-fleur-bone/45">
-                  Bloom
-                </p>
-                <p className="mt-5 text-2xl leading-snug text-fleur-ink/80 dark:text-fleur-bone/80">
-                  Peptide hair &amp; scalp serum
-                </p>
-                <div className="my-7 flex justify-center">
-                  <Rule />
-                </div>
-                <p className="text-sm leading-relaxed text-fleur-ink/60 dark:text-fleur-bone/60">
-                  Six copper peptides, including GHK-Cu and AHK-Cu, in a
-                  lightweight daily formula.
-                </p>
-                <p className="mt-8 text-sm italic tracking-wide text-fleur-ink/50 dark:text-fleur-bone/50">
-                  nourish. strengthen. fleurish.
-                </p>
-              </div>
+            <div className="relative aspect-[4/5] w-full overflow-hidden rounded-sm bg-fleur-bonedeep dark:bg-[#242b2e]">
+              <Image
+                src="/brand/hero-ritual.webp"
+                alt="A woman applying the Bloom derma stamp along her part in morning light, with the serum bottle on the counter beside her."
+                fill
+                priority
+                sizes="(max-width: 1024px) 100vw, 45vw"
+                className="object-cover"
+              />
             </div>
+            <p className="mt-4 text-sm italic tracking-wide text-fleur-ink/50 dark:text-fleur-bone/50">
+              nourish. strengthen. fleurish.
+            </p>
           </div>
         </div>
       </section>
@@ -205,7 +199,17 @@ export default function AffiliateMarketingPage() {
               customer you introduce is one who tends to reorder.
             </p>
           </div>
-          <dl className="grid grid-cols-2 gap-x-8 gap-y-10 self-center">
+          <div className="space-y-10">
+            <div className="relative aspect-square w-full overflow-hidden rounded-sm bg-fleur-bonedeep/60 dark:bg-[#242b2e]">
+              <Image
+                src="/brand/bloom-bottle.webp"
+                alt="The Bloom peptide hair and scalp serum bottle: amber-red glass with a matte charcoal dropper cap."
+                fill
+                sizes="(max-width: 1024px) 100vw, 45vw"
+                className="object-cover"
+              />
+            </div>
+          <dl className="grid grid-cols-2 gap-x-8 gap-y-10">
             {[
               ['Hero product', 'Bloom peptide serum'],
               ['Category', 'Copper-peptide haircare'],
@@ -222,6 +226,7 @@ export default function AffiliateMarketingPage() {
               </div>
             ))}
           </dl>
+          </div>
         </div>
       </section>
 
