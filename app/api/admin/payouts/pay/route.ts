@@ -124,16 +124,56 @@ export async function POST(request: NextRequest) {
     let paypalErrorDetails: any = null;
 
     try {
-      const payoutItems: PayPalPayoutItem[] = commissions.map(c => ({
-        recipient_type: 'EMAIL',
-        amount: {
-          value: c.amount.toString(),
-          currency: c.currency || 'USD',
+      // One payout item per currency, not per commission.
+      //
+      // Every item in a batch is a separate transaction and carries its own
+      // fee. A percentage fee makes that free — ten items or one costs the
+      // same — but a flat per-transaction fee (Venmo charges $0.25) multiplies
+      // by the number of commissions. Paying an affiliate's ten commissions
+      // individually would cost $2.50 in fees instead of $0.25.
+      //
+      // Grouping is by currency because an item carries a single currency and
+      // summing across currencies would be meaningless.
+      const byCurrency = new Map<string, typeof commissions>();
+      for (const c of commissions) {
+        const cur = c.currency || 'USD';
+        const group = byCurrency.get(cur);
+        if (group) group.push(c);
+        else byCurrency.set(cur, [c]);
+      }
+
+      const payoutItems: PayPalPayoutItem[] = Array.from(byCurrency.entries()).map(
+        ([itemCurrency, group]) => {
+          const groupTotal = group.reduce(
+            (sum, c) => sum + parseFloat(c.amount.toString()),
+            0,
+          );
+          const orderRefs = group.map(
+            (c) => c.order_attribution?.shopify_order_number || c.shopify_order_id,
+          );
+          // PayPal caps the note length, so list a handful and count the rest
+          // rather than risking a rejected item on a large payout.
+          const shown = orderRefs.slice(0, 20).join(', ');
+          const note =
+            group.length === 1
+              ? `Commission for order ${orderRefs[0]}`
+              : `${group.length} commissions — orders ${shown}` +
+                (orderRefs.length > 20 ? ` +${orderRefs.length - 20} more` : '');
+
+          return {
+            recipient_type: 'EMAIL' as const,
+            amount: {
+              value: groupTotal.toFixed(2),
+              currency: itemCurrency,
+            },
+            receiver: affiliate.paypal_email!,
+            note,
+            // Unique within the batch; the per-commission breakdown is kept in
+            // PayoutRunCommission rather than in PayPal.
+            sender_item_id: `${affiliate_id}_${itemCurrency}`,
+          };
         },
-        receiver: affiliate.paypal_email!,
-        note: `Commission for order ${c.order_attribution?.shopify_order_number || c.shopify_order_id}`,
-        sender_item_id: c.id,
-      }));
+      );
 
       // Create unique batch ID
       const batchId = `PAYOUT_${affiliate_id}_${Date.now()}`;
