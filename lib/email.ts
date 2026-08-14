@@ -221,3 +221,41 @@ export async function sendNewApplicationAdminEmail(
     ),
   });
 }
+
+/**
+ * Delivers a payout-verification code to a PayPal address.
+ *
+ * PayPal payouts are addressed by email, so proving control of the inbox proves
+ * who receives the money — the same thing a code in a payment note would prove,
+ * without the $0.25 fee or the dependence on PayPal surfacing the note.
+ *
+ * Venmo cannot use this: its destination is a phone number, and with no SMS
+ * provider the payment note is the only channel that reaches it.
+ */
+export async function sendPayoutVerificationCodeEmail(opts: {
+  to: string;
+  code: string;
+}): Promise<boolean> {
+  const code = escapeHtml(opts.code);
+  return send({
+    to: opts.to,
+    subject: `${opts.code} is your Fleur payout verification code`,
+    html: layout(
+      'Confirm your payout email',
+      `<p style="margin:0 0 12px;font-size:14px;line-height:22px;">
+         Enter this code to confirm that commissions should be paid to this
+         PayPal address:
+       </p>
+       <p style="margin:0 0 16px;font-size:32px;font-weight:700;letter-spacing:6px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">
+         ${code}
+       </p>
+       <p style="margin:0 0 12px;font-size:14px;line-height:22px;">
+         The code expires in an hour.
+       </p>
+       <p style="margin:0;font-size:13px;line-height:20px;color:#6b7280;">
+         If you didn't apply to the Fleur affiliate program, ignore this email —
+         nothing has been set up and no payment will be sent.
+       </p>`
+    ),
+  });
+}

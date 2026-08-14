@@ -289,10 +289,9 @@ export default function AffiliateApplyPage() {
               Method of payment
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              Choose how you&apos;d like to receive your commissions. We&apos;ll send a
-              1&cent; payment to confirm it works — open it and enter the code from the
-              payment note. This is the only way we can be certain your money reaches
-              you and not someone else.
+              Choose how you&apos;d like to receive your commissions, then confirm it
+              with a short code. This is the only way we can be certain your money
+              reaches you and not someone else.
             </p>
 
             <div className="flex gap-2 mb-4">
@@ -327,7 +326,7 @@ export default function AffiliateApplyPage() {
                   text={
                     payoutMethod === 'venmo'
                       ? 'The US mobile number your Venmo account uses. We send commissions to this number, so it must be exactly right — payments to a wrong number cannot be recovered.'
-                      : 'The email address on your PayPal account. We send commissions here.'
+                      : 'The email address on your PayPal account. We send commissions here, and we will email a code to it to confirm.'
                   }
                 />
               </label>
@@ -353,7 +352,13 @@ export default function AffiliateApplyPage() {
                     disabled={sendingCode || !payoutIdentifier.trim() || !formData.email.trim()}
                     className="shrink-0 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
                   >
-                    {sendingCode ? 'Sending…' : verificationId ? 'Resend' : 'Send 1¢'}
+                    {sendingCode
+                      ? 'Sending…'
+                      : verificationId
+                        ? 'Resend'
+                        : payoutMethod === 'venmo'
+                          ? 'Send 1¢'
+                          : 'Email code'}
                   </button>
                 )}
               </div>
@@ -383,9 +388,16 @@ export default function AffiliateApplyPage() {
             ) : verificationId ? (
               <div className="mt-3 rounded-md border border-indigo-300 dark:border-indigo-700/60 bg-indigo-50 dark:bg-indigo-900/20 p-3">
                 <p className="text-sm text-indigo-900 dark:text-indigo-200">
-                  We sent 1&cent; to <strong>{payoutIdentifier}</strong>. Open{' '}
-                  {payoutMethod === 'venmo' ? 'Venmo' : 'PayPal'} and read the 6-digit code
-                  in the payment note.
+                  {payoutMethod === 'venmo' ? (
+                    <>
+                      We sent 1&cent; to <strong>{payoutIdentifier}</strong>. Open Venmo and
+                      read the 6-digit code in the payment note.
+                    </>
+                  ) : (
+                    <>
+                      We emailed a 6-digit code to <strong>{payoutIdentifier}</strong>.
+                    </>
+                  )}
                 </p>
                 <div className="mt-2 flex gap-2">
                   <input
@@ -407,7 +419,7 @@ export default function AffiliateApplyPage() {
                   </button>
                 </div>
                 <p className="mt-2 text-xs text-indigo-800 dark:text-indigo-300">
-                  It can take a minute to arrive. The code expires in an hour.
+                  It can take a minute to arrive{payoutMethod === 'paypal' ? ' — check spam too' : ''}. The code expires in an hour.
                 </p>
               </div>
             ) : null}

@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { prisma } from './db';
 import { createPayPalPayout, PayPalPayoutItem } from './paypal';
+import { sendPayoutVerificationCodeEmail } from './email';
 
 /**
  * Proves an affiliate controls the payout destination before real money is sent
@@ -11,11 +12,15 @@ import { createPayPalPayout, PayPalPayoutItem } from './paypal';
  * a successful payment to the right one. So the destination has to be proven
  * before it is trusted.
  *
- * The code is delivered *through the payout rail itself*: a one-cent Venmo
- * payment whose note carries the code. That proves more than an SMS code would —
- * not just that someone holds the phone, but that the number resolves to a Venmo
- * account which can actually receive money from us. It is the same path the real
- * payout will take.
+ * Delivery differs by rail, because what proves control differs:
+ *
+ * - Venmo pays a phone number. With no SMS provider, the only channel that
+ *   reaches it is a one-cent payment whose note carries the code — which proves
+ *   more than a text would, since it demonstrates the number resolves to a Venmo
+ *   account that can actually receive money from us.
+ * - PayPal pays an email address, so emailing the code proves exactly the same
+ *   thing: whoever reads that inbox is who the money reaches. No fee, and no
+ *   dependence on PayPal surfacing a payment note.
  */
 
 /** How long a code stays usable. Long enough to notice the payment, short enough to matter. */
@@ -36,6 +41,8 @@ export type PayoutMethod = 'venmo' | 'paypal';
  */
 const MAX_SENDS_PER_IP_PER_HOUR = 5;
 const MAX_SENDS_PER_IDENTIFIER_PER_DAY = 3;
+/** Emailed codes cost nothing to send, so the cap here is about spam, not spend. */
+const MAX_EMAIL_SENDS_PER_IDENTIFIER_PER_DAY = 10;
 const MAX_SENDS_PER_APPLICANT_PER_DAY = 5;
 
 /** Normalises a destination for the given rail so formatting never masks a match. */
@@ -51,6 +58,7 @@ export function isValidIdentifier(method: PayoutMethod, raw: string): boolean {
 
 async function assertWithinSpendLimits(opts: {
   identifier: string;
+  method: PayoutMethod;
   ip?: string | null;
   applicantEmail?: string | null;
 }): Promise<void> {
@@ -69,12 +77,18 @@ async function assertWithinSpendLimits(opts: {
     }
   }
 
+  const perIdentifierCap =
+    opts.method === 'paypal'
+      ? MAX_EMAIL_SENDS_PER_IDENTIFIER_PER_DAY
+      : MAX_SENDS_PER_IDENTIFIER_PER_DAY;
   const forIdentifier = await prisma.payoutMethodVerification.count({
     where: { identifier: opts.identifier, created_at: { gte: dayAgo } },
   });
-  if (forIdentifier >= MAX_SENDS_PER_IDENTIFIER_PER_DAY) {
+  if (forIdentifier >= perIdentifierCap) {
     throw new PayoutVerificationError(
-      'This destination has been sent too many verification payments today. Try again tomorrow.',
+      opts.method === 'paypal'
+        ? 'This address has been sent too many codes today. Try again tomorrow.'
+        : 'This destination has been sent too many verification payments today. Try again tomorrow.',
       429,
     );
   }
@@ -185,6 +199,7 @@ export async function startVerification(opts: {
 
   await assertWithinSpendLimits({
     identifier,
+    method: opts.method,
     ip: opts.initiatedIp,
     applicantEmail,
   });
@@ -218,29 +233,41 @@ export async function startVerification(opts: {
     },
   });
 
-  // Both rails carry the code in the note the recipient sees; only the
-  // addressing differs.
-  const items: PayPalPayoutItem[] =
-    opts.method === 'venmo'
-      ? [
-          {
-            recipient_type: 'PHONE',
-            recipient_wallet: 'VENMO',
-            amount: { value: VERIFICATION_AMOUNT, currency: 'USD' },
-            receiver: identifier,
-            note: `Fleur verification code ${code} — enter this to confirm your payout number.`,
-            sender_item_id: verification.id,
-          },
-        ]
-      : [
-          {
-            recipient_type: 'EMAIL',
-            amount: { value: VERIFICATION_AMOUNT, currency: 'USD' },
-            receiver: identifier,
-            note: `Fleur verification code ${code} — enter this to confirm your payout email.`,
-            sender_item_id: verification.id,
-          },
-        ];
+  // A PayPal destination is an email address, so the code can simply be
+  // emailed: proving control of the inbox proves who receives the payout, which
+  // is the same thing a payment note proves — without the fee, and without
+  // depending on PayPal surfacing the note.
+  if (opts.method === 'paypal') {
+    const sent = await sendPayoutVerificationCodeEmail({ to: identifier, code });
+    if (!sent) {
+      await prisma.payoutMethodVerification.update({
+        where: { id: verification.id },
+        data: { status: 'failed' },
+      });
+      throw new PayoutVerificationError(
+        'Could not send the verification email. Check the address and try again.',
+        502,
+      );
+    }
+    return {
+      verification_id: verification.id,
+      paypal_batch_id: null,
+      sent_to: identifier,
+    };
+  }
+
+  // Venmo's destination is a phone number and there is no SMS provider, so the
+  // payment note is the only channel that reaches it.
+  const items: PayPalPayoutItem[] = [
+    {
+      recipient_type: 'PHONE',
+      recipient_wallet: 'VENMO',
+      amount: { value: VERIFICATION_AMOUNT, currency: 'USD' },
+      receiver: identifier,
+      note: `Fleur verification code ${code} — enter this to confirm your payout number.`,
+      sender_item_id: verification.id,
+    },
+  ];
 
   try {
     // Keyed off the verification row, not the clock, so a retried request cannot
