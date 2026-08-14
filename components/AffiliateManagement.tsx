@@ -510,17 +510,22 @@ export default function AffiliateManagement() {
     handleUpdate(syntheticEvent, recalculate);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this affiliate?')) return;
+  /** Resolves true only when the affiliate is actually gone, so callers can
+   *  decide whether to close the view they were deleting from. */
+  const handleDelete = async (id: string): Promise<boolean> => {
+    if (!confirm('Are you sure you want to delete this affiliate?')) return false;
     try {
       const res = await fetch(`/api/admin/affiliates/${id}`, { method: 'DELETE' });
-      if (res.ok) await fetchAffiliates();
-      else {
-        const data = await res.json();
-        alert(data.error || 'Failed to delete');
+      if (res.ok) {
+        await fetchAffiliates();
+        return true;
       }
+      const data = await res.json();
+      alert(data.error || 'Failed to delete');
+      return false;
     } catch (err) {
       alert('Failed to delete affiliate');
+      return false;
     }
   };
 
@@ -937,19 +942,10 @@ export default function AffiliateManagement() {
           )}
           <button
             type="button"
-            onClick={() => {
-              // While the form is open this button is the cancel action; only
-              // offer the choice when there is nothing in progress.
-              if (showForm) {
-                setShowForm(false);
-                resetForm();
-              } else {
-                setShowAddChoice(true);
-              }
-            }}
+            onClick={() => setShowAddChoice(true)}
             className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700"
           >
-            {showForm ? 'Cancel' : 'Add Affiliate'}
+            Add Affiliate
           </button>
         </div>
       </div>
@@ -1091,9 +1087,13 @@ export default function AffiliateManagement() {
         </div>
       )}
 
+      {/* Add / edit runs in its own screen rather than inline above the table,
+          so a long form is not read against a list of unrelated rows. */}
       {showForm && (
-        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800">
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 overflow-y-auto">
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-gray-200 dark:border-gray-800 overflow-hidden max-w-3xl w-full my-8">
+          <div className="sticky top-0 z-10 bg-white dark:bg-gray-900 px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-start justify-between gap-4">
+            <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
               {editingAffiliate
                 ? 'Edit Affiliate'
@@ -1108,6 +1108,17 @@ export default function AffiliateManagement() {
                 offer and adjust anything else, then create the account.
               </p>
             )}
+            </div>
+            <button
+              type="button"
+              onClick={() => { setShowForm(false); resetForm(); }}
+              className="text-gray-400 hover:text-gray-600 dark:text-gray-400 shrink-0"
+              aria-label="Close"
+            >
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
           <form
             onSubmit={(e) => {
@@ -2141,6 +2152,7 @@ export default function AffiliateManagement() {
             </div>
           </form>
         </div>
+        </div>
       )}
 
       {showAddOfferModal && (
@@ -2506,7 +2518,6 @@ export default function AffiliateManagement() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Orders</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">AOV</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Pending Conversions</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
@@ -2581,22 +2592,6 @@ export default function AffiliateManagement() {
                         {a.stats.aov > 0 ? formatCurrency(a.stats.aov, a.stats.currency) : '—'}
                     </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">{a.stats.pending_conversions}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
-                      <button
-                          type="button"
-                          onClick={() => startEdit(a)}
-                          className="text-indigo-600 hover:text-indigo-800 font-medium"
-                      >
-                        Edit
-                      </button>
-                      <button
-                          type="button"
-                          onClick={() => handleDelete(a.id)}
-                          className="text-red-600 hover:text-red-800 font-medium"
-                      >
-                        Delete
-                      </button>
-                    </td>
                   </tr>
                   );
                 })}
@@ -2978,7 +2973,22 @@ export default function AffiliateManagement() {
                 </section>
               </div>
 
-              <div className="sticky bottom-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 px-6 py-4 flex justify-end gap-2">
+              <div className="sticky bottom-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 px-6 py-4 flex items-center justify-between gap-2">
+                {/* Kept apart from Close/Edit so it is not hit by accident. */}
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const removed = await handleDelete(a.id);
+                    if (removed) {
+                      setViewingAffiliate(null);
+                      closeSeedPanel();
+                    }
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-red-600 hover:text-red-800 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
+                >
+                  Delete affiliate
+                </button>
+                <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -2992,13 +3002,15 @@ export default function AffiliateManagement() {
                 <button
                   type="button"
                   onClick={() => {
+                    // The edit form is its own screen now, so there is nothing
+                    // below to scroll to.
                     startEdit(a);
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
                   className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
                 >
                   Edit
                 </button>
+                </div>
               </div>
             </div>
           </div>
