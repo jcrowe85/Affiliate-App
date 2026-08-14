@@ -31,4 +31,9 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+// BotID sits in front of the public application endpoints. It matters most for
+// payout verification, where each request spends real money on PayPal fees, so
+// scripted traffic is expensive rather than merely noisy.
+const { withBotId } = require('botid/next/config');
+
+module.exports = withBotId(nextConfig);

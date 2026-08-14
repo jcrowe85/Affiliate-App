@@ -5,6 +5,7 @@ import {
   normalizeIdentifier,
 } from '@/lib/payout-verification';
 import { resolveShopId } from '@/lib/request-context';
+import { checkBotId } from 'botid/server';
 import { hashPassword } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import {
@@ -28,6 +29,11 @@ const MIN_PASSWORD_LENGTH = 8;
  */
 export async function POST(request: NextRequest) {
   try {
+    const { isBot } = await checkBotId();
+    if (isBot) {
+      return NextResponse.json({ error: 'Request blocked' }, { status: 403 });
+    }
+
     const body = await request.json();
     const {
       first_name,

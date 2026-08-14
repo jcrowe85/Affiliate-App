@@ -2,6 +2,18 @@
 
 import Link from 'next/link';
 import { useState, FormEvent } from 'react';
+import { BotIdClient } from 'botid/client';
+
+/**
+ * Endpoints this page calls that must not be reachable by a script.
+ *
+ * verify-payout is the one that matters: every call spends a $0.25 PayPal fee,
+ * so unattended abuse costs real money rather than just filling a table.
+ */
+const PROTECTED_ROUTES = [
+  { path: '/api/affiliate/verify-payout', method: 'POST' },
+  { path: '/api/affiliate/apply', method: 'POST' },
+];
 
 const defaultForm = {
   first_name: '',
@@ -221,6 +233,7 @@ export default function AffiliateApplyPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-12 px-4 sm:px-6 lg:px-8">
+      <BotIdClient protect={PROTECTED_ROUTES} />
       <div className="max-w-2xl mx-auto">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-extrabold text-gray-900 dark:text-gray-100">

@@ -6,6 +6,7 @@ import {
   startVerification,
 } from '@/lib/payout-verification';
 import { getTrustedClientIp, isPlatformHosted, resolveShopId } from '@/lib/request-context';
+import { checkBotId } from 'botid/server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -34,6 +35,14 @@ const confirmSchema = z.object({
  */
 export async function POST(request: NextRequest) {
   try {
+    // Checked before anything else: a request that spends money should be
+    // turned away before it can reach the code that spends it. This is a no-op
+    // in local development.
+    const { isBot } = await checkBotId();
+    if (isBot) {
+      return NextResponse.json({ error: 'Request blocked' }, { status: 403 });
+    }
+
     const raw = await request.json();
     const parsed = z.union([startSchema, confirmSchema]).safeParse(raw);
     if (!parsed.success) {
