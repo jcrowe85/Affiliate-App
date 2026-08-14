@@ -29,6 +29,9 @@ const MIN_PASSWORD_LENGTH = 8;
  */
 export async function POST(request: NextRequest) {
   try {
+    // Basic is deliberate here. This endpoint writes a row rather than spending
+    // money, and it is only reachable after verification has already passed
+    // Deep Analysis, so paying for a second deep check buys little.
     const { isBot } = await checkBotId();
     if (isBot) {
       return NextResponse.json({ error: 'Request blocked' }, { status: 403 });

@@ -38,7 +38,13 @@ export async function POST(request: NextRequest) {
     // Checked before anything else: a request that spends money should be
     // turned away before it can reach the code that spends it. This is a no-op
     // in local development.
-    const { isBot } = await checkBotId();
+    //
+    // Deep Analysis rather than basic, and only here. It bills $1 per thousand
+    // calls — a tenth of a cent — against $0.26 lost to a single abusive
+    // verification, so it pays for itself if it catches one bot in 260.
+    const { isBot } = await checkBotId({
+      advancedOptions: { checkLevel: 'deepAnalysis' },
+    });
     if (isBot) {
       return NextResponse.json({ error: 'Request blocked' }, { status: 403 });
     }
