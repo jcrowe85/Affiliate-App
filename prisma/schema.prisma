@@ -71,6 +71,10 @@ model AffiliateApplication {
   company         String?
   email           String
   paypal_email    String?
+  /// 'venmo' | 'paypal' — the rail the applicant chose and proved.
+  payout_method     String?
+  /// Mobile number for venmo, PayPal email for paypal. Normalised.
+  payout_identifier String?
   address_line1   String?
   address_line2   String?
   city            String?
@@ -240,7 +244,11 @@ model PayoutRun {
 /// the code.
 model PayoutMethodVerification {
   id              String    @id @default(cuid())
-  affiliate_id    String
+  /// Null while an applicant is verifying on the public form, before any
+  /// affiliate record exists. Set once they are approved.
+  affiliate_id    String?
+  /// Identifies a pre-signup verification, since there is no affiliate to key on.
+  applicant_email String?
   /// 'venmo' today; the flow is the same for any identifier-based rail.
   method          String
   /// The destination exactly as it was sent to PayPal, so a later change to the
@@ -263,10 +271,14 @@ model PayoutMethodVerification {
   shopify_shop_id String
   created_at      DateTime  @default(now())
   updated_at      DateTime  @updatedAt
-  affiliate       Affiliate @relation(fields: [affiliate_id], references: [id], onDelete: Cascade)
+  affiliate       Affiliate? @relation(fields: [affiliate_id], references: [id], onDelete: Cascade)
 
   @@index([affiliate_id, created_at])
   @@index([shopify_shop_id, status])
+  @@index([applicant_email, created_at])
+  /// Supports the per-IP spend cap on the public form.
+  @@index([initiated_ip, created_at])
+  @@index([identifier, created_at])
 }
 
 model PayoutRunCommission {

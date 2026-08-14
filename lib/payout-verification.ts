@@ -25,7 +25,72 @@ const MAX_ATTEMPTS = 5;
 /** Cent-value carrier for the code. The $0.25 PayPal fee dominates either way. */
 const VERIFICATION_AMOUNT = '0.01';
 
-export type PayoutMethod = 'venmo';
+export type PayoutMethod = 'venmo' | 'paypal';
+
+/**
+ * Spend caps for the public application form.
+ *
+ * Every send costs a $0.25 PayPal fee, so an unauthenticated endpoint that
+ * triggers one is a way to spend our money at will. These bound the damage: a
+ * scripted attack can burn a few dollars, not a few thousand.
+ */
+const MAX_SENDS_PER_IP_PER_HOUR = 5;
+const MAX_SENDS_PER_IDENTIFIER_PER_DAY = 3;
+const MAX_SENDS_PER_APPLICANT_PER_DAY = 5;
+
+/** Normalises a destination for the given rail so formatting never masks a match. */
+export function normalizeIdentifier(method: PayoutMethod, raw: string): string {
+  return method === 'venmo' ? normalizePhone(raw) : raw.trim().toLowerCase();
+}
+
+export function isValidIdentifier(method: PayoutMethod, raw: string): boolean {
+  return method === 'venmo'
+    ? isValidUsMobile(raw)
+    : /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(raw.trim());
+}
+
+async function assertWithinSpendLimits(opts: {
+  identifier: string;
+  ip?: string | null;
+  applicantEmail?: string | null;
+}): Promise<void> {
+  const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+  if (opts.ip) {
+    const fromIp = await prisma.payoutMethodVerification.count({
+      where: { initiated_ip: opts.ip, created_at: { gte: hourAgo } },
+    });
+    if (fromIp >= MAX_SENDS_PER_IP_PER_HOUR) {
+      throw new PayoutVerificationError(
+        'Too many verification attempts from this connection. Try again in an hour.',
+        429,
+      );
+    }
+  }
+
+  const forIdentifier = await prisma.payoutMethodVerification.count({
+    where: { identifier: opts.identifier, created_at: { gte: dayAgo } },
+  });
+  if (forIdentifier >= MAX_SENDS_PER_IDENTIFIER_PER_DAY) {
+    throw new PayoutVerificationError(
+      'This destination has been sent too many verification payments today. Try again tomorrow.',
+      429,
+    );
+  }
+
+  if (opts.applicantEmail) {
+    const forApplicant = await prisma.payoutMethodVerification.count({
+      where: { applicant_email: opts.applicantEmail, created_at: { gte: dayAgo } },
+    });
+    if (forApplicant >= MAX_SENDS_PER_APPLICANT_PER_DAY) {
+      throw new PayoutVerificationError(
+        'Too many verification attempts for this application. Try again tomorrow.',
+        429,
+      );
+    }
+  }
+}
 
 export class PayoutVerificationError extends Error {
   constructor(message: string, readonly status: number = 400) {
@@ -87,31 +152,51 @@ export async function isPayoutDestinationVerified(
  * from a previous number can never be used to verify a new one.
  */
 export async function startVerification(opts: {
-  affiliateId: string;
+  /** Set for an existing affiliate; omitted while an applicant is still applying. */
+  affiliateId?: string | null;
+  /** Ties a pre-signup verification to the application being filled in. */
+  applicantEmail?: string | null;
   method: PayoutMethod;
   identifier: string;
   shopifyShopId: string;
   initiatedBy: string;
   initiatedIp?: string | null;
 }): Promise<{ verification_id: string; paypal_batch_id: string | null; sent_to: string }> {
-  if (opts.method !== 'venmo') {
+  if (opts.method !== 'venmo' && opts.method !== 'paypal') {
     throw new PayoutVerificationError(`Unsupported payout method: ${opts.method}`);
   }
-  if (!isValidUsMobile(opts.identifier)) {
+  if (!isValidIdentifier(opts.method, opts.identifier)) {
     throw new PayoutVerificationError(
-      'Enter a 10-digit US mobile number. Venmo payouts are US-only.',
+      opts.method === 'venmo'
+        ? 'Enter a 10-digit US mobile number. Venmo payouts are US-only.'
+        : 'Enter a valid PayPal email address.',
     );
   }
 
-  const phone = normalizePhone(opts.identifier);
+  const identifier = normalizeIdentifier(opts.method, opts.identifier);
+  const applicantEmail = opts.applicantEmail?.trim().toLowerCase() || null;
 
-  if (await isPayoutDestinationVerified(opts.affiliateId, opts.method, phone)) {
-    throw new PayoutVerificationError('This number is already verified.', 409);
+  if (
+    opts.affiliateId &&
+    (await isPayoutDestinationVerified(opts.affiliateId, opts.method, identifier))
+  ) {
+    throw new PayoutVerificationError('This destination is already verified.', 409);
   }
 
-  // A stale pending code must not be usable against a different number.
+  await assertWithinSpendLimits({
+    identifier,
+    ip: opts.initiatedIp,
+    applicantEmail,
+  });
+
+  // A stale pending code must not be usable against a different destination.
   await prisma.payoutMethodVerification.updateMany({
-    where: { affiliate_id: opts.affiliateId, status: 'pending' },
+    where: {
+      status: 'pending',
+      ...(opts.affiliateId
+        ? { affiliate_id: opts.affiliateId }
+        : { applicant_email: applicantEmail }),
+    },
     data: { status: 'expired' },
   });
 
@@ -120,9 +205,10 @@ export async function startVerification(opts: {
 
   const verification = await prisma.payoutMethodVerification.create({
     data: {
-      affiliate_id: opts.affiliateId,
+      affiliate_id: opts.affiliateId ?? null,
+      applicant_email: applicantEmail,
       method: opts.method,
-      identifier: phone,
+      identifier,
       code_hash: hashCode(code),
       status: 'pending',
       expires_at: expiresAt,
@@ -132,16 +218,29 @@ export async function startVerification(opts: {
     },
   });
 
-  const items: PayPalPayoutItem[] = [
-    {
-      recipient_type: 'PHONE',
-      recipient_wallet: 'VENMO',
-      amount: { value: VERIFICATION_AMOUNT, currency: 'USD' },
-      receiver: phone,
-      note: `Fleur verification code ${code} — enter this to confirm your payout number.`,
-      sender_item_id: verification.id,
-    },
-  ];
+  // Both rails carry the code in the note the recipient sees; only the
+  // addressing differs.
+  const items: PayPalPayoutItem[] =
+    opts.method === 'venmo'
+      ? [
+          {
+            recipient_type: 'PHONE',
+            recipient_wallet: 'VENMO',
+            amount: { value: VERIFICATION_AMOUNT, currency: 'USD' },
+            receiver: identifier,
+            note: `Fleur verification code ${code} — enter this to confirm your payout number.`,
+            sender_item_id: verification.id,
+          },
+        ]
+      : [
+          {
+            recipient_type: 'EMAIL',
+            amount: { value: VERIFICATION_AMOUNT, currency: 'USD' },
+            receiver: identifier,
+            note: `Fleur verification code ${code} — enter this to confirm your payout email.`,
+            sender_item_id: verification.id,
+          },
+        ];
 
   try {
     // Keyed off the verification row, not the clock, so a retried request cannot
@@ -159,7 +258,7 @@ export async function startVerification(opts: {
     return {
       verification_id: updated.id,
       paypal_batch_id: updated.paypal_batch_id,
-      sent_to: phone,
+      sent_to: identifier,
     };
   } catch (err: any) {
     await prisma.payoutMethodVerification.update({
@@ -178,13 +277,21 @@ export async function startVerification(opts: {
  * as much a matter of record as a right one.
  */
 export async function confirmVerification(opts: {
-  affiliateId: string;
+  /** Either identifies an affiliate's attempt, or the specific pre-signup row. */
+  affiliateId?: string | null;
+  verificationId?: string | null;
   code: string;
-}): Promise<{ verified: true; identifier: string }> {
-  const verification = await prisma.payoutMethodVerification.findFirst({
-    where: { affiliate_id: opts.affiliateId, status: 'pending' },
-    orderBy: { created_at: 'desc' },
-  });
+}): Promise<{ verified: true; identifier: string; method: string; verification_id: string }> {
+  // A pre-signup applicant has no session, so the unguessable row id is what
+  // proves the code being answered is theirs.
+  const verification = opts.verificationId
+    ? await prisma.payoutMethodVerification.findFirst({
+        where: { id: opts.verificationId, status: 'pending' },
+      })
+    : await prisma.payoutMethodVerification.findFirst({
+        where: { affiliate_id: opts.affiliateId ?? undefined, status: 'pending' },
+        orderBy: { created_at: 'desc' },
+      });
 
   if (!verification) {
     throw new PayoutVerificationError(
@@ -233,5 +340,43 @@ export async function confirmVerification(opts: {
     data: { status: 'verified', verified_at: new Date(), attempts: { increment: 1 } },
   });
 
-  return { verified: true, identifier: verification.identifier };
+  return {
+    verified: true,
+    identifier: verification.identifier,
+    method: verification.method,
+    verification_id: verification.id,
+  };
+}
+
+/**
+ * Confirms a pre-signup verification really is verified and matches what the
+ * application claims, before the choice is written to the application.
+ *
+ * The client hands back the row id it was given; trusting the submitted method
+ * and identifier without rechecking would let anyone claim a verified
+ * destination they never proved.
+ */
+export async function assertApplicantVerification(opts: {
+  verificationId: string;
+  method: PayoutMethod;
+  identifier: string;
+  applicantEmail: string;
+}): Promise<void> {
+  const row = await prisma.payoutMethodVerification.findUnique({
+    where: { id: opts.verificationId },
+  });
+
+  const expected = normalizeIdentifier(opts.method, opts.identifier);
+  if (
+    !row ||
+    row.status !== 'verified' ||
+    row.method !== opts.method ||
+    row.identifier !== expected ||
+    row.applicant_email !== opts.applicantEmail.trim().toLowerCase()
+  ) {
+    throw new PayoutVerificationError(
+      'Your payout destination has not been verified. Send a verification payment and enter the code.',
+      403,
+    );
+  }
 }

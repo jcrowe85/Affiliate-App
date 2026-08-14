@@ -8,7 +8,6 @@ const defaultForm = {
   last_name: '',
   company: '',
   email: '',
-  paypal_email: '',
   phone: '',
   address_line1: '',
   address_line2: '',
@@ -73,6 +72,78 @@ export default function AffiliateApplyPage() {
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
+  // Payout destination, proven before the application can be submitted.
+  const [payoutMethod, setPayoutMethod] = useState<'venmo' | 'paypal'>('venmo');
+  const [payoutIdentifier, setPayoutIdentifier] = useState('');
+  const [verificationId, setVerificationId] = useState('');
+  const [payoutCode, setPayoutCode] = useState('');
+  const [payoutVerified, setPayoutVerified] = useState(false);
+  const [sendingCode, setSendingCode] = useState(false);
+  const [confirmingCode, setConfirmingCode] = useState(false);
+  const [payoutError, setPayoutError] = useState('');
+
+  /** Any change to the destination invalidates the proof of the previous one. */
+  const resetPayoutVerification = () => {
+    setVerificationId('');
+    setPayoutCode('');
+    setPayoutVerified(false);
+    setPayoutError('');
+  };
+
+  const handleSendVerification = async () => {
+    setPayoutError('');
+    setSendingCode(true);
+    try {
+      const res = await fetch('/api/affiliate/verify-payout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'start',
+          method: payoutMethod,
+          identifier: payoutIdentifier.trim(),
+          applicant_email: formData.email.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setPayoutError(data.error || 'Could not send the verification payment');
+        return;
+      }
+      setVerificationId(data.verification_id);
+      setPayoutCode('');
+    } catch {
+      setPayoutError('Could not send the verification payment');
+    } finally {
+      setSendingCode(false);
+    }
+  };
+
+  const handleConfirmCode = async () => {
+    setPayoutError('');
+    setConfirmingCode(true);
+    try {
+      const res = await fetch('/api/affiliate/verify-payout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'confirm',
+          verification_id: verificationId,
+          code: payoutCode,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setPayoutError(data.error || 'That code did not match');
+        return;
+      }
+      setPayoutVerified(true);
+    } catch {
+      setPayoutError('Could not check that code');
+    } finally {
+      setConfirmingCode(false);
+    }
+  };
+
   const set = (field: keyof typeof defaultForm) => (
     e: React.ChangeEvent<HTMLInputElement>
   ) => setFormData({ ...formData, [field]: e.target.value });
@@ -89,13 +160,22 @@ export default function AffiliateApplyPage() {
       setError('Password must be at least 8 characters');
       return;
     }
+    if (!payoutVerified) {
+      setError('Verify your payout destination before submitting');
+      return;
+    }
 
     setLoading(true);
     try {
       const response = await fetch('/api/affiliate/apply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          payout_method: payoutMethod,
+          payout_identifier: payoutIdentifier.trim(),
+          payout_verification_id: verificationId,
+        }),
       });
       const data = await response.json();
 
@@ -187,14 +267,141 @@ export default function AffiliateApplyPage() {
                 <label htmlFor="phone" className={labelClass}>Phone</label>
                 <input id="phone" type="tel" autoComplete="tel" value={formData.phone} onChange={set('phone')} className={inputClass} />
               </div>
-              <div className="sm:col-span-2">
-                <label htmlFor="paypal_email" className={labelClass}>
-                  PayPal email *
-                  <InfoTip text="We currently pay affiliate commissions through PayPal only, so we need the email address on your PayPal account to send your payouts." />
-                </label>
-                <input id="paypal_email" type="email" required value={formData.paypal_email} onChange={set('paypal_email')} className={inputClass} placeholder="The email on your PayPal account" />
-              </div>
             </div>
+          </div>
+
+          {/* ── Method of payment ── */}
+          <div className="border-t border-gray-200 dark:border-gray-800 pt-6">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">
+              Method of payment
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Choose how you&apos;d like to receive your commissions. We&apos;ll send a
+              1&cent; payment to confirm it works — open it and enter the code from the
+              payment note. This is the only way we can be certain your money reaches
+              you and not someone else.
+            </p>
+
+            <div className="flex gap-2 mb-4">
+              {([
+                { value: 'venmo', label: 'Venmo' },
+                { value: 'paypal', label: 'PayPal' },
+              ] as const).map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    if (payoutMethod === opt.value) return;
+                    setPayoutMethod(opt.value);
+                    // Switching rails invalidates any proof already obtained.
+                    resetPayoutVerification();
+                  }}
+                  className={`flex-1 rounded-md border px-4 py-3 text-sm font-medium transition-colors ${
+                    payoutMethod === opt.value
+                      ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300'
+                      : 'border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
+            <div>
+              <label htmlFor="payout_identifier" className={labelClass}>
+                {payoutMethod === 'venmo' ? 'Venmo mobile number *' : 'PayPal email *'}
+                <InfoTip
+                  text={
+                    payoutMethod === 'venmo'
+                      ? 'The US mobile number your Venmo account uses. We send commissions to this number, so it must be exactly right — payments to a wrong number cannot be recovered.'
+                      : 'The email address on your PayPal account. We send commissions here.'
+                  }
+                />
+              </label>
+              <div className="flex gap-2">
+                <input
+                  id="payout_identifier"
+                  type={payoutMethod === 'venmo' ? 'tel' : 'email'}
+                  required
+                  value={payoutIdentifier}
+                  onChange={(e) => {
+                    setPayoutIdentifier(e.target.value);
+                    // Editing the destination invalidates a proof of the old one.
+                    if (payoutVerified || verificationId) resetPayoutVerification();
+                  }}
+                  disabled={payoutVerified}
+                  placeholder={payoutMethod === 'venmo' ? '(555) 123-4567' : 'you@example.com'}
+                  className={`${inputClass} disabled:opacity-60`}
+                />
+                {!payoutVerified && (
+                  <button
+                    type="button"
+                    onClick={handleSendVerification}
+                    disabled={sendingCode || !payoutIdentifier.trim() || !formData.email.trim()}
+                    className="shrink-0 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
+                  >
+                    {sendingCode ? 'Sending…' : verificationId ? 'Resend' : 'Send 1¢'}
+                  </button>
+                )}
+              </div>
+              {!formData.email.trim() && (
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Enter your email above first — we tie the verification to your application.
+                </p>
+              )}
+            </div>
+
+            {payoutVerified ? (
+              <div className="mt-3 flex items-center gap-2 rounded-md bg-green-50 dark:bg-green-900/20 border border-green-300 dark:border-green-700/60 px-3 py-2">
+                <svg className="h-5 w-5 text-green-600 dark:text-green-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <p className="text-sm text-green-800 dark:text-green-200">
+                  Verified — commissions will be sent here.
+                </p>
+                <button
+                  type="button"
+                  onClick={resetPayoutVerification}
+                  className="ml-auto text-xs text-green-800 dark:text-green-300 underline"
+                >
+                  Change
+                </button>
+              </div>
+            ) : verificationId ? (
+              <div className="mt-3 rounded-md border border-indigo-300 dark:border-indigo-700/60 bg-indigo-50 dark:bg-indigo-900/20 p-3">
+                <p className="text-sm text-indigo-900 dark:text-indigo-200">
+                  We sent 1&cent; to <strong>{payoutIdentifier}</strong>. Open{' '}
+                  {payoutMethod === 'venmo' ? 'Venmo' : 'PayPal'} and read the 6-digit code
+                  in the payment note.
+                </p>
+                <div className="mt-2 flex gap-2">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={payoutCode}
+                    onChange={(e) => setPayoutCode(e.target.value.replace(/\D/g, ''))}
+                    placeholder="123456"
+                    className={`${inputClass} font-mono tracking-widest`}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleConfirmCode}
+                    disabled={confirmingCode || payoutCode.length < 6}
+                    className="shrink-0 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
+                  >
+                    {confirmingCode ? 'Checking…' : 'Confirm'}
+                  </button>
+                </div>
+                <p className="mt-2 text-xs text-indigo-800 dark:text-indigo-300">
+                  It can take a minute to arrive. The code expires in an hour.
+                </p>
+              </div>
+            ) : null}
+
+            {payoutError && (
+              <p className="mt-2 text-sm text-red-600 dark:text-red-400">{payoutError}</p>
+            )}
           </div>
 
           <div className="border-t border-gray-200 dark:border-gray-800 pt-6">
@@ -253,7 +460,7 @@ export default function AffiliateApplyPage() {
           <div className="border-t border-gray-200 dark:border-gray-800 pt-6">
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !payoutVerified}
               className="w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-indigo-500 dark:hover:bg-indigo-600"
             >
               {loading ? 'Submitting...' : 'Submit application'}

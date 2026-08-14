@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { assertApplicantVerification, normalizeIdentifier } from '@/lib/payout-verification';
 import { hashPassword } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import {
@@ -46,6 +47,9 @@ export async function POST(request: NextRequest) {
       phone,
       password,
       confirm_password,
+      payout_method,
+      payout_identifier,
+      payout_verification_id,
     } = body;
 
     if (!first_name?.trim() || !last_name?.trim()) {
@@ -57,12 +61,44 @@ export async function POST(request: NextRequest) {
     if (!email?.trim()) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 });
     }
-    // PayPal is currently the only payout method, so an affiliate we can't pay
-    // isn't worth approving.
-    if (!paypal_email?.trim()) {
+    // An affiliate we cannot pay isn't worth approving, and a destination we
+    // haven't proven is worse than none: a payout to a mistyped Venmo number is
+    // irreversible once claimed. So the rail must be chosen *and* verified
+    // before the application is accepted.
+    if (payout_method !== 'venmo' && payout_method !== 'paypal') {
       return NextResponse.json(
-        { error: 'PayPal email is required — we pay commissions through PayPal' },
+        { error: 'Choose how you would like to be paid' },
         { status: 400 }
+      );
+    }
+    if (!payout_identifier?.trim()) {
+      return NextResponse.json(
+        {
+          error:
+            payout_method === 'venmo'
+              ? 'Enter the mobile number for your Venmo account'
+              : 'Enter your PayPal email',
+        },
+        { status: 400 }
+      );
+    }
+    if (!payout_verification_id?.trim()) {
+      return NextResponse.json(
+        { error: 'Verify your payout destination before submitting' },
+        { status: 400 }
+      );
+    }
+    try {
+      await assertApplicantVerification({
+        verificationId: payout_verification_id.trim(),
+        method: payout_method,
+        identifier: payout_identifier,
+        applicantEmail: email,
+      });
+    } catch (err: any) {
+      return NextResponse.json(
+        { error: err?.message || 'Payout destination is not verified' },
+        { status: 403 }
       );
     }
     if (!password?.trim()) {
@@ -124,7 +160,12 @@ export async function POST(request: NextRequest) {
         last_name: last_name.trim(),
         company: company?.trim() || null,
         email: emailNorm,
-        paypal_email: paypal_email?.trim()?.toLowerCase() || null,
+        paypal_email:
+          payout_method === 'paypal'
+            ? normalizeIdentifier('paypal', payout_identifier)
+            : paypal_email?.trim()?.toLowerCase() || null,
+        payout_method,
+        payout_identifier: normalizeIdentifier(payout_method, payout_identifier),
         address_line1: address_line1?.trim() || null,
         address_line2: address_line2?.trim() || null,
         city: city?.trim() || null,
