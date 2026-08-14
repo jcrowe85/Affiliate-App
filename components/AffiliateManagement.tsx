@@ -40,6 +40,8 @@ interface Offer {
 
 interface AffiliateApplication {
   id: string;
+  payout_method: string | null;
+  payout_identifier: string | null;
   first_name: string;
   last_name: string;
   company: string | null;
@@ -166,6 +168,51 @@ interface SeededOrder {
   totalPrice: string;
   currency: string;
   adminUrl: string;
+}
+
+/**
+ * How this person gets paid, and where.
+ *
+ * Shown wherever an admin might be asked "I never got a code" — the answer
+ * differs entirely by rail. Venmo carries the code in a 1¢ payment; PayPal
+ * emails it, so the reply is "check all mail, including spam".
+ */
+function PayoutMethodBadge({
+  method,
+  identifier,
+  showIdentifier = false,
+}: {
+  method: string | null;
+  identifier?: string | null;
+  showIdentifier?: boolean;
+}) {
+  if (!method) {
+    return <span className="text-xs text-gray-500 dark:text-gray-400">Not set</span>;
+  }
+  const isVenmo = method === 'venmo';
+  const label = isVenmo ? 'Venmo' : method === 'paypal' ? 'PayPal' : method;
+  // A 10-digit number is easier to read grouped, and it is what the admin will
+  // be reading back to the affiliate.
+  const pretty =
+    isVenmo && identifier && /^\d{10}$/.test(identifier)
+      ? `(${identifier.slice(0, 3)}) ${identifier.slice(3, 6)}-${identifier.slice(6)}`
+      : identifier;
+  return (
+    <span className="inline-flex items-center gap-1.5 flex-wrap">
+      <span
+        className={`px-2 py-0.5 text-xs font-medium rounded ${
+          isVenmo
+            ? 'bg-sky-100 dark:bg-sky-900/40 text-sky-800 dark:text-sky-300'
+            : 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-800 dark:text-indigo-300'
+        }`}
+      >
+        {label}
+      </span>
+      {showIdentifier && pretty && (
+        <span className="text-xs text-gray-600 dark:text-gray-400 font-mono">{pretty}</span>
+      )}
+    </span>
+  );
 }
 
 // A single label/value pair in the read-only affiliate details view.
@@ -879,6 +926,14 @@ export default function AffiliateManagement() {
                     {application.phone ? ` · ${application.phone}` : ''}
                     {' · applied '}
                     {new Date(application.created_at).toLocaleDateString()}
+                  </p>
+                  <p className="mt-1 flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
+                    <span className="text-xs">Paid via</span>
+                    <PayoutMethodBadge
+                      method={application.payout_method}
+                      identifier={application.payout_identifier}
+                      showIdentifier
+                    />
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -2513,6 +2568,7 @@ export default function AffiliateManagement() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Referral URL</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Creation Date</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Payout</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Offer Name</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Revenue</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Orders</th>
@@ -2583,6 +2639,9 @@ export default function AffiliateManagement() {
                           {a.status}
                       </span>
                     </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <PayoutMethodBadge method={a.payout_method} identifier={a.payout_identifier} />
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">{primaryOffer}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
                         {formatCurrency(a.stats.revenue, a.stats.currency)}
@@ -2695,7 +2754,25 @@ export default function AffiliateManagement() {
                     <DetailField label="Merchant ID" value={a.merchant_id} />
                     <DetailField label="Source" value={a.source} />
                     <DetailField label="Payout terms" value={`Net-${a.payout_terms_days}`} />
-                    <DetailField label="Payout method" value={a.payout_method} />
+                    <div>
+                      <dt className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Payout method
+                      </dt>
+                      <dd className="mt-1 text-sm">
+                        <PayoutMethodBadge
+                          method={a.payout_method}
+                          identifier={a.payout_identifier}
+                          showIdentifier
+                        />
+                      </dd>
+                      {a.payout_method && (
+                        <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+                          {a.payout_method === 'venmo'
+                            ? 'Codes arrive as a 1¢ Venmo payment — the code is in the payment note.'
+                            : 'Codes are emailed — worth checking all mail and spam.'}
+                        </p>
+                      )}
+                    </div>
                     <DetailField
                       label="Created"
                       value={new Date(a.created_at).toLocaleDateString('en-US', {

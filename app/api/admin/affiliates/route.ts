@@ -343,8 +343,14 @@ export async function POST(request: NextRequest) {
           phone: phone?.trim() || null,
           source: source?.trim() || null,
           status,
-          payout_method: paypal_email?.trim() ? 'paypal' : null,
-          payout_identifier: paypal_email?.trim() || null,
+          // An approved applicant already chose and proved a destination, so
+          // that is the one to keep. Deriving it from paypal_email instead
+          // discarded a verified Venmo number outright, leaving the affiliate
+          // with no payable destination at all.
+          payout_method:
+            application?.payout_method ?? (paypal_email?.trim() ? 'paypal' : null),
+          payout_identifier:
+            application?.payout_identifier ?? (paypal_email?.trim() || null),
           payout_terms_days,
           password_hash,
           merchant_id: merchant_id?.trim() || null,
@@ -366,6 +372,18 @@ export async function POST(request: NextRequest) {
             reviewed_at: new Date(),
             affiliate_id: created.id,
           },
+        });
+
+        // Attach the proof the applicant gave before they had an account.
+        // isPayoutDestinationVerified looks a verification up by affiliate_id,
+        // so leaving these rows detached would make a properly verified
+        // affiliate look unverified and block their first payout.
+        await tx.payoutMethodVerification.updateMany({
+          where: {
+            applicant_email: application.email.trim().toLowerCase(),
+            affiliate_id: null,
+          },
+          data: { affiliate_id: created.id },
         });
       }
 

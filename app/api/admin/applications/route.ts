@@ -28,6 +28,8 @@ export async function GET(request: NextRequest) {
         company: true,
         email: true,
         paypal_email: true,
+        payout_method: true,
+        payout_identifier: true,
         address_line1: true,
         address_line2: true,
         city: true,
