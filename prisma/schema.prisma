@@ -262,6 +262,9 @@ model PayoutMethodVerification {
   attempts        Int       @default(0)
   expires_at      DateTime
   verified_at     DateTime?
+  /// Set when the proof has been spent on an application, so one verification
+  /// cannot back several submissions.
+  consumed_at     DateTime?
   /// The micro-payment that delivered the code.
   paypal_batch_id String?
   paypal_item_id  String?

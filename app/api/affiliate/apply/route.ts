@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { assertApplicantVerification, normalizeIdentifier } from '@/lib/payout-verification';
+import {
+  assertApplicantVerification,
+  consumeApplicantVerification,
+  normalizeIdentifier,
+} from '@/lib/payout-verification';
+import { resolveShopId } from '@/lib/request-context';
 import { hashPassword } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import {
@@ -17,15 +22,6 @@ const MIN_PASSWORD_LENGTH = 8;
  * scripts/create-second-admin.ts does rather than trusting anything the client
  * sends.
  */
-async function resolveShopId(): Promise<string | null> {
-  if (process.env.SHOPIFY_SHOP_ID) return process.env.SHOPIFY_SHOP_ID;
-  const admin = await prisma.adminUser.findFirst({
-    select: { shopify_shop_id: true },
-    orderBy: { created_at: 'asc' },
-  });
-  return admin?.shopify_shop_id ?? null;
-}
-
 /**
  * Public affiliate application endpoint. Creates a pending AffiliateApplication
  * for an admin to review and complete; it never creates an Affiliate directly.
@@ -153,6 +149,11 @@ export async function POST(request: NextRequest) {
     }
 
     const password_hash = await hashPassword(password);
+
+    // Spend the proof only now, after every validation has passed. Consuming it
+    // earlier would strand an applicant whose submission was then rejected,
+    // leaving them to pay for a second verification through no fault of theirs.
+    await consumeApplicantVerification(payout_verification_id.trim());
 
     const application = await prisma.affiliateApplication.create({
       data: {

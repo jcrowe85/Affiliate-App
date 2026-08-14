@@ -308,7 +308,16 @@ export async function confirmVerification(opts: {
     throw new PayoutVerificationError('That code has expired. Send a new verification payment.', 410);
   }
 
-  if (verification.attempts >= MAX_ATTEMPTS) {
+  // Claim an attempt before checking the code. Reading the count and then
+  // incrementing would let concurrent requests share the same budget and slip
+  // past the cap; incrementing first makes each attempt cost exactly one.
+  const claimed = await prisma.payoutMethodVerification.update({
+    where: { id: verification.id },
+    data: { attempts: { increment: 1 } },
+    select: { attempts: true },
+  });
+
+  if (claimed.attempts > MAX_ATTEMPTS) {
     await prisma.payoutMethodVerification.update({
       where: { id: verification.id },
       data: { status: 'failed' },
@@ -325,11 +334,7 @@ export async function confirmVerification(opts: {
     crypto.timingSafeEqual(Buffer.from(actual), Buffer.from(expected));
 
   if (!matches) {
-    await prisma.payoutMethodVerification.update({
-      where: { id: verification.id },
-      data: { attempts: { increment: 1 } },
-    });
-    const left = MAX_ATTEMPTS - (verification.attempts + 1);
+    const left = MAX_ATTEMPTS - claimed.attempts;
     throw new PayoutVerificationError(
       left > 0 ? `Incorrect code. ${left} attempt${left === 1 ? '' : 's'} left.` : 'Incorrect code.',
     );
@@ -337,7 +342,7 @@ export async function confirmVerification(opts: {
 
   await prisma.payoutMethodVerification.update({
     where: { id: verification.id },
-    data: { status: 'verified', verified_at: new Date(), attempts: { increment: 1 } },
+    data: { status: 'verified', verified_at: new Date() },
   });
 
   return {
@@ -370,6 +375,7 @@ export async function assertApplicantVerification(opts: {
   if (
     !row ||
     row.status !== 'verified' ||
+    row.consumed_at !== null ||
     row.method !== opts.method ||
     row.identifier !== expected ||
     row.applicant_email !== opts.applicantEmail.trim().toLowerCase()
@@ -377,6 +383,28 @@ export async function assertApplicantVerification(opts: {
     throw new PayoutVerificationError(
       'Your payout destination has not been verified. Send a verification payment and enter the code.',
       403,
+    );
+  }
+}
+
+/**
+ * Spends a proof so it cannot back a second application.
+ *
+ * The conditional update is the whole point: two simultaneous submissions both
+ * pass the read-only check above, and only the one that flips consumed_at from
+ * null gets a row back. Call this once the application is safely created —
+ * consuming earlier would strand an applicant whose submission then failed
+ * validation, forcing them to pay for another verification.
+ */
+export async function consumeApplicantVerification(verificationId: string): Promise<void> {
+  const { count } = await prisma.payoutMethodVerification.updateMany({
+    where: { id: verificationId, status: 'verified', consumed_at: null },
+    data: { consumed_at: new Date() },
+  });
+  if (count !== 1) {
+    throw new PayoutVerificationError(
+      'That verification has already been used. Verify your payout destination again.',
+      409,
     );
   }
 }

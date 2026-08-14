@@ -5,6 +5,7 @@ import {
   PayoutVerificationError,
   startVerification,
 } from '@/lib/payout-verification';
+import { getTrustedClientIp, isPlatformHosted, resolveShopId } from '@/lib/request-context';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -42,10 +43,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
-    const shopId = process.env.SHOPIFY_SHOP_ID?.replace('.myshopify.com', '') || 'default';
-
     if (parsed.data.action === 'start') {
+      // Only a platform-set header is trusted here. x-forwarded-for is
+      // caller-controlled, so a cap keyed on it caps nothing — and treating a
+      // missing value as "unlimited" turned the cap off entirely for anyone who
+      // simply omitted the header. Refuse instead.
+      const ip = getTrustedClientIp(request);
+      if (!ip && isPlatformHosted()) {
+        return NextResponse.json(
+          { error: 'Could not verify the origin of this request. Please try again.' },
+          { status: 400 },
+        );
+      }
+
+      const shopId = await resolveShopId();
+      if (!shopId) {
+        return NextResponse.json(
+          { error: 'Applications are not available right now. Please contact support.' },
+          { status: 503 },
+        );
+      }
+
       const result = await startVerification({
         applicantEmail: parsed.data.applicant_email,
         method: parsed.data.method,
