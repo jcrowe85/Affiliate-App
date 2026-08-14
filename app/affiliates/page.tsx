@@ -136,18 +136,35 @@ export default function AffiliateMarketingPage() {
             </p>
           </div>
 
-          {/* The store's own product photography. Square rather than 4:5 so the
-              packshot is not cropped into — the carton and the bottles are the
-              composition, and trimming either breaks it. */}
+          {/* The store's brand film. Kept at its native 16:9 so nothing is
+              cropped out — the sequence moves between the bottle and the scalp,
+              and a square crop would cut the bottle in half.
+
+              muted + playsInline are what make autoplay permitted at all; the
+              poster covers the gap before the first frame decodes, and the
+              whole thing is decorative, so it is hidden from assistive tech and
+              suppressed for anyone who asks for reduced motion. */}
           <div className="relative">
-            <div className="relative aspect-square w-full overflow-hidden rounded-sm bg-[#F1EFEC] dark:bg-[#242b2e]">
+            <div className="relative aspect-video w-full overflow-hidden rounded-sm bg-[#EADFCE] dark:bg-[#242b2e]">
+              <video
+                src="/brand/bloom-hero.mp4"
+                poster="/brand/bloom-hero-poster.webp"
+                autoPlay
+                muted
+                loop
+                playsInline
+                preload="metadata"
+                aria-hidden="true"
+                className="absolute inset-0 h-full w-full object-cover motion-reduce:hidden"
+              />
+              {/* Shown instead of the film when reduced motion is preferred. */}
               <Image
-                src="/brand/bloom-trio.webp"
-                alt="Three bottles of Bloom peptide hair and scalp serum in amber glass beside the oxblood Fleur carton."
+                src="/brand/bloom-hero-poster.webp"
+                alt="A bottle of Bloom peptide hair and scalp serum turning slowly against a warm backdrop."
                 fill
                 priority
                 sizes="(max-width: 1024px) 100vw, 45vw"
-                className="object-cover"
+                className="hidden object-cover motion-reduce:block"
               />
             </div>
             <p className="mt-4 text-sm italic tracking-wide text-fleur-ink/50 dark:text-fleur-bone/50">
