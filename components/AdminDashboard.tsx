@@ -9,6 +9,7 @@ import PixelTest from '@/components/PixelTest';
 import Conversions from '@/components/Conversions';
 import WebhookManager from '@/components/WebhookManager';
 import Analytics from '@/components/Analytics';
+import CreatorOutreach from '@/components/CreatorOutreach';
 import ThemeToggle from '@/components/ThemeToggle';
 import { useTheme } from '@/components/ThemeProvider';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -121,7 +122,7 @@ interface PaidPayout {
   }>;
 }
 
-type Tab = 'overview' | 'pending' | 'fraud' | 'payouts' | 'performance' | 'affiliates' | 'offers' | 'payout-runs' | 'pixel-test' | 'conversions' | 'webhooks' | 'analytics';
+type Tab = 'overview' | 'pending' | 'fraud' | 'payouts' | 'performance' | 'affiliates' | 'offers' | 'payout-runs' | 'pixel-test' | 'conversions' | 'webhooks' | 'analytics' | 'creators';
 type ReportSubTab = 'performance' | 'payouts';
 
 // Payout Reports Section Component
@@ -341,7 +342,7 @@ function PayoutReportsSectionComponent({
   );
 }
 
-const VALID_TABS: Tab[] = ['overview', 'pending', 'fraud', 'payouts', 'performance', 'affiliates', 'offers', 'payout-runs', 'pixel-test', 'conversions', 'webhooks', 'analytics'];
+const VALID_TABS: Tab[] = ['overview', 'pending', 'fraud', 'payouts', 'performance', 'affiliates', 'offers', 'payout-runs', 'pixel-test', 'conversions', 'webhooks', 'analytics', 'creators'];
 
 export default function AdminDashboard({ initialTab }: { initialTab?: string | null } = {}) {
   const router = useRouter();
@@ -816,6 +817,7 @@ export default function AdminDashboard({ initialTab }: { initialTab?: string | n
           <div className={`pt-2 px-2 pb-1 ${sidebarCollapsed ? 'md:hidden' : ''}`}>
             <div className="px-2 py-1 text-xs font-semibold text-slate-400 uppercase tracking-wider">Tools</div>
           </div>
+          {btn('creators', 'Creator Outreach', icons.users)}
           {btn('pixel-test', 'Pixel Test', icons.check)}
           {btn('webhooks', 'Webhooks', icons.cog)}
           <div className={`pt-2 px-2 pb-1 ${sidebarCollapsed ? 'md:hidden' : ''}`}>
@@ -859,6 +861,7 @@ export default function AdminDashboard({ initialTab }: { initialTab?: string | n
               {activeTab === 'webhooks' && 'Webhooks'}
               {activeTab === 'payout-runs' && 'Payout Runs'}
               {activeTab === 'analytics' && 'Analytics'}
+              {activeTab === 'creators' && 'Creator Outreach'}
             </h2>
           </div>
         </div>
@@ -1803,6 +1806,11 @@ export default function AdminDashboard({ initialTab }: { initialTab?: string | n
 
           {activeTab === 'offers' && (
             <OffersManagement />
+          )}
+
+          {/* Creator Outreach Tab */}
+          {activeTab === 'creators' && (
+            <CreatorOutreach />
           )}
 
           {/* Payout Runs Tab */}

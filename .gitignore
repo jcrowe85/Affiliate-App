@@ -67,3 +67,6 @@ Thumbs.db
 *.tmp
 *.temp
 .cache/
+# Captured Trybe session request — contains a live session cookie
+.trybe/
+.env*

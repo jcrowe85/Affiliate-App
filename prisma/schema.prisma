@@ -523,3 +523,109 @@ model VisitorEvent {
   @@index([visitor_session_id])
   @@index([shopify_shop_id, timestamp])
 }
+
+// ---------------------------------------------------------------------------
+// Creator outreach
+//
+// Trybe caps invites at 12/day. These models back a parallel pipeline that
+// sources creators from Trybe's own filtered directory, resolves their
+// Instagram handle to a public contact email, and emails them the Trybe join
+// link directly — the same creators, without the platform's daily ceiling.
+//
+// The pipeline is deliberately three separate stages with durable state
+// between them (sourced -> resolved -> emailed) so a failure in the Instagram
+// resolver never costs us the sourcing work, and so nobody can be emailed
+// twice after a crashed run.
+// ---------------------------------------------------------------------------
+
+model CreatorLead {
+  id              String @id @default(cuid())
+  shopify_shop_id String
+
+  // --- Sourcing (stage 1: Trybe) ---
+  trybe_creator_id String?
+  source_filter    String? // which saved Trybe filter produced this lead
+  sourced_at       DateTime @default(now())
+
+  // --- Profile (stage 2: Instagram) ---
+  instagram_handle String // stored lowercased, without the leading @
+  full_name        String?
+  bio              String?  @db.Text
+  followers        Int?
+  engagement_rate  Decimal? @db.Decimal(6, 3)
+  is_business      Boolean?
+  profile_url      String?
+
+  // --- Contact (stage 2 output) ---
+  email        String?
+  // 'business_email' (the public contact field) | 'bio' (regex over bio text)
+  // | 'manual' (typed in by an admin). Bio-derived addresses are the ones
+  // worth eyeballing before a send, so we keep the provenance.
+  email_source String?
+  resolved_at  DateTime?
+  // Guards the resolver against burning credits re-fetching profiles that
+  // genuinely have no public email.
+  resolve_attempts Int     @default(0)
+  resolve_error    String?
+
+  // --- Outreach (stage 3) ---
+  // sourced | resolved | unresolvable | emailed | bounced | replied | joined | suppressed
+  status            String    @default("sourced")
+  emailed_at        DateTime?
+  follow_up_count   Int       @default(0)
+  last_follow_up_at DateTime?
+  replied_at        DateTime?
+  joined_at         DateTime?
+  unsubscribed_at   DateTime?
+  // Unguessable so an unsubscribe link can't be walked to opt out other
+  // creators. Distinct from the row id, which appears in admin URLs.
+  unsubscribe_token String    @unique
+  notes             String?   @db.Text
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  events CreatorOutreachEvent[]
+
+  // One row per creator per shop. The whole point of this table is that a
+  // creator surfacing under three different Trybe filters is still one person
+  // who gets one email.
+  @@unique([shopify_shop_id, instagram_handle])
+  @@index([shopify_shop_id, status])
+  @@index([shopify_shop_id, email])
+}
+
+/// Never-contact list, checked before every send. Kept separate from
+/// CreatorLead so an opt-out survives the lead row being deleted or re-sourced
+/// under a different handle spelling.
+model CreatorSuppression {
+  id               String  @id @default(cuid())
+  shopify_shop_id  String
+  email            String?
+  instagram_handle String?
+  // unsubscribed | bounced | complaint | manual | existing_affiliate
+  reason           String
+  created_at       DateTime @default(now())
+
+  @@index([shopify_shop_id, email])
+  @@index([shopify_shop_id, instagram_handle])
+}
+
+/// Append-only audit of everything that happened to a lead. This is what you
+/// read when deliverability goes sideways and you need to know what actually
+/// went out, to whom, and when.
+model CreatorOutreachEvent {
+  id       String @id @default(cuid())
+  lead_id  String
+  // sourced | resolved | resolve_failed | emailed | send_failed | follow_up
+  // | unsubscribed | bounced | replied | joined | suppressed
+  type     String
+  detail   String? @db.Text
+  provider_message_id String?
+  created_at DateTime @default(now())
+
+  lead CreatorLead @relation(fields: [lead_id], references: [id], onDelete: Cascade)
+
+  @@index([lead_id, created_at])
+  @@index([type, created_at])
+}

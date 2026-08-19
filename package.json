@@ -20,7 +20,12 @@
     "type-check": "tsc --noEmit",
     "test:shopify-config": "node scripts/test-shopify-config.js",
     "test:webhook": "bash scripts/test-webhook-curl.sh",
-    "test:shopify-api": "node scripts/test-shopify-api-credentials.js"
+    "test:shopify-api": "node scripts/test-shopify-api-credentials.js",
+    "creators:capture": "tsx scripts/creators-capture-trybe.ts",
+    "creators:source": "tsx scripts/creators-source.ts",
+    "creators:resolve": "tsx scripts/creators-resolve.ts",
+    "creators:send": "tsx scripts/creators-send.ts",
+    "creators:selftest": "tsx scripts/creators-selftest.ts"
   },
   "dependencies": {
     "@paypal/payouts-sdk": "^1.1.1",
