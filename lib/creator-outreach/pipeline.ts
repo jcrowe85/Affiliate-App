@@ -12,7 +12,14 @@ import { randomBytes } from 'crypto';
 import type { SourcedCreator } from './trybe';
 import { resolveProfiles, chunk } from './instagram';
 import { normalizeEmail } from './email-extract';
-import { defaultCopy, sendOutreach, type OutreachCopy } from './outreach-email';
+import {
+  defaultCopy,
+  sendOutreach,
+  copyForVariant,
+  VARIANT_KEYS,
+  type OutreachCopy,
+} from './outreach-email';
+import { assignVariants, compareVariants, type VariantStats, type Comparison } from './experiment';
 
 /** Cheap, unguessable token for unsubscribe links. */
 function unsubToken(): string {
@@ -514,6 +521,14 @@ export async function scheduleBatch(
   let firstAt: Date | null = null;
   let lastAt: Date | null = null;
 
+  // Continue the rotation from wherever the last batch left off, so a run of
+  // small batches still ends up evenly split rather than every batch starting
+  // on variant A.
+  const alreadyAssigned = await prisma.creatorLead.count({
+    where: { shopify_shop_id: shopId, copy_variant: { not: null } },
+  });
+  const variants = assignVariants(sendable.length, VARIANT_KEYS, alreadyAssigned);
+
   for (let i = 0; i < sendable.length; i++) {
     // Jitter each gap by ±50% of the nominal spacing.
     const jittered = spacing * (0.5 + Math.random());
@@ -523,7 +538,13 @@ export async function scheduleBatch(
 
     await prisma.creatorLead.update({
       where: { id: sendable[i].id },
-      data: { status: 'queued', batch_id: batchId, scheduled_send_at: at, send_error: null },
+      data: {
+        status: 'queued',
+        batch_id: batchId,
+        scheduled_send_at: at,
+        send_error: null,
+        copy_variant: variants[i],
+      },
     });
   }
 
@@ -545,7 +566,6 @@ export async function sendDue(
   const now = options.now ?? new Date();
   const limit = options.limit ?? 10;
   const joinUrl = process.env.TRYBE_JOIN_URL || '';
-  const copy = options.copy ?? defaultCopy(joinUrl);
 
   const due = await prisma.creatorLead.findMany({
     where: {
@@ -578,6 +598,7 @@ export async function sendDue(
         instagram_handle: true,
         full_name: true,
         unsubscribe_token: true,
+        copy_variant: true,
       },
     });
     if (!lead?.email) {
@@ -587,6 +608,10 @@ export async function sendDue(
       });
       continue;
     }
+
+    // Whatever variant this lead was assigned at planning time. An override
+    // passed by the caller wins, which is how the CLI's one-off sends work.
+    const copy = options.copy ?? copyForVariant(lead.copy_variant, joinUrl);
 
     const result = await sendOutreach(
       {
@@ -603,7 +628,7 @@ export async function sendDue(
         where: { id: lead.id },
         data: { status: 'emailed', emailed_at: new Date(), send_error: null },
       });
-      await logEvent(lead.id, 'emailed', lead.email, result.messageId);
+      await logEvent(lead.id, 'emailed', `${lead.email} (variant ${lead.copy_variant ?? 'A'})`, result.messageId);
       sent++;
     } else {
       // Back to 'queued' so the next tick retries — unless it is a
@@ -692,4 +717,56 @@ export async function liveBatch(shopId: string): Promise<{
     dailyCap: parseInt(process.env.CREATOR_OUTREACH_DAILY_CAP || '100', 10),
     nextAt: pending[0]?.scheduled_send_at ?? null,
   };
+}
+
+/**
+ * Results per copy variant, with an honest read on whether the gap means
+ * anything yet.
+ *
+ * "Replied" and "joined" come from the admin marking them, so the numbers are
+ * only as good as that habit. Worth knowing before anyone treats a rate here
+ * as gospel.
+ */
+export async function experimentResults(shopId: string): Promise<{
+  variants: VariantStats[];
+  comparison: Comparison;
+}> {
+  const rows = await prisma.creatorLead.groupBy({
+    by: ['copy_variant', 'status'],
+    where: {
+      shopify_shop_id: shopId,
+      copy_variant: { not: null },
+      emailed_at: { not: null },
+    },
+    _count: { _all: true },
+  });
+
+  const byVariant = new Map<string, VariantStats>();
+  for (const key of VARIANT_KEYS) {
+    byVariant.set(key, { variant: key, sent: 0, replied: 0, joined: 0, replyRate: 0, joinRate: 0 });
+  }
+
+  for (const row of rows) {
+    const key = row.copy_variant ?? 'A';
+    const stats = byVariant.get(key) ?? {
+      variant: key, sent: 0, replied: 0, joined: 0, replyRate: 0, joinRate: 0,
+    };
+    // Everything with emailed_at counts as sent, whatever it became afterwards.
+    stats.sent += row._count._all;
+    // 'joined' implies a reply in every sense that matters for this test.
+    if (row.status === 'replied') stats.replied += row._count._all;
+    if (row.status === 'joined') {
+      stats.replied += row._count._all;
+      stats.joined += row._count._all;
+    }
+    byVariant.set(key, stats);
+  }
+
+  const variants = [...byVariant.values()].map((stats) => ({
+    ...stats,
+    replyRate: stats.sent > 0 ? stats.replied / stats.sent : 0,
+    joinRate: stats.sent > 0 ? stats.joined / stats.sent : 0,
+  }));
+
+  return { variants, comparison: compareVariants(variants) };
 }

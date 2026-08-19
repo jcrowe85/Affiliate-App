@@ -575,6 +575,9 @@ model CreatorLead {
   /// Groups the leads released together, so a batch can be shown and cancelled
   /// as a unit.
   batch_id          String?
+  /// Which copy variant this creator was sent. Assigned when the batch is
+  /// planned, not when it sends, so a cancelled batch doesn't skew the split.
+  copy_variant      String?
   /// When this lead is due to go out. Sends are paced minutes apart, so the
   /// schedule has to outlive the process that planned it — a request that
   /// slept between sends would hit a serverless timeout long before a batch
@@ -606,6 +609,7 @@ model CreatorLead {
   // Drives the worker's "what is due right now" query on every tick.
   @@index([shopify_shop_id, status, scheduled_send_at])
   @@index([batch_id])
+  @@index([shopify_shop_id, copy_variant, status])
 }
 
 /// Never-contact list, checked before every send. Kept separate from

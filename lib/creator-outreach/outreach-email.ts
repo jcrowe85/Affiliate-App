@@ -87,13 +87,28 @@ export type OutreachCopy = {
 };
 
 /**
- * Default copy. Kept in one place and passed through buildEmail() so the
- * message can be edited (or A/B'd) without touching send logic.
- *
- * `{{first}}` and `{{handle}}` are the only placeholders.
+ * Copy for the control variant. `{{first}}` and `{{handle}}` are the only
+ * placeholders either variant may use.
  */
 export function defaultCopy(joinUrl: string): OutreachCopy {
-  return {
+  return COPY_VARIANTS.A(joinUrl);
+}
+
+/**
+ * The copy variants under test.
+ *
+ * Variants should differ on something you could act on, not on wording. These
+ * two take opposite angles: A explains the offer and reassures (no minimum, no
+ * exclusivity, you keep the rights); B says almost nothing and asks a question.
+ * A test between two paraphrases of the same email teaches you nothing no
+ * matter how many you send.
+ *
+ * Keys are stored on the lead, so renaming one orphans the results already
+ * collected. Add new variants rather than editing existing ones mid-test.
+ */
+export const COPY_VARIANTS: Record<string, (joinUrl: string) => OutreachCopy> = {
+  // A — the full pitch: what it is, what you get, what we won't ask of you.
+  A: (joinUrl) => ({
     subject: 'Sending you Fleur — gifting collab',
     paragraphs: [
       `Hi {{first}} — found you on Trybe and your feed genuinely fits what we're building at Fleur.`,
@@ -102,7 +117,27 @@ export function defaultCopy(joinUrl: string): OutreachCopy {
       `Takes about two minutes. If it's not for you, no hard feelings — just ignore this one.`,
     ],
     signOff: 'Thanks,\nThe Fleur team',
-  };
+  }),
+
+  // B — short and asks a question. Costs less attention to read and gives an
+  // easy reply that isn't "yes to a commitment".
+  B: (joinUrl) => ({
+    subject: 'free Fleur product for you?',
+    paragraphs: [
+      `Hi {{first}} — we make Fleur, and we'd like to send you some, free.`,
+      `All we'd ask for is a couple of short videos. Want us to ship it?`,
+      joinUrl,
+    ],
+    signOff: 'Josh\nFleur',
+  }),
+};
+
+export const VARIANT_KEYS = Object.keys(COPY_VARIANTS);
+
+/** Copy for a named variant, falling back to A for unknown or missing keys. */
+export function copyForVariant(variant: string | null | undefined, joinUrl: string): OutreachCopy {
+  const build = (variant && COPY_VARIANTS[variant]) || COPY_VARIANTS.A;
+  return build(joinUrl);
 }
 
 function fill(template: string, lead: OutreachLead): string {

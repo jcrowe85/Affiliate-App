@@ -31,6 +31,15 @@ interface Lead {
   profile_url: string | null;
 }
 
+interface VariantStats {
+  variant: string;
+  sent: number;
+  replied: number;
+  joined: number;
+  replyRate: number;
+  joinRate: number;
+}
+
 interface Payload {
   leads: Lead[];
   total: number;
@@ -40,6 +49,10 @@ interface Payload {
   sentToday: number;
   dailyCap: number;
   config: { apifyReady: boolean; sendingReady: boolean };
+  experiment: {
+    variants: VariantStats[];
+    comparison: { leader: string | null; significant: boolean; verdict: string };
+  };
 }
 
 const STATUS_TABS: { key: string; label: string }[] = [
@@ -213,6 +226,66 @@ export default function CreatorOutreach() {
           </div>
         ))}
       </div>
+
+      {/* Copy experiment */}
+      {(data?.experiment.variants.some((v) => v.sent > 0) ?? false) && (
+        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Copy test</h3>
+            <span className="text-xs text-gray-400 dark:text-gray-500">
+              reply rate — replies are counted from what you mark below
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {data!.experiment.variants.map((v) => {
+              const leads = data!.experiment.comparison.leader === v.variant;
+              return (
+                <div
+                  key={v.variant}
+                  className={`rounded-lg border p-3 ${
+                    leads
+                      ? 'border-green-400 dark:border-green-700 bg-green-50 dark:bg-green-900/20'
+                      : 'border-gray-200 dark:border-gray-800'
+                  }`}
+                >
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                      Variant {v.variant}
+                      {leads && <span className="ml-2 text-xs text-green-700 dark:text-green-400">winner</span>}
+                    </span>
+                    <span className="text-lg font-semibold tabular-nums text-gray-900 dark:text-gray-100">
+                      {(v.replyRate * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    {v.replied} replied of {v.sent} sent · {v.joined} joined
+                  </div>
+                  <div className="mt-2 h-1.5 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+                    <div
+                      className={leads ? 'h-full bg-green-500' : 'h-full bg-gray-400 dark:bg-gray-600'}
+                      style={{ width: `${Math.min(100, v.replyRate * 100 * 3)}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* The verdict matters more than the percentages — a lead of a few
+              points on small numbers is noise, and saying so prevents a bad
+              call being made off this panel. */}
+          <p
+            className={`mt-3 text-sm rounded-lg px-3 py-2 ${
+              data!.experiment.comparison.significant
+                ? 'text-green-800 dark:text-green-300 bg-green-50 dark:bg-green-900/20'
+                : 'text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800'
+            }`}
+          >
+            {data!.experiment.comparison.verdict}
+          </p>
+        </div>
+      )}
 
       {/* Controls */}
       <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4 space-y-4">

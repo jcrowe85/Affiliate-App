@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getCurrentAdmin } from '@/lib/auth';
-import { sentInLast24h, statusCounts } from '@/lib/creator-outreach/pipeline';
+import { sentInLast24h, statusCounts, experimentResults } from '@/lib/creator-outreach/pipeline';
 import { apifyToken } from '@/lib/creator-outreach/instagram';
 
 export const dynamic = 'force-dynamic';
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
         : {}),
     };
 
-    const [leads, total, counts, sentToday] = await Promise.all([
+    const [leads, total, counts, sentToday, experiment] = await Promise.all([
       prisma.creatorLead.findMany({
         where,
         orderBy: [{ sourced_at: 'desc' }],
@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
       prisma.creatorLead.count({ where }),
       statusCounts(admin.shopify_shop_id),
       sentInLast24h(admin.shopify_shop_id),
+      experimentResults(admin.shopify_shop_id),
     ]);
 
     return NextResponse.json({
@@ -68,6 +69,7 @@ export async function GET(request: NextRequest) {
       pageSize,
       counts,
       sentToday,
+      experiment,
       dailyCap: parseInt(process.env.CREATOR_OUTREACH_DAILY_CAP || '100', 10),
       // Surfaced so the UI can tell the admin what's missing instead of letting
       // a send fail silently later.
