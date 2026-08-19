@@ -376,8 +376,10 @@ function requestForPage(config: TrybeConfig, pageIndex: number): RequestSpec {
 export type SourceResult = {
   creators: SourcedCreator[];
   pagesFetched: number;
+  /** Creators found that we had never seen before this run. */
+  newCount: number;
   /** Set when paging stopped early, so the caller can report why. */
-  stoppedBecause: 'max-pages' | 'empty-page' | 'no-new-records' | 'error';
+  stoppedBecause: 'max-pages' | 'empty-page' | 'no-new-records' | 'saturated' | 'error';
   error?: string;
 };
 
@@ -391,12 +393,32 @@ export type SourceResult = {
  */
 export async function sourceCreators(
   config: TrybeConfig,
-  options: { onPage?: (page: number, found: number) => void; delayMs?: number } = {}
+  options: {
+    onPage?: (page: number, found: number, fresh: number) => void;
+    delayMs?: number;
+    /**
+     * Handles already in the database. Used only to measure how much of a page
+     * is new — known creators are still returned, so the caller can record that
+     * a second filter surfaced them.
+     */
+    known?: Set<string>;
+    /**
+     * Stop once `pages` consecutive pages come back less than `minNewRatio`
+     * new. This is what removes the need for anyone to track page numbers
+     * between runs: re-running a filter simply walks forward until it stops
+     * finding people, wherever that happens to be.
+     */
+    saturation?: { pages: number; minNewRatio: number };
+  } = {}
 ): Promise<SourceResult> {
   const seen = new Set<string>();
   const creators: SourcedCreator[] = [];
+  const known = options.known ?? new Set<string>();
+  const saturation = options.saturation ?? { pages: 3, minNewRatio: 0.1 };
   const maxPages = config.pagination.mode === 'none' ? 1 : config.pagination.maxPages;
   const delayMs = options.delayMs ?? 1200;
+  let newCount = 0;
+  let saturatedPages = 0;
 
   for (let page = 0; page < maxPages; page++) {
     const spec = requestForPage(config, page);
@@ -413,6 +435,7 @@ export async function sourceCreators(
         return {
           creators,
           pagesFetched: page,
+          newCount,
           stoppedBecause: 'error',
           error:
             `Trybe returned ${response.status} — the captured session has expired. ` +
@@ -423,6 +446,7 @@ export async function sourceCreators(
         return {
           creators,
           pagesFetched: page,
+          newCount,
           stoppedBecause: 'error',
           error: `Trybe returned ${response.status} on page ${page + 1}.`,
         };
@@ -433,6 +457,7 @@ export async function sourceCreators(
       return {
         creators,
         pagesFetched: page,
+        newCount,
         stoppedBecause: 'error',
         error: err instanceof Error ? err.message : String(err),
       };
@@ -443,22 +468,35 @@ export async function sourceCreators(
       : discoverRecords(payload);
 
     if (records.length === 0) {
-      options.onPage?.(page + 1, 0);
-      return { creators, pagesFetched: page + 1, stoppedBecause: 'empty-page' };
+      options.onPage?.(page + 1, 0, 0);
+      return { creators, pagesFetched: page + 1, newCount, stoppedBecause: 'empty-page' };
     }
 
     let added = 0;
+    let fresh = 0;
     for (const creator of toCreators(records, config.fields)) {
       if (seen.has(creator.instagramHandle)) continue;
       seen.add(creator.instagramHandle);
       creators.push(creator);
       added++;
+      if (!known.has(creator.instagramHandle)) {
+        fresh++;
+        newCount++;
+      }
     }
 
-    options.onPage?.(page + 1, added);
+    options.onPage?.(page + 1, added, fresh);
 
     if (added === 0) {
-      return { creators, pagesFetched: page + 1, stoppedBecause: 'no-new-records' };
+      return { creators, pagesFetched: page + 1, newCount, stoppedBecause: 'no-new-records' };
+    }
+
+    // Saturation is measured against the database, not against this run, so
+    // overlapping filters and re-runs of the same filter both wind down on
+    // their own instead of grinding through pages we already have.
+    saturatedPages = fresh / added < saturation.minNewRatio ? saturatedPages + 1 : 0;
+    if (saturatedPages >= saturation.pages) {
+      return { creators, pagesFetched: page + 1, newCount, stoppedBecause: 'saturated' };
     }
 
     // Pace the requests. This endpoint is meant to serve a person clicking
@@ -469,5 +507,5 @@ export async function sourceCreators(
     }
   }
 
-  return { creators, pagesFetched: maxPages, stoppedBecause: 'max-pages' };
+  return { creators, pagesFetched: maxPages, newCount, stoppedBecause: 'max-pages' };
 }

@@ -85,6 +85,8 @@ export type IngestSummary = {
   seen: number;
   created: number;
   alreadyKnown: number;
+  /** Already known, but surfaced by a filter that hadn't found them before. */
+  newFilterOverlap: number;
   suppressed: number;
 };
 
@@ -100,7 +102,13 @@ export async function ingestSourced(
   label: string | null
 ): Promise<IngestSummary> {
   const { handles } = await suppressionSets(shopId);
-  const summary: IngestSummary = { seen: creators.length, created: 0, alreadyKnown: 0, suppressed: 0 };
+  const summary: IngestSummary = {
+    seen: creators.length,
+    created: 0,
+    alreadyKnown: 0,
+    newFilterOverlap: 0,
+    suppressed: 0,
+  };
 
   for (const creator of creators) {
     if (handles.has(creator.instagramHandle)) {
@@ -115,11 +123,24 @@ export async function ingestSourced(
           instagram_handle: creator.instagramHandle,
         },
       },
-      select: { id: true },
+      select: { id: true, source_filter: true },
     });
 
     if (existing) {
       summary.alreadyKnown++;
+      // The lead keeps whichever filter found them first, but we record the
+      // overlap. Filters are worth judging on reply rate later, and that means
+      // knowing every filter a creator came through — not just the first.
+      if (label && existing.source_filter !== label) {
+        const seenBefore = await prisma.creatorOutreachEvent.findFirst({
+          where: { lead_id: existing.id, type: 'sourced', detail: `filter: ${label}` },
+          select: { id: true },
+        });
+        if (!seenBefore) {
+          await logEvent(existing.id, 'sourced', `filter: ${label}`);
+          summary.newFilterOverlap++;
+        }
+      }
       continue;
     }
 
