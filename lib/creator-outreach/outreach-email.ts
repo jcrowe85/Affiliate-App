@@ -139,7 +139,7 @@ export const COPY_VARIANTS: Record<string, (joinUrl: string) => OutreachCopy> = 
       `If we put ad spend behind your video, you'll earn 15% of the sales it generates.`,
       `You don't need a huge audience. You don't need to post every day. Make great content, and we'll handle putting advertising dollars behind the videos that perform.`,
       `Peptide hair care is a hot category right now and creator content has already generated significant sales for Fleur.`,
-      `No follower minimum. No exclusivity. Just free product + an opportunity to turn a great video into ongoing commission.`,
+      `No follower minimum. No exclusivity. Just free product + 15% of the sales your video drives.`,
       `Claim your product:`,
       joinUrl,
     ],
