@@ -98,37 +98,52 @@ export function defaultCopy(joinUrl: string): OutreachCopy {
  * The copy variants under test.
  *
  * Variants should differ on something you could act on, not on wording. These
- * two take opposite angles: A explains the offer and reassures (no minimum, no
- * exclusivity, you keep the rights); B says almost nothing and asks a question.
- * A test between two paraphrases of the same email teaches you nothing no
- * matter how many you send.
+ * two lead differently: A opens on the mechanism (our ad spend behind your
+ * content), B opens on the creator (your content, your upside). A test between
+ * two paraphrases of the same email teaches you nothing at any sample size.
+ *
+ * The greeting uses {{first}} rather than a name. Both drafts arrived written
+ * out to one person, and shipping that literally would have opened every email
+ * to every creator with the same wrong name.
  *
  * Keys are stored on the lead, so renaming one orphans the results already
  * collected. Add new variants rather than editing existing ones mid-test.
  */
 export const COPY_VARIANTS: Record<string, (joinUrl: string) => OutreachCopy> = {
-  // A — the full pitch: what it is, what you get, what we won't ask of you.
+  // A — leads with the mechanism: here is the deal, here is why it pays.
   A: (joinUrl) => ({
-    subject: 'Sending you Fleur — gifting collab',
+    subject: 'Your content + our ad spend = 15% commission',
     paragraphs: [
-      `Hi {{first}} — found you on Trybe and your feed genuinely fits what we're building at Fleur.`,
-      `We'd love to send you product, free, in exchange for a couple of short videos. No follower minimum, no exclusivity, and you keep full rights to what you make.`,
-      `If you're in, you can claim it here: ${joinUrl}`,
-      `Takes about two minutes. If it's not for you, no hard feelings — just ignore this one.`,
+      `Hi {{first}},`,
+      `Found your content on Trybe and think you'd be a great fit for Fleur.`,
+      `We're the brand behind Bloom, our peptide-powered hair serum that's been taking off with creators. Peptide beauty is having a huge moment right now, and creator content has already driven serious GMV for Fleur.`,
+      `Here's the opportunity:`,
+      `We send you Bloom completely free. You create a couple of short videos. If we run your content as ads, you earn 15% of the sales your videos generate.`,
+      `That means you're not relying on your own following to make money. We put our ad spend behind winning creative and you participate in the upside.`,
+      `No follower minimum. No exclusivity. No cost to participate.`,
+      `If you want in, claim your product here:`,
+      joinUrl,
+      `Takes about two minutes.`,
     ],
-    signOff: 'Thanks,\nThe Fleur team',
+    signOff: 'Thanks,\nThe Fleur Team',
   }),
 
-  // B — short and asks a question. Costs less attention to read and gives an
-  // easy reply that isn't "yes to a commitment".
+  // B — leads with the creator: your content, your upside, less about us.
   B: (joinUrl) => ({
-    subject: 'free Fleur product for you?',
+    subject: 'Want to earn 15% on your content?',
     paragraphs: [
-      `Hi {{first}} — we make Fleur, and we'd like to send you some, free.`,
-      `All we'd ask for is a couple of short videos. Want us to ship it?`,
+      `Hi {{first}},`,
+      `Your content caught our eye on Trybe, and we'd love to see what you could do with Fleur.`,
+      `We're sending creators our bestselling peptide hair serum, Bloom, completely free in exchange for a couple of short videos.`,
+      `But here's the part we're most excited about:`,
+      `If we put ad spend behind your video, you'll earn 15% of the sales it generates.`,
+      `You don't need a huge audience. You don't need to post every day. Make great content, and we'll handle putting advertising dollars behind the videos that perform.`,
+      `Peptide hair care is a hot category right now and creator content has already generated significant sales for Fleur.`,
+      `No follower minimum. No exclusivity. Just free product + an opportunity to turn a great video into ongoing commission.`,
+      `Claim your product:`,
       joinUrl,
     ],
-    signOff: 'Josh\nFleur',
+    signOff: 'The Fleur Team',
   }),
 };
 
