@@ -25,7 +25,8 @@
     "creators:source": "tsx scripts/creators-source.ts",
     "creators:resolve": "tsx scripts/creators-resolve.ts",
     "creators:send": "tsx scripts/creators-send.ts",
-    "creators:selftest": "tsx scripts/creators-selftest.ts"
+    "creators:selftest": "tsx scripts/creators-selftest.ts",
+    "creators:worker": "tsx scripts/creators-worker.ts"
   },
   "dependencies": {
     "@paypal/payouts-sdk": "^1.1.1",

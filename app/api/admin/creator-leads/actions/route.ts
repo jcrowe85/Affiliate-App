@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentAdmin } from '@/lib/auth';
-import { resolvePending, sendBatch, statusCounts, sentInLast24h } from '@/lib/creator-outreach/pipeline';
+import {
+  resolvePending,
+  sendBatch,
+  statusCounts,
+  sentInLast24h,
+  scheduleBatch,
+  sendDue,
+  cancelBatch,
+} from '@/lib/creator-outreach/pipeline';
 import { apifyToken } from '@/lib/creator-outreach/instagram';
 
 export const dynamic = 'force-dynamic';
@@ -49,6 +57,27 @@ export async function POST(request: NextRequest) {
         counts: await statusCounts(shopId),
         sentToday: await sentInLast24h(shopId),
       });
+    }
+
+    if (action === 'schedule') {
+      const count = Math.max(1, parseInt(body?.count ?? 25, 10) || 25);
+      const summary = await scheduleBatch(shopId, {
+        count,
+        spacingSeconds: body?.spacingSeconds ? parseInt(body.spacingSeconds, 10) : undefined,
+      });
+      return NextResponse.json({ summary, counts: await statusCounts(shopId) });
+    }
+
+    // Sends anything already due. The cron worker does this every minute; the
+    // UI can also call it so an open page doesn't sit waiting on the next tick.
+    if (action === 'send-due') {
+      const summary = await sendDue(shopId, { limit: 5 });
+      return NextResponse.json({ summary });
+    }
+
+    if (action === 'cancel-batch') {
+      const cancelled = await cancelBatch(shopId, String(body?.batchId || ''));
+      return NextResponse.json({ cancelled, counts: await statusCounts(shopId) });
     }
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });

@@ -569,8 +569,18 @@ model CreatorLead {
   resolve_error    String?
 
   // --- Outreach (stage 3) ---
-  // sourced | resolved | unresolvable | emailed | bounced | replied | joined | suppressed
+  // sourced | resolved | unresolvable | queued | sending | emailed | bounced
+  // | replied | joined | suppressed
   status            String    @default("sourced")
+  /// Groups the leads released together, so a batch can be shown and cancelled
+  /// as a unit.
+  batch_id          String?
+  /// When this lead is due to go out. Sends are paced minutes apart, so the
+  /// schedule has to outlive the process that planned it — a request that
+  /// slept between sends would hit a serverless timeout long before a batch
+  /// finished, and a countdown in the UI needs a real time to count down to.
+  scheduled_send_at DateTime?
+  send_error        String?
   emailed_at        DateTime?
   follow_up_count   Int       @default(0)
   last_follow_up_at DateTime?
@@ -593,6 +603,9 @@ model CreatorLead {
   @@unique([shopify_shop_id, instagram_handle])
   @@index([shopify_shop_id, status])
   @@index([shopify_shop_id, email])
+  // Drives the worker's "what is due right now" query on every tick.
+  @@index([shopify_shop_id, status, scheduled_send_at])
+  @@index([batch_id])
 }
 
 /// Never-contact list, checked before every send. Kept separate from

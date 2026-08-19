@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import CreatorSendMonitor from '@/components/CreatorSendMonitor';
 
 /**
  * Review queue for the creator-outreach pipeline.
@@ -79,6 +80,10 @@ export default function CreatorOutreach() {
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ id: string; value: string } | null>(null);
+  // 'leads' is the review queue; 'sending' is the live batch view. Separate
+  // views rather than one long page: reviewing addresses and watching a send
+  // go out are different jobs, done at different times.
+  const [view, setView] = useState<'leads' | 'sending'>('leads');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -163,11 +168,38 @@ export default function CreatorOutreach() {
 
   return (
     <div className="space-y-6">
+      {/* View switcher */}
+      <div className="flex items-center gap-2">
+        {([
+          ['leads', 'Leads'],
+          ['sending', 'Live sending'],
+        ] as const).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setView(key)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium ${
+              view === key
+                ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900'
+                : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300'
+            }`}
+          >
+            {label}
+            {key === 'sending' && (counts.queued ?? 0) > 0 ? ` (${counts.queued})` : ''}
+          </button>
+        ))}
+      </div>
+
+      {view === 'sending' && <CreatorSendMonitor onChanged={load} />}
+
+      {view === 'leads' && (
+      <>
       {/* Pipeline summary */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         {[
           { label: 'Sourced', value: counts.sourced ?? 0 },
           { label: 'Ready to email', value: counts.resolved ?? 0 },
+          { label: 'Queued', value: counts.queued ?? 0 },
           { label: 'Emailed', value: counts.emailed ?? 0 },
           { label: 'Replied', value: counts.replied ?? 0 },
           { label: 'Joined', value: counts.joined ?? 0 },
@@ -205,15 +237,11 @@ export default function CreatorOutreach() {
 
           <button
             type="button"
-            onClick={() => {
-              if (confirm(`Send up to 10 outreach emails now? ${capLeft} left under today's cap.`)) {
-                runAction('send', { limit: 10 });
-              }
-            }}
-            disabled={busy !== null || !data?.config.sendingReady || capLeft === 0}
+            onClick={() => setView('sending')}
+            disabled={!data?.config.sendingReady || (counts.resolved ?? 0) === 0}
             className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium disabled:opacity-40"
           >
-            {busy === 'send' ? 'Sending…' : 'Send 10'}
+            Queue a batch →
           </button>
 
           <div className="text-sm text-gray-500 dark:text-gray-400 ml-auto">
@@ -451,6 +479,8 @@ export default function CreatorOutreach() {
             </button>
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   );

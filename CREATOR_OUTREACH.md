@@ -138,6 +138,30 @@ entry every two hours:
 The rolling 24h cap holds regardless of how often this runs, so a missed slot
 costs volume rather than causing a double-send.
 
+## Sending a batch (the live view)
+
+**Creator Outreach → Live sending** in the admin UI.
+
+Sends are paced minutes apart, which is longer than any serverless request may
+run. So a batch is *planned* rather than *performed*: pressing Queue writes a
+send time onto each lead, and a worker delivers whatever is due whenever it
+runs. That split is what lets the page show a real countdown, survive a closed
+tab or a deploy mid-batch, and be cancelled partway through.
+
+The view shows sent messages with a filled bar and a timestamp, whatever is
+in flight with a live bar, and everything still waiting with a spinner and the
+time until it goes. Cancelling returns the unsent ones to the ready pool.
+
+Two things drive the queue, and they are safe to run together — every lead is
+claimed with a conditional update before any mail goes out, so overlapping
+workers cannot send the same message twice:
+
+- **Vercel Cron**, every minute, via `/api/cron/creator-outreach`
+  (see `vercel.json`). Needs `CRON_SECRET` set in Vercel.
+- **`npm run creators:worker`**, a local loop that ticks every 20 seconds. Use
+  this if your Vercel plan does not allow minute-level cron (Hobby schedules
+  run at most once a day), or to drive a batch from your machine.
+
 ## The admin UI
 
 **Creator Outreach** in the admin sidebar. It exists for the two jobs a person

@@ -437,3 +437,259 @@ export async function statusCounts(shopId: string): Promise<Record<string, numbe
   });
   return Object.fromEntries(rows.map((row) => [row.status, row._count._all]));
 }
+
+// ---------------------------------------------------------------------------
+// Scheduled batches
+//
+// sendBatch() above sends inside one process, sleeping between messages. That
+// is fine for a CLI run and useless for anything else: a serverless request
+// would time out long before a paced batch finished, and a UI has nothing to
+// display while a script sleeps.
+//
+// So a batch is planned first — every lead gets a send time written to the
+// database — and a worker sends whatever is due whenever it happens to run.
+// The schedule outlives any single process, which is what lets the UI show a
+// real countdown and lets a batch survive a deploy.
+// ---------------------------------------------------------------------------
+
+export type ScheduleSummary = {
+  batchId: string;
+  scheduled: number;
+  firstAt: Date | null;
+  lastAt: Date | null;
+  capRemaining: number;
+};
+
+/**
+ * Plans a batch: picks resolved leads and stamps each with a send time.
+ *
+ * Spacing is jittered so the pattern doesn't read as machine-generated, and the
+ * rolling 24h cap is applied here rather than at send time so the UI can show
+ * an honest schedule the moment it is created.
+ */
+export async function scheduleBatch(
+  shopId: string,
+  options: { count?: number; spacingSeconds?: number; startInSeconds?: number; dailyCap?: number } = {}
+): Promise<ScheduleSummary> {
+  const dailyCap = options.dailyCap ?? parseInt(process.env.CREATOR_OUTREACH_DAILY_CAP || '100', 10);
+  const spacing = options.spacingSeconds ?? Math.round(
+    parseInt(process.env.CREATOR_OUTREACH_SEND_DELAY_MS || '15000', 10) / 1000
+  );
+
+  // Anything already queued counts against the cap — it is spoken for.
+  const [alreadySent, alreadyQueued] = await Promise.all([
+    sentInLast24h(shopId),
+    prisma.creatorLead.count({
+      where: { shopify_shop_id: shopId, status: { in: ['queued', 'sending'] } },
+    }),
+  ]);
+  const capRemaining = Math.max(0, dailyCap - alreadySent - alreadyQueued);
+  const count = Math.min(options.count ?? capRemaining, capRemaining);
+
+  const batchId = randomBytes(8).toString('hex');
+  if (count <= 0) {
+    return { batchId, scheduled: 0, firstAt: null, lastAt: null, capRemaining };
+  }
+
+  const { emails, handles } = await suppressionSets(shopId);
+
+  const candidates = await prisma.creatorLead.findMany({
+    where: {
+      shopify_shop_id: shopId,
+      status: 'resolved',
+      email: { not: null },
+      emailed_at: null,
+      unsubscribed_at: null,
+    },
+    select: { id: true, email: true, instagram_handle: true },
+    orderBy: { sourced_at: 'asc' },
+    take: count,
+  });
+
+  const sendable = candidates.filter(
+    (lead) => !emails.has(normalizeEmail(lead.email!)) && !handles.has(lead.instagram_handle)
+  );
+
+  const start = Date.now() + (options.startInSeconds ?? 10) * 1000;
+  let firstAt: Date | null = null;
+  let lastAt: Date | null = null;
+
+  for (let i = 0; i < sendable.length; i++) {
+    // Jitter each gap by ±50% of the nominal spacing.
+    const jittered = spacing * (0.5 + Math.random());
+    const at = new Date(start + i * jittered * 1000);
+    if (i === 0) firstAt = at;
+    lastAt = at;
+
+    await prisma.creatorLead.update({
+      where: { id: sendable[i].id },
+      data: { status: 'queued', batch_id: batchId, scheduled_send_at: at, send_error: null },
+    });
+  }
+
+  return { batchId, scheduled: sendable.length, firstAt, lastAt, capRemaining };
+}
+
+/**
+ * Sends everything that is due. Safe to call from anywhere, at any frequency.
+ *
+ * Each lead is claimed with a conditional update before any mail goes out, so
+ * two workers overlapping — a cron tick landing on top of a manual run — can't
+ * both send the same message. The claim is the only thing standing between a
+ * retry and a creator getting the same pitch twice.
+ */
+export async function sendDue(
+  shopId: string,
+  options: { limit?: number; copy?: OutreachCopy; now?: Date } = {}
+): Promise<{ sent: number; failed: number; remaining: number }> {
+  const now = options.now ?? new Date();
+  const limit = options.limit ?? 10;
+  const joinUrl = process.env.TRYBE_JOIN_URL || '';
+  const copy = options.copy ?? defaultCopy(joinUrl);
+
+  const due = await prisma.creatorLead.findMany({
+    where: {
+      shopify_shop_id: shopId,
+      status: 'queued',
+      scheduled_send_at: { lte: now },
+    },
+    select: { id: true },
+    orderBy: { scheduled_send_at: 'asc' },
+    take: limit,
+  });
+
+  let sent = 0;
+  let failed = 0;
+
+  for (const candidate of due) {
+    // Claim it. updateMany with the status in the filter is atomic, so exactly
+    // one caller can move a given lead out of 'queued'.
+    const claimed = await prisma.creatorLead.updateMany({
+      where: { id: candidate.id, status: 'queued' },
+      data: { status: 'sending' },
+    });
+    if (claimed.count === 0) continue; // someone else got there first
+
+    const lead = await prisma.creatorLead.findUnique({
+      where: { id: candidate.id },
+      select: {
+        id: true,
+        email: true,
+        instagram_handle: true,
+        full_name: true,
+        unsubscribe_token: true,
+      },
+    });
+    if (!lead?.email) {
+      await prisma.creatorLead.update({
+        where: { id: candidate.id },
+        data: { status: 'unresolvable', send_error: 'no email at send time' },
+      });
+      continue;
+    }
+
+    const result = await sendOutreach(
+      {
+        email: lead.email,
+        instagram_handle: lead.instagram_handle,
+        full_name: lead.full_name,
+        unsubscribe_token: lead.unsubscribe_token,
+      },
+      copy
+    );
+
+    if (result.ok) {
+      await prisma.creatorLead.update({
+        where: { id: lead.id },
+        data: { status: 'emailed', emailed_at: new Date(), send_error: null },
+      });
+      await logEvent(lead.id, 'emailed', lead.email, result.messageId);
+      sent++;
+    } else {
+      // Back to 'queued' so the next tick retries — unless it is a
+      // configuration fault, which will fail identically forever.
+      const fatal = /not set|API key|refusing/i.test(result.reason);
+      await prisma.creatorLead.update({
+        where: { id: lead.id },
+        data: { status: fatal ? 'resolved' : 'queued', send_error: result.reason.slice(0, 500) },
+      });
+      await logEvent(lead.id, 'send_failed', result.reason);
+      failed++;
+      if (fatal) break;
+    }
+  }
+
+  const remaining = await prisma.creatorLead.count({
+    where: { shopify_shop_id: shopId, status: { in: ['queued', 'sending'] } },
+  });
+
+  return { sent, failed, remaining };
+}
+
+/** Puts a batch's unsent leads back in the ready pool. */
+export async function cancelBatch(shopId: string, batchId: string): Promise<number> {
+  const result = await prisma.creatorLead.updateMany({
+    where: { shopify_shop_id: shopId, batch_id: batchId, status: { in: ['queued', 'sending'] } },
+    data: { status: 'resolved', scheduled_send_at: null, batch_id: null },
+  });
+  return result.count;
+}
+
+export type LiveLead = {
+  id: string;
+  instagram_handle: string;
+  full_name: string | null;
+  email: string | null;
+  status: string;
+  scheduled_send_at: Date | null;
+  emailed_at: Date | null;
+  send_error: string | null;
+};
+
+/**
+ * The current batch, for the live view: everything queued or sending, plus what
+ * has already gone out today so the list reads as one continuous run.
+ */
+export async function liveBatch(shopId: string): Promise<{
+  batchId: string | null;
+  leads: LiveLead[];
+  sentToday: number;
+  dailyCap: number;
+  nextAt: Date | null;
+}> {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+  const leads = await prisma.creatorLead.findMany({
+    where: {
+      shopify_shop_id: shopId,
+      OR: [
+        { status: { in: ['queued', 'sending'] } },
+        { status: 'emailed', emailed_at: { gte: since } },
+      ],
+    },
+    select: {
+      id: true,
+      instagram_handle: true,
+      full_name: true,
+      email: true,
+      status: true,
+      scheduled_send_at: true,
+      emailed_at: true,
+      send_error: true,
+      batch_id: true,
+    },
+    // Pending first in send order, then the completed ones newest-last so the
+    // list reads top-to-bottom as the run progresses.
+    orderBy: [{ scheduled_send_at: 'asc' }, { emailed_at: 'asc' }],
+  });
+
+  const pending = leads.filter((lead) => lead.status === 'queued' || lead.status === 'sending');
+
+  return {
+    batchId: pending[0]?.batch_id ?? null,
+    leads: leads.map(({ batch_id, ...rest }) => rest),
+    sentToday: await sentInLast24h(shopId),
+    dailyCap: parseInt(process.env.CREATOR_OUTREACH_DAILY_CAP || '100', 10),
+    nextAt: pending[0]?.scheduled_send_at ?? null,
+  };
+}
