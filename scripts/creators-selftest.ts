@@ -165,5 +165,45 @@ eq('real record shape', extractMetrics({ last30Days: { gmvBucket: '20k+', submis
 eq('no performance block at all', extractMetrics({ id: 'z' } as any).gmv30d, null);
 eq('metrics ride along on toCreator', toCreator(perfRecord as any)!.metrics.submissions30d, 12);
 
+console.log('\n-- send-time scheduling --');
+{
+  const { planSendTimes } = require('../lib/creator-outreach/schedule');
+  const win = {
+    startHour: 9, startMinute: 0, endHour: 17, endMinute: 0,
+    timezone: 'America/Chicago', skipWeekends: true, minGapSeconds: 45,
+  };
+  // Deterministic "random" so the assertions below are stable.
+  let seed = 0;
+  const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
+  const hourIn = (d: Date) =>
+    Number(new Intl.DateTimeFormat('en-US', { timeZone: win.timezone, hour12: false, hour: '2-digit' }).format(d));
+  const dayIn = (d: Date) =>
+    new Intl.DateTimeFormat('en-US', { timeZone: win.timezone, weekday: 'short' }).format(d);
+
+  // Queued at 3am Wednesday — nothing may go out before the window opens.
+  const overnight = planSendTimes({ count: 20, perDay: 20, now: new Date('2026-08-19T08:00:00Z'), window: win, random: rnd });
+  eq('all 20 placed', overnight.length, 20);
+  eq('none before 09:00 local', overnight.every((d: Date) => hourIn(d) >= 9), true);
+  eq('none at or after 17:00 local', overnight.every((d: Date) => hourIn(d) < 17), true);
+  eq('strictly increasing', overnight.every((d: Date, i: number) => i === 0 || d > overnight[i - 1]), true);
+  eq('min gap respected', overnight.every((d: Date, i: number) => i === 0 || +d - +overnight[i - 1] >= 45000), true);
+  eq('spread over hours, not minutes', +overnight[19] - +overnight[0] > 4 * 3600_000, true);
+
+  // Gaps must be irregular — a metronome is the thing this replaces.
+  const gaps = overnight.slice(1).map((d: Date, i: number) => +d - +overnight[i]);
+  eq('gaps vary', new Set(gaps.map((g: number) => Math.round(g / 60000))).size > 5, true);
+
+  // A batch larger than a day's cap spills forward, skipping the weekend.
+  const spill = planSendTimes({ count: 60, perDay: 20, now: new Date('2026-08-21T14:00:00Z'), window: win, random: rnd });
+  eq('60 placed across days', spill.length, 60);
+  eq('no weekend sends', spill.some((d: Date) => dayIn(d) === 'Sat' || dayIn(d) === 'Sun'), false);
+  eq('uses three weekdays', new Set(spill.map((d: Date) => dayIn(d))).size, 3);
+
+  // Queued after the window closes — rolls to the next day, not out tonight.
+  const evening = planSendTimes({ count: 5, perDay: 20, now: new Date('2026-08-19T23:30:00Z'), window: win, random: rnd });
+  eq('after-hours batch waits for the morning', hourIn(evening[0]) >= 9, true);
+  eq('and lands the next weekday', dayIn(evening[0]), 'Thu');
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

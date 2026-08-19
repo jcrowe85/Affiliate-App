@@ -21,6 +21,7 @@ import {
 } from './outreach-email';
 import { assignVariants, compareVariants, type VariantStats, type Comparison } from './experiment';
 import { effectiveDailyCap, type WarmupState } from './warmup';
+import { planSendTimes, sendWindowFromEnv, describeWindow } from './schedule';
 
 /** Cheap, unguessable token for unsubscribe links. */
 function unsubToken(): string {
@@ -473,6 +474,8 @@ export type ScheduleSummary = {
   firstAt: Date | null;
   lastAt: Date | null;
   capRemaining: number;
+  /** e.g. "09:00–17:00 Chicago, weekdays only" */
+  window: string;
 };
 
 /**
@@ -484,12 +487,9 @@ export type ScheduleSummary = {
  */
 export async function scheduleBatch(
   shopId: string,
-  options: { count?: number; spacingSeconds?: number; startInSeconds?: number; dailyCap?: number } = {}
+  options: { count?: number; startInSeconds?: number; dailyCap?: number; now?: Date } = {}
 ): Promise<ScheduleSummary> {
   const dailyCap = options.dailyCap ?? effectiveDailyCap().cap;
-  const spacing = options.spacingSeconds ?? Math.round(
-    parseInt(process.env.CREATOR_OUTREACH_SEND_DELAY_MS || '15000', 10) / 1000
-  );
 
   // Anything already queued counts against the cap — it is spoken for.
   const [alreadySent, alreadyQueued] = await Promise.all([
@@ -502,8 +502,9 @@ export async function scheduleBatch(
   const count = Math.min(options.count ?? capRemaining, capRemaining);
 
   const batchId = randomBytes(8).toString('hex');
+  const windowLabel = describeWindow(sendWindowFromEnv());
   if (count <= 0) {
-    return { batchId, scheduled: 0, firstAt: null, lastAt: null, capRemaining };
+    return { batchId, scheduled: 0, firstAt: null, lastAt: null, capRemaining, window: windowLabel };
   }
 
   const { emails, handles } = await suppressionSets(shopId);
@@ -525,7 +526,6 @@ export async function scheduleBatch(
     (lead) => !emails.has(normalizeEmail(lead.email!)) && !handles.has(lead.instagram_handle)
   );
 
-  const start = Date.now() + (options.startInSeconds ?? 10) * 1000;
   let firstAt: Date | null = null;
   let lastAt: Date | null = null;
 
@@ -537,10 +537,14 @@ export async function scheduleBatch(
   });
   const variants = assignVariants(sendable.length, VARIANT_KEYS, alreadyAssigned);
 
+  // Scattered across the sending window rather than fired off back to back —
+  // see lib/creator-outreach/schedule.ts. A batch bigger than one day's cap
+  // spills onto following days by itself.
+  const times = planSendTimes({ count: sendable.length, perDay: dailyCap, now: options.now });
+
   for (let i = 0; i < sendable.length; i++) {
-    // Jitter each gap by ±50% of the nominal spacing.
-    const jittered = spacing * (0.5 + Math.random());
-    const at = new Date(start + i * jittered * 1000);
+    const at = times[i];
+    if (!at) break; // window couldn't hold the rest; the remainder stays ready
     if (i === 0) firstAt = at;
     lastAt = at;
 
@@ -556,7 +560,14 @@ export async function scheduleBatch(
     });
   }
 
-  return { batchId, scheduled: sendable.length, firstAt, lastAt, capRemaining };
+  return {
+    batchId,
+    scheduled: times.length < sendable.length ? times.length : sendable.length,
+    firstAt,
+    lastAt,
+    capRemaining,
+    window: windowLabel,
+  };
 }
 
 /**

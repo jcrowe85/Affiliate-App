@@ -51,6 +51,15 @@ function timeOfDay(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
+/** Batches can now span days, so a bare clock time would be ambiguous. */
+function whenLabel(iso: string): string {
+  const at = new Date(iso);
+  const today = new Date().toDateString() === at.toDateString();
+  return today
+    ? timeOfDay(iso)
+    : at.toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+}
+
 export default function CreatorSendMonitor({ onChanged }: { onChanged?: () => void }) {
   const [data, setData] = useState<LivePayload | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -101,7 +110,7 @@ export default function CreatorSendMonitor({ onChanged }: { onChanged?: () => vo
         setMessage(
           s.scheduled === 0
             ? `Nothing scheduled — ${s.capRemaining} left under today's cap, and no leads ready.`
-            : `Queued ${s.scheduled}. First goes out at ${timeOfDay(s.firstAt)}, last around ${timeOfDay(s.lastAt)}.`
+            : `Queued ${s.scheduled}, spread over ${s.window}. First ${whenLabel(s.firstAt)}, last ${whenLabel(s.lastAt)}.`
         );
       } else if (action === 'cancel-batch') {
         setMessage(`Cancelled ${result.cancelled} pending — they're back in the ready pool.`);
@@ -281,13 +290,16 @@ export default function CreatorSendMonitor({ onChanged }: { onChanged?: () => vo
                 <div className="shrink-0 text-right w-28">
                   {isSent ? (
                     <span className="text-xs text-green-700 dark:text-green-500">
-                      sent {lead.emailed_at ? timeOfDay(lead.emailed_at) : ''}
+                      sent {lead.emailed_at ? whenLabel(lead.emailed_at) : ''}
                     </span>
                   ) : isSending ? (
                     <span className="text-xs text-indigo-600 dark:text-indigo-400">sending…</span>
                   ) : (
                     <span className="text-xs text-gray-500 dark:text-gray-400 tabular-nums">
-                      in {countdown(dueIn)}
+                      {lead.scheduled_send_at ? whenLabel(lead.scheduled_send_at) : ''}
+                      <span className="block text-[10px] text-gray-400 dark:text-gray-500">
+                        in {countdown(dueIn)}
+                      </span>
                     </span>
                   )}
                 </div>

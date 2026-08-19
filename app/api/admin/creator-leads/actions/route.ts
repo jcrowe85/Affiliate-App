@@ -61,10 +61,7 @@ export async function POST(request: NextRequest) {
 
     if (action === 'schedule') {
       const count = Math.max(1, parseInt(body?.count ?? 25, 10) || 25);
-      const summary = await scheduleBatch(shopId, {
-        count,
-        spacingSeconds: body?.spacingSeconds ? parseInt(body.spacingSeconds, 10) : undefined,
-      });
+      const summary = await scheduleBatch(shopId, { count });
       return NextResponse.json({ summary, counts: await statusCounts(shopId) });
     }
 

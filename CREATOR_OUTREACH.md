@@ -142,8 +142,13 @@ costs volume rather than causing a double-send.
 
 **Creator Outreach → Live sending** in the admin UI.
 
-Sends are paced minutes apart, which is longer than any serverless request may
-run. So a batch is *planned* rather than *performed*: pressing Queue writes a
+Sends are scattered across a working-day window — 09:00–17:00 Central,
+weekdays, by default — with irregular gaps of roughly 15–45 minutes. Twenty
+emails fired off in five minutes at 3am reads as a machine and lands under
+everything that arrived overnight; this reads as a person working through a
+list. A batch larger than the day's cap spills onto following days by itself.
+
+That pacing is longer than any serverless request may run. So a batch is *planned* rather than *performed*: pressing Queue writes a
 send time onto each lead, and a worker delivers whatever is due whenever it
 runs. That split is what lets the page show a real countdown, survive a closed
 tab or a deploy mid-batch, and be cancelled partway through.
