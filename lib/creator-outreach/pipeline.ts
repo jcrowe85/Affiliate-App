@@ -20,6 +20,7 @@ import {
   type OutreachCopy,
 } from './outreach-email';
 import { assignVariants, compareVariants, type VariantStats, type Comparison } from './experiment';
+import { effectiveDailyCap, type WarmupState } from './warmup';
 
 /** Cheap, unguessable token for unsubscribe links. */
 function unsubToken(): string {
@@ -313,7 +314,7 @@ export async function sendBatch(
     onSend?: (email: string, ok: boolean, reason?: string) => void;
   } = {}
 ): Promise<SendSummary> {
-  const dailyCap = options.dailyCap ?? parseInt(process.env.CREATOR_OUTREACH_DAILY_CAP || '100', 10);
+  const dailyCap = options.dailyCap ?? effectiveDailyCap().cap;
   const delayMs = options.delayMs ?? parseInt(process.env.CREATOR_OUTREACH_SEND_DELAY_MS || '15000', 10);
   const joinUrl = process.env.TRYBE_JOIN_URL || '';
   const copy = options.copy ?? defaultCopy(joinUrl);
@@ -485,7 +486,7 @@ export async function scheduleBatch(
   shopId: string,
   options: { count?: number; spacingSeconds?: number; startInSeconds?: number; dailyCap?: number } = {}
 ): Promise<ScheduleSummary> {
-  const dailyCap = options.dailyCap ?? parseInt(process.env.CREATOR_OUTREACH_DAILY_CAP || '100', 10);
+  const dailyCap = options.dailyCap ?? effectiveDailyCap().cap;
   const spacing = options.spacingSeconds ?? Math.round(
     parseInt(process.env.CREATOR_OUTREACH_SEND_DELAY_MS || '15000', 10) / 1000
   );
@@ -687,9 +688,11 @@ export async function liveBatch(shopId: string): Promise<{
   leads: LiveLead[];
   sentToday: number;
   dailyCap: number;
+  warmup: WarmupState;
   nextAt: Date | null;
 }> {
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const warmup = effectiveDailyCap();
 
   const leads = await prisma.creatorLead.findMany({
     where: {
@@ -721,7 +724,8 @@ export async function liveBatch(shopId: string): Promise<{
     batchId: pending[0]?.batch_id ?? null,
     leads: leads.map(({ batch_id, ...rest }) => rest),
     sentToday: await sentInLast24h(shopId),
-    dailyCap: parseInt(process.env.CREATOR_OUTREACH_DAILY_CAP || '100', 10),
+    dailyCap: warmup.cap,
+    warmup: warmup.state,
     nextAt: pending[0]?.scheduled_send_at ?? null,
   };
 }

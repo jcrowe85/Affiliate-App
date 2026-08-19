@@ -30,6 +30,7 @@ type LivePayload = {
   dailyCap: number;
   nextAt: string | null;
   serverNow: string;
+  warmup: { active: boolean; day: number | null; cap: number; nextCap: number | null; nextAt: string | null; note: string };
 };
 
 const POLL_MS = 4000;
@@ -147,7 +148,10 @@ export default function CreatorSendMonitor({ onChanged }: { onChanged?: () => vo
             <div className="text-sm text-gray-700 dark:text-gray-300">
               {data?.sentToday ?? 0} / {data?.dailyCap ?? 0} in last 24h
             </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">{capLeft} left under cap</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400">
+              {capLeft} left under cap
+              {data?.warmup?.active && data.warmup.day != null ? ` · warmup day ${data.warmup.day}` : ''}
+            </div>
           </div>
         </div>
 
@@ -204,6 +208,12 @@ export default function CreatorSendMonitor({ onChanged }: { onChanged?: () => vo
             live · refreshes every {POLL_MS / 1000}s
           </span>
         </div>
+
+        {/* The cap is not arbitrary — say why it is what it is, so nobody
+            "fixes" it by typing a bigger number. */}
+        {data?.warmup?.note && (
+          <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">{data.warmup.note}</p>
+        )}
 
         {message && (
           <p className="mt-3 text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">

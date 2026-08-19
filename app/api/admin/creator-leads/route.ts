@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { getCurrentAdmin } from '@/lib/auth';
 import { sentInLast24h, statusCounts, experimentResults } from '@/lib/creator-outreach/pipeline';
 import { apifyToken } from '@/lib/creator-outreach/instagram';
+import { effectiveDailyCap } from '@/lib/creator-outreach/warmup';
 
 export const dynamic = 'force-dynamic';
 
@@ -70,7 +71,8 @@ export async function GET(request: NextRequest) {
       counts,
       sentToday,
       experiment,
-      dailyCap: parseInt(process.env.CREATOR_OUTREACH_DAILY_CAP || '100', 10),
+      dailyCap: effectiveDailyCap().cap,
+      warmup: effectiveDailyCap().state,
       // Surfaced so the UI can tell the admin what's missing instead of letting
       // a send fail silently later.
       config: {
