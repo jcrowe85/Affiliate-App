@@ -159,6 +159,13 @@ export async function ingestSourced(
         full_name: creator.fullName,
         followers: creator.followers,
         source_filter: label,
+        // Snapshot from before we made contact — see the schema comment.
+        trybe_metrics: (creator.metrics.raw ?? undefined) as never,
+        gmv_30d: creator.metrics.gmv30d,
+        submissions_30d: creator.metrics.submissions30d,
+        approval_rate: creator.metrics.approvalRate,
+        brand_partnerships: creator.metrics.brandPartnerships,
+        sample_score: creator.metrics.sampleScore,
         unsubscribe_token: unsubToken(),
         status: 'sourced',
       },

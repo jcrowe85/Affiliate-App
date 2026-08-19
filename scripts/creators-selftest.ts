@@ -13,7 +13,7 @@
 
 import { extractEmailsFromText, chooseContactEmail, isPlausibleEmail } from '../lib/creator-outreach/email-extract';
 import { parseCurl } from '../lib/creator-outreach/curl';
-import { discoverRecords, toCreator, toCreators, normalizeHandle } from '../lib/creator-outreach/trybe';
+import { discoverRecords, toCreator, toCreators, normalizeHandle, extractMetrics } from '../lib/creator-outreach/trybe';
 
 let pass = 0, fail = 0;
 const eq = (name: string, got: unknown, want: unknown) => {
@@ -124,6 +124,37 @@ eq('page-level strictness skips the record with no instagram',
    toCreators(page as any).map((c) => c.instagramHandle), ['nicole_mamapreneur']);
 eq('payload that models no socials still falls back to username',
    toCreators([{ id: 'c3', username: 'plainapi' }] as any).map((c) => c.instagramHandle), ['plainapi']);
+
+console.log('\n-- Trybe performance snapshot --');
+// The shape inside last30Days was never observed directly, so these check the
+// tolerant reads AND that the raw block survives regardless.
+const perfRecord = {
+  id: 'c9',
+  username: 'x',
+  creatorProfile: { instagramUrl: 'https://instagram.com/x' },
+  brandPartnershipCount: 7,
+  sampleScore: 82.5,
+  last30Days: { gmv: 1450.75, submissions: 12, approvalRate: 91 },
+};
+const m = extractMetrics(perfRecord as any);
+eq('gmv', m.gmv30d, 1450.75);
+eq('submissions', m.submissions30d, 12);
+eq('approval rate', m.approvalRate, 91);
+eq('brand partnerships', m.brandPartnerships, 7);
+eq('sample score', m.sampleScore, 82.5);
+eq('raw block kept verbatim', m.raw, { gmv: 1450.75, submissions: 12, approvalRate: 91 });
+
+// Different spellings, because the real key names are still unconfirmed.
+const alt = extractMetrics({ last30Days: { GMV: '2200', videoCount: 4, submissionApprovalRate: 75 } } as any);
+eq('alt spellings', [alt.gmv30d, alt.submissions30d, alt.approvalRate], [2200, 4, 75]);
+
+// A wrong guess must not lose the data.
+const unknown = extractMetrics({ last30Days: { totallyUnexpectedKey: 99 } } as any);
+eq('unknown keys -> nulls, not a crash', [unknown.gmv30d, unknown.submissions30d], [null, null]);
+eq('unknown keys -> raw still stored', unknown.raw, { totallyUnexpectedKey: 99 });
+
+eq('no performance block at all', extractMetrics({ id: 'z' } as any).gmv30d, null);
+eq('metrics ride along on toCreator', toCreator(perfRecord as any)!.metrics.submissions30d, 12);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

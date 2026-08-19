@@ -53,8 +53,21 @@ export type SourcedCreator = {
   trybeCreatorId: string | null;
   fullName: string | null;
   followers: number | null;
+  /** Trybe's performance snapshot for this creator, before we contacted them. */
+  metrics: TrybeMetrics;
   /** The original record, kept so a mis-mapped field can be recovered later. */
   raw: unknown;
+};
+
+export type TrybeMetrics = {
+  /** The raw performance block, stored verbatim so a wrong guess below is
+   *  recoverable without re-scraping. */
+  raw: unknown;
+  gmv30d: number | null;
+  submissions30d: number | null;
+  approvalRate: number | null;
+  brandPartnerships: number | null;
+  sampleScore: number | null;
 };
 
 export const CONFIG_DIR = path.join(process.cwd(), '.trybe');
@@ -256,6 +269,54 @@ function findFollowers(record: Record<string, unknown>): number | null {
   return null;
 }
 
+/**
+ * Reads a number from an object under any of several likely key spellings,
+ * tolerating numeric strings.
+ */
+function numberAt(node: unknown, keys: string[]): number | null {
+  if (node === null || typeof node !== 'object') return null;
+  const record = node as Record<string, unknown>;
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value))) {
+      return Number(value);
+    }
+  }
+  return null;
+}
+
+/**
+ * Pulls Trybe's performance snapshot off a creator record.
+ *
+ * The shape inside `last30Days` was never inspected directly — the capture that
+ * revealed the field names happened after the session token expired — so every
+ * read here tries several spellings and the whole block is stored raw
+ * alongside. If a name is wrong, the data is still on the row and the fix is a
+ * backfill rather than a re-scrape.
+ */
+export function extractMetrics(record: Record<string, unknown>): TrybeMetrics {
+  // The performance block appears as `last30Days`, but accept the obvious
+  // variants, and fall back to the record itself for flatter payloads.
+  const block =
+    (['last30Days', 'last_30_days', 'last30days', 'performance', 'stats'] as const)
+      .map((key) => record[key])
+      .find((value) => value !== null && typeof value === 'object') ?? record;
+
+  return {
+    raw: record['last30Days'] ?? block ?? null,
+    gmv30d: numberAt(block, ['gmv', 'GMV', 'gmv30d', 'revenue', 'sales', 'totalGmv', 'gmvCents']),
+    submissions30d: numberAt(block, [
+      'submissions', 'submissionCount', 'submissions30d', 'videos', 'videoCount', 'posts',
+    ]),
+    approvalRate: numberAt(block, [
+      'approvalRate', 'submissionApprovalRate', 'approval_rate', 'approvalPercentage',
+    ]),
+    brandPartnerships: numberAt(record, ['brandPartnershipCount', 'brandPartnerships', 'partnerships']),
+    sampleScore: numberAt(record, ['sampleScore', 'score', 'sample_score']),
+  };
+}
+
 function findId(record: Record<string, unknown>): string | null {
   for (const key of ['id', 'creator_id', 'creatorId', 'uuid', '_id', 'user_id', 'userId']) {
     const value = record[key];
@@ -329,6 +390,7 @@ export function toCreator(
       : findName(record),
     followers:
       typeof followersRaw === 'number' ? Math.round(followersRaw) : findFollowers(record),
+    metrics: extractMetrics(record),
     raw: record,
   };
 }

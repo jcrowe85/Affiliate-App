@@ -547,6 +547,22 @@ model CreatorLead {
   source_filter    String? // which saved Trybe filter produced this lead
   sourced_at       DateTime @default(now())
 
+  // --- Trybe performance, captured at sourcing time ---
+  //
+  // These are a snapshot from before we contacted anyone, which is the only
+  // reason to grab them now: once a creator works with us their Trybe numbers
+  // answer a different question, and the pre-outreach baseline is gone.
+  //
+  // `trybe_metrics` keeps the raw block verbatim. The typed columns below are
+  // best-effort reads of it, and the raw copy is what makes a wrong guess
+  // recoverable without re-scraping.
+  trybe_metrics      Json?
+  gmv_30d            Decimal? @db.Decimal(12, 2)
+  submissions_30d    Int?
+  approval_rate      Decimal? @db.Decimal(5, 2)
+  brand_partnerships Int?
+  sample_score       Decimal? @db.Decimal(8, 3)
+
   // --- Profile (stage 2: Instagram) ---
   instagram_handle String // stored lowercased, without the leading @
   full_name        String?
