@@ -287,6 +287,32 @@ function numberAt(node: unknown, keys: string[]): number | null {
 }
 
 /**
+ * Parses Trybe's GMV bucket into a numeric floor.
+ *
+ * The API reports GMV as a band — "20k+", "5k-10k", "$1,200" — rather than a
+ * figure, so this returns the *lower bound* of whatever band a creator is in.
+ * Treat it as "at least this much", never as their actual revenue: a creator in
+ * "20k+" might be at 20,001 or at 900,000. The raw string is kept in
+ * trybe_metrics for anyone who needs the band itself.
+ */
+export function parseGmvBucket(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value !== 'string') return null;
+
+  const cleaned = value.trim().toLowerCase().replace(/[$,\s]/g, '');
+  if (!cleaned) return null;
+
+  // Take the first number in the band — "5k-10k" floors at 5,000.
+  const match = cleaned.match(/^(\d+(?:\.\d+)?)([km]?)/);
+  if (!match) return null;
+
+  const amount = Number(match[1]);
+  if (!Number.isFinite(amount)) return null;
+  const multiplier = match[2] === 'k' ? 1_000 : match[2] === 'm' ? 1_000_000 : 1;
+  return amount * multiplier;
+}
+
+/**
  * Pulls Trybe's performance snapshot off a creator record.
  *
  * The shape inside `last30Days` was never inspected directly — the capture that
@@ -305,7 +331,13 @@ export function extractMetrics(record: Record<string, unknown>): TrybeMetrics {
 
   return {
     raw: record['last30Days'] ?? block ?? null,
-    gmv30d: numberAt(block, ['gmv', 'GMV', 'gmv30d', 'revenue', 'sales', 'totalGmv', 'gmvCents']),
+    // Numeric first, then the bucket string Trybe actually returns.
+    gmv30d:
+      numberAt(block, ['gmv', 'GMV', 'gmv30d', 'revenue', 'sales', 'totalGmv']) ??
+      parseGmvBucket(
+        (block as Record<string, unknown>)?.['gmvBucket'] ??
+          (block as Record<string, unknown>)?.['gmv_bucket']
+      ),
     submissions30d: numberAt(block, [
       'submissions', 'submissionCount', 'submissions30d', 'videos', 'videoCount', 'posts',
     ]),

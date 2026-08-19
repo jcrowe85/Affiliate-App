@@ -13,7 +13,7 @@
 
 import { extractEmailsFromText, chooseContactEmail, isPlausibleEmail } from '../lib/creator-outreach/email-extract';
 import { parseCurl } from '../lib/creator-outreach/curl';
-import { discoverRecords, toCreator, toCreators, normalizeHandle, extractMetrics } from '../lib/creator-outreach/trybe';
+import { discoverRecords, toCreator, toCreators, normalizeHandle, extractMetrics, parseGmvBucket } from '../lib/creator-outreach/trybe';
 
 let pass = 0, fail = 0;
 const eq = (name: string, got: unknown, want: unknown) => {
@@ -152,6 +152,15 @@ eq('alt spellings', [alt.gmv30d, alt.submissions30d, alt.approvalRate], [2200, 4
 const unknown = extractMetrics({ last30Days: { totallyUnexpectedKey: 99 } } as any);
 eq('unknown keys -> nulls, not a crash', [unknown.gmv30d, unknown.submissions30d], [null, null]);
 eq('unknown keys -> raw still stored', unknown.raw, { totallyUnexpectedKey: 99 });
+
+// Trybe reports GMV as a band, not a figure — confirmed live as gmvBucket:"20k+".
+eq('bucket "20k+" floors at 20000', parseGmvBucket('20k+'), 20000);
+eq('range "5k-10k" floors at 5000', parseGmvBucket('5k-10k'), 5000);
+eq('plain "$1,200"', parseGmvBucket('$1,200'), 1200);
+eq('"1.5m"', parseGmvBucket('1.5m'), 1500000);
+eq('already numeric passes through', parseGmvBucket(4200), 4200);
+eq('nonsense -> null', parseGmvBucket('lots'), null);
+eq('real record shape', extractMetrics({ last30Days: { gmvBucket: '20k+', submissions: 4, approvalRate: 100 } } as any).gmv30d, 20000);
 
 eq('no performance block at all', extractMetrics({ id: 'z' } as any).gmv30d, null);
 eq('metrics ride along on toCreator', toCreator(perfRecord as any)!.metrics.submissions30d, 12);
