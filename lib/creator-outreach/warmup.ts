@@ -22,6 +22,19 @@
 export type WarmupTier = { throughDay: number; cap: number };
 
 /**
+ * Midnight of the given instant, in local terms.
+ *
+ * The tier must change at a day boundary, not at the clock time the ramp was
+ * configured — otherwise the cap steps up mid-afternoon and a day gets a
+ * mixture of two tiers.
+ */
+function midnight(at: Date): Date {
+  const copy = new Date(at.getTime());
+  copy.setHours(0, 0, 0, 0);
+  return copy;
+}
+
+/**
  * Days are 1-based from the first send. Each tier caps sends per rolling 24h
  * up to and including `throughDay`.
  *
@@ -83,9 +96,10 @@ export function warmupState(options: {
   }
 
   const msPerDay = 24 * 60 * 60 * 1000;
-  // Day 1 is the start date itself, so a schedule set today begins at tier one
-  // rather than at zero.
-  const day = Math.floor((now.getTime() - startedAt.getTime()) / msPerDay) + 1;
+  // Counted in whole days from the start, so the tier steps up at midnight
+  // rather than at whatever time of day the ramp happened to begin.
+  const day =
+    Math.floor((midnight(now).getTime() - midnight(startedAt).getTime()) / msPerDay) + 1;
 
   if (day < 1) {
     return {
@@ -142,4 +156,9 @@ export function effectiveDailyCap(now?: Date): { cap: number; state: WarmupState
   const configuredCap = parseInt(process.env.CREATOR_OUTREACH_DAILY_CAP || '300', 10);
   const state = warmupState({ startedAt: warmupStartedAt(), configuredCap, now });
   return { cap: state.cap, state };
+}
+
+/** The cap that will be in force on a given future day. */
+export function capForDay(day: Date): number {
+  return effectiveDailyCap(day).cap;
 }

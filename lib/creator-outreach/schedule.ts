@@ -122,8 +122,13 @@ export function planSendTimes(options: {
   count: number;
   now?: Date;
   window?: SendWindow;
-  /** Most sends to place in any one day, i.e. the warmup cap. */
-  perDay: number;
+  /**
+   * Most sends to place in a given day. A function rather than a number
+   * because the warmup cap climbs: booking three days ahead at today's cap
+   * silently under-books every later day, and the ramp never applies to
+   * anything queued in advance.
+   */
+  perDay: number | ((day: Date) => number);
   /**
    * Slots still free today, when part of today's cap is already spent. Only
    * applies to the first day with an open window; later days get the full
@@ -159,7 +164,9 @@ export function planSendTimes(options: {
     // firstDayLimit is today's leftover allowance. If today's window has
     // already closed, the first day we place into is tomorrow — and tomorrow
     // starts fresh, so it must get the full cap rather than today's remainder.
-    const dayCap = isToday ? (options.firstDayLimit ?? options.perDay) : options.perDay;
+    const capThisDay =
+      typeof options.perDay === 'function' ? options.perDay(opens) : options.perDay;
+    const dayCap = isToday ? (options.firstDayLimit ?? capThisDay) : capThisDay;
     const today = Math.min(remaining, dayCap);
     // Never pack a day tighter than the minimum gap allows.
     const capacity = Math.max(1, Math.floor(span / (window.minGapSeconds * 1000)));

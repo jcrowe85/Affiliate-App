@@ -20,7 +20,7 @@ import {
   type OutreachCopy,
 } from './outreach-email';
 import { assignVariants, compareVariants, type VariantStats, type Comparison } from './experiment';
-import { effectiveDailyCap, type WarmupState } from './warmup';
+import { effectiveDailyCap, capForDay, type WarmupState } from './warmup';
 import { planSendTimes, sendWindowFromEnv, describeWindow, startOfSendingDay } from './schedule';
 
 /** Cheap, unguessable token for unsubscribe links. */
@@ -560,7 +560,8 @@ export async function scheduleBatch(
   // spills onto following days by itself.
   const times = planSendTimes({
     count: sendable.length,
-    perDay: dailyCap,
+    // Each day gets the cap that will actually apply on that day.
+    perDay: capForDay,
     firstDayLimit: capRemaining,
     now,
   });
@@ -832,7 +833,6 @@ export async function autoTopUp(
   options: { days?: number; now?: Date } = {}
 ): Promise<{ queued: number; alreadyBooked: number; readyPool: number; target: number }> {
   const days = options.days ?? parseInt(process.env.CREATOR_OUTREACH_QUEUE_DAYS || '3', 10);
-  const dailyCap = effectiveDailyCap().cap;
   const now = options.now ?? new Date();
   const horizon = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
 
@@ -855,9 +855,14 @@ export async function autoTopUp(
     }),
   ]);
 
-  // Today is partly spent, so the horizon holds one fewer full day than `days`.
+  // Sum each day's own cap across the horizon rather than multiplying today's
+  // — during warmup the later days are worth more.
   const sentToday = await sentInLast24h(shopId, now);
-  const target = Math.max(0, dailyCap * days - sentToday);
+  let capacity = 0;
+  for (let i = 0; i < days; i++) {
+    capacity += capForDay(new Date(now.getTime() + i * 24 * 60 * 60 * 1000));
+  }
+  const target = Math.max(0, capacity - sentToday);
   const shortfall = Math.min(target - alreadyBooked, readyPool);
 
   if (shortfall <= 0) {

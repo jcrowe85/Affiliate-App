@@ -222,6 +222,22 @@ console.log('\n-- send-time scheduling --');
   });
   eq('closed window -> next day gets the FULL cap, not the remainder', [...ahDays.values()][0], 20);
 
+  // Regression: booking days ahead must use each day's own cap. Reusing
+  // today's silently under-books every later day, so the warmup ramp never
+  // reaches anything queued in advance — caught live with Friday booked at 30
+  // when the ramp said 50.
+  const ramp = (d: Date) => {
+    const day = Math.floor((+d - +new Date('2026-08-20T00:00:00Z')) / 86400000);
+    return day <= 0 ? 30 : day === 1 ? 50 : 75;
+  };
+  const ramped = planSendTimes({ count: 200, perDay: ramp, now: new Date('2026-08-20T13:00:00Z'), window: win, random: rnd });
+  const rampDays = new Map<string, number>();
+  ramped.forEach((d: Date) => {
+    const k = new Intl.DateTimeFormat('en-US', { timeZone: win.timezone, month: 'short', day: 'numeric' }).format(d);
+    rampDays.set(k, (rampDays.get(k) ?? 0) + 1);
+  });
+  eq('each day uses its own cap as the ramp climbs', [...rampDays.values()].slice(0, 3), [30, 50, 75]);
+
   // Queued after the window closes — rolls to the next day, not out tonight.
   const evening = planSendTimes({ count: 5, perDay: 20, now: new Date('2026-08-19T23:30:00Z'), window: win, random: rnd });
   eq('after-hours batch waits for the morning', hourIn(evening[0]) >= 9, true);
