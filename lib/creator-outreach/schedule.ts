@@ -124,6 +124,12 @@ export function planSendTimes(options: {
   window?: SendWindow;
   /** Most sends to place in any one day, i.e. the warmup cap. */
   perDay: number;
+  /**
+   * Slots still free today, when part of today's cap is already spent. Only
+   * applies to the first day with an open window; later days get the full
+   * `perDay`.
+   */
+  firstDayLimit?: number;
   random?: () => number;
 }): Date[] {
   const window = options.window ?? sendWindowFromEnv();
@@ -138,6 +144,8 @@ export function planSendTimes(options: {
   // bound just stops a misconfigured window (opens after it closes) spinning.
   while (remaining > 0 && dayOffset < 30) {
     const { weekday, opens, closes } = windowFor(dayOffset, now, window);
+    // Capture before advancing: `firstDayLimit` describes *today* specifically.
+    const isToday = dayOffset === 0;
     dayOffset++;
 
     if (window.skipWeekends && WEEKEND.has(weekday)) continue;
@@ -148,7 +156,11 @@ export function planSendTimes(options: {
     if (earliest >= closes) continue;
 
     const span = closes.getTime() - earliest.getTime();
-    const today = Math.min(remaining, options.perDay);
+    // firstDayLimit is today's leftover allowance. If today's window has
+    // already closed, the first day we place into is tomorrow — and tomorrow
+    // starts fresh, so it must get the full cap rather than today's remainder.
+    const dayCap = isToday ? (options.firstDayLimit ?? options.perDay) : options.perDay;
+    const today = Math.min(remaining, dayCap);
     // Never pack a day tighter than the minimum gap allows.
     const capacity = Math.max(1, Math.floor(span / (window.minGapSeconds * 1000)));
     const placing = Math.min(today, capacity);
@@ -183,4 +195,18 @@ export function describeWindow(window: SendWindow): string {
     `${pad(window.startHour)}:${pad(window.startMinute)}–${pad(window.endHour)}:${pad(window.endMinute)} ` +
     `${zone}${window.skipWeekends ? ', weekdays only' : ''}`
   );
+}
+
+/**
+ * Midnight today, in the sending timezone.
+ *
+ * The daily cap is counted from here rather than over a rolling 24 hours: a
+ * rolling window lets an afternoon's sends eat into the next morning's
+ * allowance, which throttles the following day for no gain.
+ */
+export function startOfSendingDay(now?: Date): Date {
+  const window = sendWindowFromEnv();
+  const at = now ?? new Date();
+  const { year, month, day } = zonedParts(at, window.timezone);
+  return fromZoned(year, month, day, 0, 0, window.timezone);
 }

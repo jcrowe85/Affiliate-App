@@ -21,7 +21,7 @@ import {
 } from './outreach-email';
 import { assignVariants, compareVariants, type VariantStats, type Comparison } from './experiment';
 import { effectiveDailyCap, type WarmupState } from './warmup';
-import { planSendTimes, sendWindowFromEnv, describeWindow } from './schedule';
+import { planSendTimes, sendWindowFromEnv, describeWindow, startOfSendingDay } from './schedule';
 
 /** Cheap, unguessable token for unsubscribe links. */
 function unsubToken(): string {
@@ -281,11 +281,19 @@ export async function resolvePending(
   return summary;
 }
 
-/** How many outreach emails went out in the last 24 hours. */
-export async function sentInLast24h(shopId: string): Promise<number> {
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+/**
+ * How many outreach emails have gone out today, where "today" is the calendar
+ * day in the sending timezone.
+ *
+ * Deliberately not a rolling 24-hour window. Rolling sounds stricter and reads
+ * worse in practice: 19 sends on Wednesday afternoon would eat most of
+ * Thursday morning's allowance, so Thursday quietly runs at a third of the cap
+ * for no benefit. A calendar day is also what "30/day" means to everyone
+ * looking at the number.
+ */
+export async function sentInLast24h(shopId: string, now?: Date): Promise<number> {
   return prisma.creatorLead.count({
-    where: { shopify_shop_id: shopId, emailed_at: { gte: since } },
+    where: { shopify_shop_id: shopId, emailed_at: { gte: startOfSendingDay(now) } },
   });
 }
 
@@ -491,15 +499,25 @@ export async function scheduleBatch(
 ): Promise<ScheduleSummary> {
   const dailyCap = options.dailyCap ?? effectiveDailyCap().cap;
 
-  // Anything already queued counts against the cap — it is spoken for.
-  const [alreadySent, alreadyQueued] = await Promise.all([
-    sentInLast24h(shopId),
+  // The cap governs sends per rolling 24 hours — not how far ahead the queue
+  // is booked. Counting every queued lead against it (as this used to) meant a
+  // batch could never exceed one day, so the multi-day spill in planSendTimes
+  // could never actually fire.
+  const now = options.now ?? new Date();
+  const endOfToday = new Date(startOfSendingDay(now).getTime() + 24 * 60 * 60 * 1000);
+  const [alreadySent, queuedToday] = await Promise.all([
+    sentInLast24h(shopId, now),
     prisma.creatorLead.count({
-      where: { shopify_shop_id: shopId, status: { in: ['queued', 'sending'] } },
+      where: {
+        shopify_shop_id: shopId,
+        status: { in: ['queued', 'sending'] },
+        scheduled_send_at: { lt: endOfToday },
+      },
     }),
   ]);
-  const capRemaining = Math.max(0, dailyCap - alreadySent - alreadyQueued);
-  const count = Math.min(options.count ?? capRemaining, capRemaining);
+  const capRemaining = Math.max(0, dailyCap - alreadySent - queuedToday);
+  // A batch may run past today; later days are capped inside planSendTimes.
+  const count = Math.max(0, options.count ?? capRemaining);
 
   const batchId = randomBytes(8).toString('hex');
   const windowLabel = describeWindow(sendWindowFromEnv());
@@ -540,7 +558,12 @@ export async function scheduleBatch(
   // Scattered across the sending window rather than fired off back to back —
   // see lib/creator-outreach/schedule.ts. A batch bigger than one day's cap
   // spills onto following days by itself.
-  const times = planSendTimes({ count: sendable.length, perDay: dailyCap, now: options.now });
+  const times = planSendTimes({
+    count: sendable.length,
+    perDay: dailyCap,
+    firstDayLimit: capRemaining,
+    now,
+  });
 
   for (let i = 0; i < sendable.length; i++) {
     const at = times[i];
@@ -791,4 +814,56 @@ export async function experimentResults(shopId: string): Promise<{
   }));
 
   return { variants, comparison: compareVariants(variants) };
+}
+
+/**
+ * Keeps the queue booked `days` ahead without anyone pressing a button.
+ *
+ * scheduleBatch is a deliberate act — you choose a number and it books it.
+ * That is right for the first sends and wrong as a steady state: the queue
+ * drains, nobody notices, and a week goes by at zero volume. This tops it back
+ * up to the warmup cap for each of the next `days` days.
+ *
+ * Idempotent by construction: it only ever queues the shortfall, so running it
+ * every minute from the cron worker is harmless.
+ */
+export async function autoTopUp(
+  shopId: string,
+  options: { days?: number; now?: Date } = {}
+): Promise<{ queued: number; alreadyBooked: number; readyPool: number; target: number }> {
+  const days = options.days ?? parseInt(process.env.CREATOR_OUTREACH_QUEUE_DAYS || '3', 10);
+  const dailyCap = effectiveDailyCap().cap;
+  const now = options.now ?? new Date();
+  const horizon = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+
+  const [alreadyBooked, readyPool] = await Promise.all([
+    prisma.creatorLead.count({
+      where: {
+        shopify_shop_id: shopId,
+        status: { in: ['queued', 'sending'] },
+        scheduled_send_at: { lte: horizon },
+      },
+    }),
+    prisma.creatorLead.count({
+      where: {
+        shopify_shop_id: shopId,
+        status: 'resolved',
+        email: { not: null },
+        emailed_at: null,
+        unsubscribed_at: null,
+      },
+    }),
+  ]);
+
+  // Today is partly spent, so the horizon holds one fewer full day than `days`.
+  const sentToday = await sentInLast24h(shopId, now);
+  const target = Math.max(0, dailyCap * days - sentToday);
+  const shortfall = Math.min(target - alreadyBooked, readyPool);
+
+  if (shortfall <= 0) {
+    return { queued: 0, alreadyBooked, readyPool, target };
+  }
+
+  const summary = await scheduleBatch(shopId, { count: shortfall, now });
+  return { queued: summary.scheduled, alreadyBooked, readyPool, target };
 }

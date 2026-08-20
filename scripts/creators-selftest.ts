@@ -199,6 +199,29 @@ console.log('\n-- send-time scheduling --');
   eq('no weekend sends', spill.some((d: Date) => dayIn(d) === 'Sat' || dayIn(d) === 'Sun'), false);
   eq('uses three weekdays', new Set(spill.map((d: Date) => dayIn(d))).size, 3);
 
+  // Multi-day batches must respect a partly-spent first day.
+  const partial = planSendTimes({ count: 50, perDay: 20, firstDayLimit: 5, now: new Date('2026-08-19T14:00:00Z'), window: win, random: rnd });
+  const perDay = new Map<string, number>();
+  partial.forEach((d: Date) => {
+    const k = new Intl.DateTimeFormat('en-US', { timeZone: win.timezone, month: 'short', day: 'numeric' }).format(d);
+    perDay.set(k, (perDay.get(k) ?? 0) + 1);
+  });
+  const counts = [...perDay.values()];
+  eq('first day honours the partial limit', counts[0], 5);
+  eq('later days get the full cap', counts.slice(1, 3), [20, 20]);
+  eq('all 50 placed', partial.length, 50);
+
+  // Regression: when today's window has already closed, the leftover-allowance
+  // limit must NOT land on tomorrow — tomorrow starts fresh. This shipped
+  // wrong once and silently ran the next day at a third of the cap.
+  const afterHours = planSendTimes({ count: 50, perDay: 20, firstDayLimit: 3, now: new Date('2026-08-19T23:30:00Z'), window: win, random: rnd });
+  const ahDays = new Map<string, number>();
+  afterHours.forEach((d: Date) => {
+    const k = new Intl.DateTimeFormat('en-US', { timeZone: win.timezone, month: 'short', day: 'numeric' }).format(d);
+    ahDays.set(k, (ahDays.get(k) ?? 0) + 1);
+  });
+  eq('closed window -> next day gets the FULL cap, not the remainder', [...ahDays.values()][0], 20);
+
   // Queued after the window closes — rolls to the next day, not out tonight.
   const evening = planSendTimes({ count: 5, perDay: 20, now: new Date('2026-08-19T23:30:00Z'), window: win, random: rnd });
   eq('after-hours batch waits for the morning', hourIn(evening[0]) >= 9, true);
