@@ -85,13 +85,16 @@ export function warmupState(options: {
   const now = options.now ?? new Date();
 
   if (!startedAt) {
+    const cap = Math.min(configuredCap, UNKNOWN_START_CAP);
     return {
-      active: false,
+      active: true,
       day: null,
-      cap: configuredCap,
+      cap,
       nextCap: null,
       nextAt: null,
-      note: 'No warmup start date set — using the configured cap as-is.',
+      note:
+        `No warmup start date known, so sending is held at ${cap}/day. ` +
+        'Set CREATOR_OUTREACH_WARMUP_START (or send once, and it is inferred).',
     };
   }
 
@@ -143,7 +146,7 @@ export function warmupState(options: {
   };
 }
 
-/** Reads the warmup start from config. Unset means no ramp is enforced. */
+/** Reads the warmup start from config, if configured. */
 export function warmupStartedAt(): Date | null {
   const raw = process.env.CREATOR_OUTREACH_WARMUP_START?.trim();
   if (!raw) return null;
@@ -151,14 +154,37 @@ export function warmupStartedAt(): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-/** The cap the pipeline should actually enforce. */
-export function effectiveDailyCap(now?: Date): { cap: number; state: WarmupState } {
+/**
+ * Cap used when no warmup start is configured and none can be inferred.
+ *
+ * A missing environment variable must never read as "no limit". This shipped
+ * to production without CREATOR_OUTREACH_WARMUP_START set, and the deployed
+ * worker read the ceiling — 300/day — as the cap in force, ten times the
+ * intended pace on a domain four days old. Absent config now fails closed.
+ */
+export const UNKNOWN_START_CAP = 20;
+
+/**
+ * The cap the pipeline should actually enforce.
+ *
+ * `startedAt` overrides the configured start — callers that can reach the
+ * database pass the first send date, so the ramp survives a missing env var
+ * rather than silently disappearing.
+ */
+export function effectiveDailyCap(
+  now?: Date,
+  startedAt?: Date | null
+): { cap: number; state: WarmupState } {
   const configuredCap = parseInt(process.env.CREATOR_OUTREACH_DAILY_CAP || '300', 10);
-  const state = warmupState({ startedAt: warmupStartedAt(), configuredCap, now });
+  const state = warmupState({
+    startedAt: startedAt ?? warmupStartedAt(),
+    configuredCap,
+    now,
+  });
   return { cap: state.cap, state };
 }
 
 /** The cap that will be in force on a given future day. */
-export function capForDay(day: Date): number {
-  return effectiveDailyCap(day).cap;
+export function capForDay(day: Date, startedAt?: Date | null): number {
+  return effectiveDailyCap(day, startedAt).cap;
 }

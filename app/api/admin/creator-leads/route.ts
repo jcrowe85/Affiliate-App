@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getCurrentAdmin } from '@/lib/auth';
-import { sentInLast24h, statusCounts, experimentResults } from '@/lib/creator-outreach/pipeline';
+import { sentInLast24h, statusCounts, experimentResults, resolveWarmupStart } from '@/lib/creator-outreach/pipeline';
 import { apifyToken } from '@/lib/creator-outreach/instagram';
 import { effectiveDailyCap } from '@/lib/creator-outreach/warmup';
 
@@ -32,6 +32,8 @@ export async function GET(request: NextRequest) {
           }
         : {}),
     };
+
+    const warmup = effectiveDailyCap(undefined, await resolveWarmupStart(admin.shopify_shop_id));
 
     const [leads, total, counts, sentToday, experiment] = await Promise.all([
       prisma.creatorLead.findMany({
@@ -71,8 +73,8 @@ export async function GET(request: NextRequest) {
       counts,
       sentToday,
       experiment,
-      dailyCap: effectiveDailyCap().cap,
-      warmup: effectiveDailyCap().state,
+      dailyCap: warmup.cap,
+      warmup: warmup.state,
       // Surfaced so the UI can tell the admin what's missing instead of letting
       // a send fail silently later.
       config: {

@@ -20,7 +20,7 @@ import {
   type OutreachCopy,
 } from './outreach-email';
 import { assignVariants, compareVariants, type VariantStats, type Comparison } from './experiment';
-import { effectiveDailyCap, capForDay, type WarmupState } from './warmup';
+import { effectiveDailyCap, capForDay, warmupStartedAt, type WarmupState } from './warmup';
 import { planSendTimes, sendWindowFromEnv, describeWindow, startOfSendingDay } from './schedule';
 
 /** Cheap, unguessable token for unsubscribe links. */
@@ -50,6 +50,26 @@ export async function resolveShopId(): Promise<string> {
     `Several shops on record (${shops.map((s) => s.shopify_shop_id).join(', ')}). ` +
       'Set SHOPIFY_SHOP_ID to pick one.'
   );
+}
+
+/**
+ * When this shop first sent outreach.
+ *
+ * Config wins, but the database is the fallback: the date of the first email
+ * is exactly the warmup start, and it can't be lost by forgetting an
+ * environment variable in one environment. That is not hypothetical — it
+ * shipped that way, and production read the ceiling as the cap.
+ */
+export async function resolveWarmupStart(shopId: string): Promise<Date | null> {
+  const configured = warmupStartedAt();
+  if (configured) return configured;
+
+  const first = await prisma.creatorLead.findFirst({
+    where: { shopify_shop_id: shopId, emailed_at: { not: null } },
+    orderBy: { emailed_at: 'asc' },
+    select: { emailed_at: true },
+  });
+  return first?.emailed_at ?? null;
 }
 
 async function logEvent(
@@ -497,7 +517,8 @@ export async function scheduleBatch(
   shopId: string,
   options: { count?: number; startInSeconds?: number; dailyCap?: number; now?: Date } = {}
 ): Promise<ScheduleSummary> {
-  const dailyCap = options.dailyCap ?? effectiveDailyCap().cap;
+  const warmupStart = await resolveWarmupStart(shopId);
+  const dailyCap = options.dailyCap ?? effectiveDailyCap(options.now, warmupStart).cap;
 
   // The cap governs sends per rolling 24 hours — not how far ahead the queue
   // is booked. Counting every queued lead against it (as this used to) meant a
@@ -561,7 +582,7 @@ export async function scheduleBatch(
   const times = planSendTimes({
     count: sendable.length,
     // Each day gets the cap that will actually apply on that day.
-    perDay: capForDay,
+    perDay: (day: Date) => capForDay(day, warmupStart),
     firstDayLimit: capRemaining,
     now,
   });
@@ -727,7 +748,7 @@ export async function liveBatch(shopId: string): Promise<{
   nextAt: Date | null;
 }> {
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const warmup = effectiveDailyCap();
+  const warmup = effectiveDailyCap(undefined, await resolveWarmupStart(shopId));
 
   const leads = await prisma.creatorLead.findMany({
     where: {
@@ -834,6 +855,7 @@ export async function autoTopUp(
 ): Promise<{ queued: number; alreadyBooked: number; readyPool: number; target: number }> {
   const days = options.days ?? parseInt(process.env.CREATOR_OUTREACH_QUEUE_DAYS || '3', 10);
   const now = options.now ?? new Date();
+  const warmupStart = await resolveWarmupStart(shopId);
   const horizon = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
 
   const [alreadyBooked, readyPool] = await Promise.all([
@@ -860,7 +882,7 @@ export async function autoTopUp(
   const sentToday = await sentInLast24h(shopId, now);
   let capacity = 0;
   for (let i = 0; i < days; i++) {
-    capacity += capForDay(new Date(now.getTime() + i * 24 * 60 * 60 * 1000));
+    capacity += capForDay(new Date(now.getTime() + i * 24 * 60 * 60 * 1000), warmupStart);
   }
   const target = Math.max(0, capacity - sentToday);
   const shortfall = Math.min(target - alreadyBooked, readyPool);
