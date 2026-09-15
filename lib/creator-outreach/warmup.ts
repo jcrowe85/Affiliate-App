@@ -93,8 +93,8 @@ export function warmupState(options: {
       nextCap: null,
       nextAt: null,
       note:
-        `No warmup start date known, so sending is held at ${cap}/day. ` +
-        'Set CREATOR_OUTREACH_WARMUP_START (or send once, and it is inferred).',
+        `No active warmup run — nothing sent yet, or sending paused for ${WARMUP_RESET_GAP_DAYS}+ days — ` +
+        `so sending is held at ${cap}/day until the next send restarts the ramp.`,
     };
   }
 
@@ -155,6 +155,54 @@ export function warmupStartedAt(): Date | null {
 }
 
 /**
+ * A pause long enough that the domain has to warm up again.
+ *
+ * Mailbox providers judge a sender on recent history, not lifetime history. A
+ * domain that sent for a week and then went quiet for two is, to them, close to
+ * new again — resuming at the calendar's cap reads as the 0, 0, then 200 pattern
+ * the ramp exists to prevent. This happened: sending stopped Sep 1, and the
+ * calendar alone would have resumed at 250/day on Sep 15.
+ */
+export const WARMUP_RESET_GAP_DAYS = 7;
+
+/**
+ * Where the ramp should count from, given the configured start and the days
+ * mail actually went out.
+ *
+ * The ramp restarts after any gap of `gapDays` or more, including the gap
+ * between the last send and now — in which case this returns null, holding
+ * sending at UNKNOWN_START_CAP until the next send starts a fresh run. A start
+ * configured after the last send is a deliberate restart and wins; one
+ * configured before the first real send can't be used to skip the ramp.
+ */
+export function effectiveWarmupStart(options: {
+  configured: Date | null;
+  /** Any instant within each day mail went out. */
+  sendDays: Date[];
+  now?: Date;
+  gapDays?: number;
+}): Date | null {
+  const now = options.now ?? new Date();
+  const gapMs = (options.gapDays ?? WARMUP_RESET_GAP_DAYS) * 24 * 60 * 60 * 1000;
+  const { configured } = options;
+  const sends = options.sendDays
+    .filter((d) => d.getTime() <= now.getTime())
+    .sort((a, b) => a.getTime() - b.getTime());
+
+  if (sends.length === 0) return configured;
+
+  const last = sends[sends.length - 1];
+  if (configured && configured.getTime() > last.getTime()) return configured;
+  if (now.getTime() - last.getTime() >= gapMs) return null;
+
+  let runStart = sends[0];
+  for (let i = 1; i < sends.length; i++) {
+    if (sends[i].getTime() - sends[i - 1].getTime() >= gapMs) runStart = sends[i];
+  }
+  return configured && configured.getTime() > runStart.getTime() ? configured : runStart;
+}
+
+/**
  * Cap used when no warmup start is configured and none can be inferred.
  *
  * A missing environment variable must never read as "no limit". This shipped
@@ -177,7 +225,9 @@ export function effectiveDailyCap(
 ): { cap: number; state: WarmupState } {
   const configuredCap = parseInt(process.env.CREATOR_OUTREACH_DAILY_CAP || '300', 10);
   const state = warmupState({
-    startedAt: startedAt ?? warmupStartedAt(),
+    // Only an omitted start falls back to config. An explicit null is a
+    // decision — "no active run" — and must not quietly become the old date.
+    startedAt: startedAt === undefined ? warmupStartedAt() : startedAt,
     configuredCap,
     now,
   });

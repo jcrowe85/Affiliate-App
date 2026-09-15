@@ -14,6 +14,7 @@
 import { extractEmailsFromText, chooseContactEmail, isPlausibleEmail } from '../lib/creator-outreach/email-extract';
 import { parseCurl } from '../lib/creator-outreach/curl';
 import { discoverRecords, toCreator, toCreators, normalizeHandle, extractMetrics, parseGmvBucket } from '../lib/creator-outreach/trybe';
+import { effectiveWarmupStart, warmupState } from '../lib/creator-outreach/warmup';
 
 let pass = 0, fail = 0;
 const eq = (name: string, got: unknown, want: unknown) => {
@@ -242,6 +243,42 @@ console.log('\n-- send-time scheduling --');
   const evening = planSendTimes({ count: 5, perDay: 20, now: new Date('2026-08-19T23:30:00Z'), window: win, random: rnd });
   eq('after-hours batch waits for the morning', hourIn(evening[0]) >= 9, true);
   eq('and lands the next weekday', dayIn(evening[0]), 'Thu');
+}
+
+console.log('\n-- warmup restarts after a pause --');
+{
+  const at = (s: string) => new Date(s);
+  const iso = (d: Date | null) => (d ? d.toISOString() : null);
+  const august = ['2026-08-19T14:00:00Z', '2026-08-20T14:00:00Z', '2026-08-21T14:00:00Z', '2026-08-24T14:00:00Z'].map(at);
+
+  eq('a continuous run counts from its first send',
+    iso(effectiveWarmupStart({ configured: null, sendDays: august, now: at('2026-08-25T15:00:00Z') })),
+    '2026-08-19T14:00:00.000Z');
+  eq('six quiet days is not a pause',
+    iso(effectiveWarmupStart({ configured: null, sendDays: august, now: at('2026-08-30T15:00:00Z') })),
+    '2026-08-19T14:00:00.000Z');
+
+  // Regression: sending stopped Sep 1, and counting from Aug 18 would have
+  // resumed on Sep 15 at 250/day on a domain that had been silent for two weeks.
+  const withSep1 = [...august, at('2026-09-01T14:20:00Z')];
+  eq('a run after an 8-day gap starts its own ramp',
+    iso(effectiveWarmupStart({ configured: null, sendDays: withSep1, now: at('2026-09-02T15:00:00Z') })),
+    '2026-09-01T14:20:00.000Z');
+  eq('gone cold since the last send: no active start, even with an old configured date',
+    iso(effectiveWarmupStart({ configured: at('2026-08-18T00:00:00Z'), sendDays: withSep1, now: at('2026-09-15T00:30:00Z') })),
+    null);
+  eq('which holds sending at the day-one cap',
+    warmupState({ startedAt: null, configuredCap: 300, now: at('2026-09-15T00:30:00Z') }).cap,
+    20);
+  eq('a start configured after the last send is a deliberate restart',
+    iso(effectiveWarmupStart({ configured: at('2026-09-14T00:00:00Z'), sendDays: withSep1, now: at('2026-09-15T00:30:00Z') })),
+    '2026-09-14T00:00:00.000Z');
+  eq('a start configured before the first send cannot skip the ramp',
+    iso(effectiveWarmupStart({ configured: at('2026-08-01T00:00:00Z'), sendDays: august, now: at('2026-08-25T15:00:00Z') })),
+    '2026-08-19T14:00:00.000Z');
+  eq('nothing sent yet: the configured start stands',
+    iso(effectiveWarmupStart({ configured: at('2026-09-14T00:00:00Z'), sendDays: [], now: at('2026-09-15T00:30:00Z') })),
+    '2026-09-14T00:00:00.000Z');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

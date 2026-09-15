@@ -8,6 +8,7 @@
  */
 
 import { prisma } from '@/lib/db';
+import type { Prisma } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import type { SourcedCreator } from './trybe';
 import { resolveProfiles, chunk } from './instagram';
@@ -20,7 +21,7 @@ import {
   type OutreachCopy,
 } from './outreach-email';
 import { assignVariants, compareVariants, type VariantStats, type Comparison } from './experiment';
-import { effectiveDailyCap, capForDay, warmupStartedAt, type WarmupState } from './warmup';
+import { effectiveDailyCap, capForDay, warmupStartedAt, effectiveWarmupStart, type WarmupState } from './warmup';
 import { planSendTimes, sendWindowFromEnv, describeWindow, startOfSendingDay } from './schedule';
 
 /** Cheap, unguessable token for unsubscribe links. */
@@ -53,23 +54,49 @@ export async function resolveShopId(): Promise<string> {
 }
 
 /**
- * When this shop first sent outreach.
+ * Where this shop's warmup ramp counts from.
  *
- * Config wins, but the database is the fallback: the date of the first email
- * is exactly the warmup start, and it can't be lost by forgetting an
- * environment variable in one environment. That is not hypothetical — it
- * shipped that way, and production read the ceiling as the cap.
+ * Read from the days mail actually went out, not just config: a configured
+ * date can be missing in one environment (it shipped that way, and production
+ * read the ceiling as the cap), and it can't see a pause. The ramp restarts
+ * after a gap of WARMUP_RESET_GAP_DAYS — see effectiveWarmupStart.
  */
-export async function resolveWarmupStart(shopId: string): Promise<Date | null> {
-  const configured = warmupStartedAt();
-  if (configured) return configured;
-
-  const first = await prisma.creatorLead.findFirst({
-    where: { shopify_shop_id: shopId, emailed_at: { not: null } },
-    orderBy: { emailed_at: 'asc' },
-    select: { emailed_at: true },
+export async function resolveWarmupStart(shopId: string, now: Date = new Date()): Promise<Date | null> {
+  const days = await prisma.$queryRaw<Array<{ first: Date }>>`
+    SELECT MIN(emailed_at) AS first
+    FROM "CreatorLead"
+    WHERE shopify_shop_id = ${shopId} AND emailed_at IS NOT NULL
+    GROUP BY date_trunc('day', emailed_at)
+  `;
+  return effectiveWarmupStart({
+    configured: warmupStartedAt(),
+    sendDays: days.map((d) => d.first),
+    now,
   });
-  return first?.emailed_at ?? null;
+}
+
+/**
+ * Runs `fn` holding a per-shop lock, so anything that reads a count and then
+ * writes against it can't interleave with another caller doing the same.
+ *
+ * The daily cap used to be exactly that read-then-write with nothing in between.
+ * On Aug 24 about fifteen scheduling calls read "12 queued today" before any of
+ * them wrote, each booked its own share, and 166 went out against a cap of 50.
+ * A transaction-scoped advisory lock releases itself on commit or rollback, so
+ * a crashed caller can't leave it held, and it works through a pooled
+ * connection.
+ */
+async function withShopLock<T>(
+  shopId: string,
+  fn: (db: Prisma.TransactionClient) => Promise<T>
+): Promise<T> {
+  return prisma.$transaction(
+    async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`creator-outreach:${shopId}`}))`;
+      return fn(tx);
+    },
+    { maxWait: 30_000, timeout: 120_000 }
+  );
 }
 
 async function logEvent(
@@ -343,7 +370,7 @@ export async function sendBatch(
     onSend?: (email: string, ok: boolean, reason?: string) => void;
   } = {}
 ): Promise<SendSummary> {
-  const dailyCap = options.dailyCap ?? effectiveDailyCap().cap;
+  const dailyCap = options.dailyCap ?? effectiveDailyCap(undefined, await resolveWarmupStart(shopId)).cap;
   const delayMs = options.delayMs ?? parseInt(process.env.CREATOR_OUTREACH_SEND_DELAY_MS || '15000', 10);
   const joinUrl = process.env.TRYBE_JOIN_URL || '';
   const copy = options.copy ?? defaultCopy(joinUrl);
@@ -517,102 +544,125 @@ export async function scheduleBatch(
   shopId: string,
   options: { count?: number; startInSeconds?: number; dailyCap?: number; now?: Date } = {}
 ): Promise<ScheduleSummary> {
-  const warmupStart = await resolveWarmupStart(shopId);
-  const dailyCap = options.dailyCap ?? effectiveDailyCap(options.now, warmupStart).cap;
-
-  // The cap governs sends per rolling 24 hours — not how far ahead the queue
-  // is booked. Counting every queued lead against it (as this used to) meant a
-  // batch could never exceed one day, so the multi-day spill in planSendTimes
-  // could never actually fire.
   const now = options.now ?? new Date();
-  const endOfToday = new Date(startOfSendingDay(now).getTime() + 24 * 60 * 60 * 1000);
-  const [alreadySent, queuedToday] = await Promise.all([
-    sentInLast24h(shopId, now),
-    prisma.creatorLead.count({
+  const warmupStart = await resolveWarmupStart(shopId, now);
+  const dailyCap = options.dailyCap ?? effectiveDailyCap(now, warmupStart).cap;
+  const batchId = randomBytes(8).toString('hex');
+  const windowLabel = describeWindow(sendWindowFromEnv());
+  const { emails, handles } = await suppressionSets(shopId);
+
+  // Everything from reading what's already booked to writing the new bookings
+  // happens under the shop lock — see withShopLock for why.
+  return withShopLock(shopId, async (db) => {
+    // The cap governs sends per sending day — not how far ahead the queue is
+    // booked. Counting every queued lead against it (as this used to) meant a
+    // batch could never exceed one day, so the multi-day spill in planSendTimes
+    // could never actually fire.
+    const startOfToday = startOfSendingDay(now);
+    const endOfToday = new Date(startOfToday.getTime() + 24 * 60 * 60 * 1000);
+    const alreadySent = await db.creatorLead.count({
+      where: { shopify_shop_id: shopId, emailed_at: { gte: startOfToday } },
+    });
+    const queuedToday = await db.creatorLead.count({
       where: {
         shopify_shop_id: shopId,
         status: { in: ['queued', 'sending'] },
         scheduled_send_at: { lt: endOfToday },
       },
-    }),
-  ]);
-  const capRemaining = Math.max(0, dailyCap - alreadySent - queuedToday);
-  // A batch may run past today; later days are capped inside planSendTimes.
-  const count = Math.max(0, options.count ?? capRemaining);
-
-  const batchId = randomBytes(8).toString('hex');
-  const windowLabel = describeWindow(sendWindowFromEnv());
-  if (count <= 0) {
-    return { batchId, scheduled: 0, firstAt: null, lastAt: null, capRemaining, window: windowLabel };
-  }
-
-  const { emails, handles } = await suppressionSets(shopId);
-
-  const candidates = await prisma.creatorLead.findMany({
-    where: {
-      shopify_shop_id: shopId,
-      status: 'resolved',
-      email: { not: null },
-      emailed_at: null,
-      unsubscribed_at: null,
-    },
-    select: { id: true, email: true, instagram_handle: true },
-    orderBy: { sourced_at: 'asc' },
-    take: count,
-  });
-
-  const sendable = candidates.filter(
-    (lead) => !emails.has(normalizeEmail(lead.email!)) && !handles.has(lead.instagram_handle)
-  );
-
-  let firstAt: Date | null = null;
-  let lastAt: Date | null = null;
-
-  // Continue the rotation from wherever the last batch left off, so a run of
-  // small batches still ends up evenly split rather than every batch starting
-  // on variant A.
-  const alreadyAssigned = await prisma.creatorLead.count({
-    where: { shopify_shop_id: shopId, copy_variant: { not: null } },
-  });
-  const variants = assignVariants(sendable.length, VARIANT_KEYS, alreadyAssigned);
-
-  // Scattered across the sending window rather than fired off back to back —
-  // see lib/creator-outreach/schedule.ts. A batch bigger than one day's cap
-  // spills onto following days by itself.
-  const times = planSendTimes({
-    count: sendable.length,
-    // Each day gets the cap that will actually apply on that day.
-    perDay: (day: Date) => capForDay(day, warmupStart),
-    firstDayLimit: capRemaining,
-    now,
-  });
-
-  for (let i = 0; i < sendable.length; i++) {
-    const at = times[i];
-    if (!at) break; // window couldn't hold the rest; the remainder stays ready
-    if (i === 0) firstAt = at;
-    lastAt = at;
-
-    await prisma.creatorLead.update({
-      where: { id: sendable[i].id },
-      data: {
-        status: 'queued',
-        batch_id: batchId,
-        scheduled_send_at: at,
-        send_error: null,
-        copy_variant: variants[i],
-      },
     });
-  }
+    const capRemaining = Math.max(0, dailyCap - alreadySent - queuedToday);
+    // A batch may run past today; later days are capped inside planSendTimes.
+    const count = Math.max(0, options.count ?? capRemaining);
 
-  return {
-    batchId,
-    scheduled: times.length < sendable.length ? times.length : sendable.length,
-    firstAt,
-    lastAt,
-    capRemaining,
-    window: windowLabel,
-  };
+    if (count <= 0) {
+      return { batchId, scheduled: 0, firstAt: null, lastAt: null, capRemaining, window: windowLabel };
+    }
+
+    // Later days may already carry bookings from earlier batches, and each only
+    // has room for its own cap minus those. Without this, two batches booked a
+    // day apart could each fill tomorrow.
+    const bookedLater = await db.creatorLead.findMany({
+      where: {
+        shopify_shop_id: shopId,
+        status: { in: ['queued', 'sending'] },
+        scheduled_send_at: { gte: endOfToday },
+      },
+      select: { scheduled_send_at: true },
+    });
+    const bookedByDay = new Map<number, number>();
+    for (const { scheduled_send_at: at } of bookedLater) {
+      const key = startOfSendingDay(at!).getTime();
+      bookedByDay.set(key, (bookedByDay.get(key) ?? 0) + 1);
+    }
+
+    const candidates = await db.creatorLead.findMany({
+      where: {
+        shopify_shop_id: shopId,
+        status: 'resolved',
+        email: { not: null },
+        emailed_at: null,
+        unsubscribed_at: null,
+      },
+      select: { id: true, email: true, instagram_handle: true },
+      orderBy: { sourced_at: 'asc' },
+      take: count,
+    });
+
+    const sendable = candidates.filter(
+      (lead) => !emails.has(normalizeEmail(lead.email!)) && !handles.has(lead.instagram_handle)
+    );
+
+    let firstAt: Date | null = null;
+    let lastAt: Date | null = null;
+
+    // Continue the rotation from wherever the last batch left off, so a run of
+    // small batches still ends up evenly split rather than every batch starting
+    // on variant A.
+    const alreadyAssigned = await db.creatorLead.count({
+      where: { shopify_shop_id: shopId, copy_variant: { not: null } },
+    });
+    const variants = assignVariants(sendable.length, VARIANT_KEYS, alreadyAssigned);
+
+    // Scattered across the sending window rather than fired off back to back —
+    // see lib/creator-outreach/schedule.ts. A batch bigger than one day's cap
+    // spills onto following days by itself.
+    const times = planSendTimes({
+      count: sendable.length,
+      // Each day gets the cap that will actually apply on that day, less what
+      // earlier batches already booked there.
+      perDay: (day: Date) =>
+        Math.max(0, capForDay(day, warmupStart) - (bookedByDay.get(startOfSendingDay(day).getTime()) ?? 0)),
+      firstDayLimit: capRemaining,
+      now,
+    });
+
+    for (let i = 0; i < sendable.length; i++) {
+      const at = times[i];
+      if (!at) break; // window couldn't hold the rest; the remainder stays ready
+      if (i === 0) firstAt = at;
+      lastAt = at;
+
+      await db.creatorLead.update({
+        where: { id: sendable[i].id },
+        data: {
+          status: 'queued',
+          batch_id: batchId,
+          scheduled_send_at: at,
+          send_error: null,
+          copy_variant: variants[i],
+        },
+      });
+    }
+
+    return {
+      batchId,
+      scheduled: times.length < sendable.length ? times.length : sendable.length,
+      firstAt,
+      lastAt,
+      capRemaining,
+      window: windowLabel,
+    };
+  });
 }
 
 /**
@@ -630,32 +680,49 @@ export async function sendDue(
   const now = options.now ?? new Date();
   const limit = options.limit ?? 10;
   const joinUrl = process.env.TRYBE_JOIN_URL || '';
+  const cap = effectiveDailyCap(now, await resolveWarmupStart(shopId, now)).cap;
 
-  const due = await prisma.creatorLead.findMany({
-    where: {
-      shopify_shop_id: shopId,
-      status: 'queued',
-      scheduled_send_at: { lte: now },
-    },
-    select: { id: true },
-    orderBy: { scheduled_send_at: 'asc' },
-    take: limit,
+  // Claimed under the shop lock and counted against today's cap before any mail
+  // goes out. Scheduling is supposed to keep each day inside its cap, but this is
+  // the last check before a send, so it holds even when the schedule doesn't —
+  // Aug 24 was over-booked and nothing on the send path noticed.
+  const claimedIds = await withShopLock(shopId, async (db) => {
+    const sentToday = await db.creatorLead.count({
+      where: { shopify_shop_id: shopId, emailed_at: { gte: startOfSendingDay(now) } },
+    });
+    // A claim a crashed run never finished shouldn't eat the cap forever.
+    const inFlight = await db.creatorLead.count({
+      where: {
+        shopify_shop_id: shopId,
+        status: 'sending',
+        updated_at: { gte: new Date(now.getTime() - 10 * 60 * 1000) },
+      },
+    });
+    const allowance = Math.max(0, Math.min(limit, cap - sentToday - inFlight));
+    if (allowance === 0) return [];
+
+    const due = await db.creatorLead.findMany({
+      where: { shopify_shop_id: shopId, status: 'queued', scheduled_send_at: { lte: now } },
+      select: { id: true },
+      orderBy: { scheduled_send_at: 'asc' },
+      take: allowance,
+    });
+    const ids = due.map((lead) => lead.id);
+    if (ids.length) {
+      await db.creatorLead.updateMany({
+        where: { id: { in: ids }, status: 'queued' },
+        data: { status: 'sending' },
+      });
+    }
+    return ids;
   });
 
   let sent = 0;
   let failed = 0;
 
-  for (const candidate of due) {
-    // Claim it. updateMany with the status in the filter is atomic, so exactly
-    // one caller can move a given lead out of 'queued'.
-    const claimed = await prisma.creatorLead.updateMany({
-      where: { id: candidate.id, status: 'queued' },
-      data: { status: 'sending' },
-    });
-    if (claimed.count === 0) continue; // someone else got there first
-
+  for (const id of claimedIds) {
     const lead = await prisma.creatorLead.findUnique({
-      where: { id: candidate.id },
+      where: { id },
       select: {
         id: true,
         email: true,
@@ -667,7 +734,7 @@ export async function sendDue(
     });
     if (!lead?.email) {
       await prisma.creatorLead.update({
-        where: { id: candidate.id },
+        where: { id },
         data: { status: 'unresolvable', send_error: 'no email at send time' },
       });
       continue;
@@ -706,6 +773,15 @@ export async function sendDue(
       failed++;
       if (fatal) break;
     }
+  }
+
+  // A fatal error stops the loop with leads still claimed; put them back rather
+  // than strand them in 'sending'.
+  if (claimedIds.length) {
+    await prisma.creatorLead.updateMany({
+      where: { id: { in: claimedIds }, status: 'sending' },
+      data: { status: 'queued' },
+    });
   }
 
   const remaining = await prisma.creatorLead.count({
@@ -855,7 +931,7 @@ export async function autoTopUp(
 ): Promise<{ queued: number; alreadyBooked: number; readyPool: number; target: number }> {
   const days = options.days ?? parseInt(process.env.CREATOR_OUTREACH_QUEUE_DAYS || '3', 10);
   const now = options.now ?? new Date();
-  const warmupStart = await resolveWarmupStart(shopId);
+  const warmupStart = await resolveWarmupStart(shopId, now);
   const horizon = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
 
   const [alreadyBooked, readyPool] = await Promise.all([
