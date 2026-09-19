@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, FormEvent } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { BotIdClient } from 'botid/client';
 
 /**
@@ -78,6 +78,20 @@ function EyeIcon({ open }: { open: boolean }) {
 
 export default function AffiliateApplyPage() {
   const [formData, setFormData] = useState(defaultForm);
+  /**
+   * Where this applicant came from, e.g. /apply?source=meta-dm.
+   *
+   * Read from the URL rather than asked for in a field: it is our bookkeeping,
+   * not theirs, and a visible box would only collect guesses. Read on mount
+   * from window.location rather than useSearchParams, which would force a
+   * Suspense boundary around the entire form.
+   */
+  const [source, setSource] = useState('');
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const raw = params.get('source') ?? params.get('utm_source') ?? params.get('ref') ?? '';
+    setSource(raw.trim().slice(0, 64));
+  }, []);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
@@ -187,6 +201,7 @@ export default function AffiliateApplyPage() {
           payout_method: payoutMethod,
           payout_identifier: payoutIdentifier.trim(),
           payout_verification_id: verificationId,
+          source,
         }),
       });
       const data = await response.json();

@@ -341,7 +341,10 @@ export async function POST(request: NextRequest) {
           state: state?.trim() || null,
           zip: zip?.trim() || null,
           phone: phone?.trim() || null,
-          source: source?.trim() || null,
+          // The applicant's own ?source= survives approval unless an admin
+          // typed one. Taking the request's null here would throw away the only
+          // record of which campaign produced them.
+          source: source?.trim() || application?.source || null,
           status,
           // An approved applicant already chose and proved a destination, so
           // that is the one to keep. Deriving it from paypal_email instead

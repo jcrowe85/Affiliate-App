@@ -81,6 +81,11 @@ model AffiliateApplication {
   state           String?
   zip             String?
   phone           String?
+  /// Where this applicant came from — set from ?source= on /apply, so a
+  /// campaign can be told apart from an organic signup. Carried onto the
+  /// Affiliate at approval, which is where it has to survive to be worth
+  /// anything.
+  source          String?
   password_hash   String
   status          String     @default("pending")
   shopify_shop_id String

@@ -53,6 +53,7 @@ interface AffiliateApplication {
   state: string | null;
   zip: string | null;
   phone: string | null;
+  source: string | null;
   status: string;
   created_at: string;
 }
@@ -365,7 +366,10 @@ export default function AffiliateManagement() {
       state: application.state || '',
       zip: application.zip || '',
       phone: application.phone || '',
-      source: 'Affiliate signup form',
+      // Keep what the applicant arrived with. Hardcoding the generic label here
+      // overwrote the campaign tag at the one moment it had to survive, which
+      // made ?source= on /apply pointless for anyone approved through this UI.
+      source: application.source || 'Affiliate signup form',
     });
     setEditingAffiliate(null);
     setApprovingApplication(application);
@@ -935,6 +939,14 @@ export default function AffiliateManagement() {
                       showIdentifier
                     />
                   </p>
+                  {application.source && (
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 truncate">
+                      Came from{' '}
+                      <span className="font-medium text-gray-700 dark:text-gray-300">
+                        {application.source}
+                      </span>
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <button

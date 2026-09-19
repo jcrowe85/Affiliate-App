@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
         state: true,
         zip: true,
         phone: true,
+        source: true,
         status: true,
         created_at: true,
       },

@@ -55,6 +55,7 @@ export async function POST(request: NextRequest) {
       payout_method,
       payout_identifier,
       payout_verification_id,
+      source,
     } = body;
 
     if (!first_name?.trim() || !last_name?.trim()) {
@@ -182,6 +183,14 @@ export async function POST(request: NextRequest) {
         state: state?.trim() || null,
         zip: zip?.trim() || null,
         phone: phone?.trim() || null,
+        // Anyone can post to this route, so the tag is accepted only in the
+        // shape we set ourselves. A junk value is dropped rather than stored,
+        // because a campaign report is worth less than nothing once it can be
+        // filled in by a stranger.
+        source:
+          typeof source === 'string' && /^[A-Za-z0-9._:-]{1,64}$/.test(source.trim())
+            ? source.trim()
+            : null,
         password_hash,
         shopify_shop_id,
       },
