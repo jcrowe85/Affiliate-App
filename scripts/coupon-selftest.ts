@@ -4,6 +4,7 @@
  * Run: npx tsx scripts/coupon-selftest.ts
  */
 import { buildCouponCode, couponPercent } from '../lib/affiliate-coupon';
+import { isCreatorSource } from '../lib/creator-offer';
 
 let pass = 0, fail = 0;
 const eq = (name: string, got: unknown, want: unknown) => {
@@ -38,6 +39,18 @@ eq('negative is treated as zero', couponPercent(), 0);
 process.env.AFFILIATE_COUPON_PERCENT = '500';
 eq('clamped to 100', couponPercent(), 100);
 if (orig === undefined) delete process.env.AFFILIATE_COUPON_PERCENT; else process.env.AFFILIATE_COUPON_PERCENT = orig;
+
+console.log('\n-- creator source matching --');
+eq('meta-dm is a creator source', isCreatorSource('meta-dm'), true);
+eq('meta-email is a creator source', isCreatorSource('meta-email'), true);
+eq('bare meta counts', isCreatorSource('meta'), true);
+eq('case and padding ignored', isCreatorSource('  Meta-DM  '), true);
+eq('trybe-email is not', isCreatorSource('trybe-email'), false);
+eq('the signup-form label is not', isCreatorSource('Affiliate signup form'), false);
+// Guards the 40% offer against a lookalike tag quietly collecting it.
+eq('metabolism-blog is not a creator source', isCreatorSource('metabolism-blog'), false);
+eq('null is not', isCreatorSource(null), false);
+eq('empty is not', isCreatorSource(''), false);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

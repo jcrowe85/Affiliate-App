@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { isCreatorSource } from '@/lib/creator-offer';
 
 // Helper function to normalize redirect URL - ensures trailing slash after domain
 function normalizeRedirectUrl(url: string): string {
@@ -370,6 +371,12 @@ export default function AffiliateManagement() {
       // overwrote the campaign tag at the one moment it had to survive, which
       // made ?source= on /apply pointless for anyone approved through this UI.
       source: application.source || 'Affiliate signup form',
+      // Pre-select the offer a Meta creator was actually promised. Left blank,
+      // approving them is a free-hand choice, and 40% in an email becomes 20%
+      // in the database with nothing flagging the difference.
+      offer_id: isCreatorSource(application.source)
+        ? offers.find((o) => /organic creators/i.test(o.name))?.id ?? ''
+        : '',
     });
     setEditingAffiliate(null);
     setApprovingApplication(application);

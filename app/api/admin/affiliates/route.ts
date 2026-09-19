@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ensureAffiliateCoupon } from '@/lib/affiliate-coupon';
+import { isCreatorSource, CREATOR_OFFER_NAME_HINT } from '@/lib/creator-offer';
 import { prisma } from '@/lib/db';
 import { getCurrentAdmin, hashPassword } from '@/lib/auth';
 import { sendApplicationApprovedEmail } from '@/lib/email';
@@ -269,8 +270,30 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    // A creator from the Meta campaign was promised 40% in writing, but the
+    // offer is otherwise chosen by hand on every approval. Fill it in when
+    // nothing was supplied — never override a deliberate choice, since an admin
+    // who picked a different offer meant it.
+    let effectiveOfferId = offer_id?.trim() || '';
+    if (!effectiveOfferId && isCreatorSource(application?.source ?? source)) {
+      const configured = process.env.CREATOR_OFFER_ID?.trim();
+      const creatorOffer = configured
+        ? await prisma.offer.findFirst({
+            where: { id: configured, shopify_shop_id: admin.shopify_shop_id },
+            select: { id: true },
+          })
+        : await prisma.offer.findFirst({
+            where: {
+              shopify_shop_id: admin.shopify_shop_id,
+              name: { contains: CREATOR_OFFER_NAME_HINT, mode: 'insensitive' },
+            },
+            select: { id: true },
+          });
+      if (creatorOffer) effectiveOfferId = creatorOffer.id;
+    }
+
     // Validate that an offer is provided
-    if (!offer_id || offer_id.trim() === '') {
+    if (!effectiveOfferId) {
       return NextResponse.json(
         { error: 'An offer is required' },
         { status: 400 }
@@ -358,7 +381,7 @@ export async function POST(request: NextRequest) {
           payout_terms_days,
           password_hash,
           merchant_id: merchant_id?.trim() || null,
-          offer_id: offer_id.trim(),
+          offer_id: effectiveOfferId,
           webhook_url: webhook_url?.trim() || null,
           webhook_parameter_mapping: webhook_parameter_mapping || null,
           redirect_base_url: redirect_base_url?.trim() || null,
