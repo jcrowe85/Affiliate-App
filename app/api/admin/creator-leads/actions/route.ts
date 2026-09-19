@@ -10,6 +10,7 @@ import {
   cancelBatch,
 } from '@/lib/creator-outreach/pipeline';
 import { apifyToken } from '@/lib/creator-outreach/instagram';
+import { isAudience, type Audience } from '@/lib/creator-outreach/audience';
 
 export const dynamic = 'force-dynamic';
 // Resolving a batch of profiles waits on a third-party scraper run, which is
@@ -33,19 +34,28 @@ export async function POST(request: NextRequest) {
     const action = String(body?.action || '');
     const shopId = admin.shopify_shop_id;
 
+    // Explicit on every action that picks recipients, and 'paid' when absent:
+    // an admin looking at the organic list must not be able to draw Trybe
+    // leads into a send, and a stale client that knows nothing about
+    // audiences must not quietly mail the wrong offer either.
+    const audience: Audience = isAudience(body?.audience) ? body.audience : 'paid';
+
     if (action === 'resolve') {
       if (!apifyToken()) {
         return NextResponse.json({ error: 'No Apify credential configured' }, { status: 400 });
       }
       const limit = Math.min(50, Math.max(1, parseInt(body?.limit ?? 50, 10) || 50));
+      // Resolution is audience-neutral: finding someone's public email says
+      // nothing about which offer they'll be sent.
       const summary = await resolvePending(shopId, { limit, batchSize: limit });
-      return NextResponse.json({ summary, counts: await statusCounts(shopId) });
+      return NextResponse.json({ summary, counts: await statusCounts(shopId, audience) });
     }
 
     if (action === 'send') {
       const limit = Math.min(25, Math.max(1, parseInt(body?.limit ?? 10, 10) || 10));
       const summary = await sendBatch(shopId, {
         limit,
+        audience,
         dryRun: Boolean(body?.dryRun),
         // Tighter than the CLI's spacing purely to fit the request window.
         // The rolling 24h cap still governs total volume, so this can't be
@@ -54,15 +64,15 @@ export async function POST(request: NextRequest) {
       });
       return NextResponse.json({
         summary,
-        counts: await statusCounts(shopId),
+        counts: await statusCounts(shopId, audience),
         sentToday: await sentInLast24h(shopId),
       });
     }
 
     if (action === 'schedule') {
       const count = Math.max(1, parseInt(body?.count ?? 25, 10) || 25);
-      const summary = await scheduleBatch(shopId, { count });
-      return NextResponse.json({ summary, counts: await statusCounts(shopId) });
+      const summary = await scheduleBatch(shopId, { count, audience });
+      return NextResponse.json({ summary, counts: await statusCounts(shopId, audience) });
     }
 
     // Sends anything already due. The cron worker does this every minute; the

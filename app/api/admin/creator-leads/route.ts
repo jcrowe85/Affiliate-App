@@ -4,6 +4,7 @@ import { getCurrentAdmin } from '@/lib/auth';
 import { sentInLast24h, statusCounts, experimentResults, resolveWarmupStart } from '@/lib/creator-outreach/pipeline';
 import { apifyToken } from '@/lib/creator-outreach/instagram';
 import { effectiveDailyCap } from '@/lib/creator-outreach/warmup';
+import { audienceWhere, isAudienceFilter } from '@/lib/creator-outreach/audience';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,21 +17,31 @@ export async function GET(request: NextRequest) {
     const params = request.nextUrl.searchParams;
     const status = params.get('status');
     const search = params.get('q')?.trim();
+    const audienceParam = params.get('audience');
+    const audience = isAudienceFilter(audienceParam) ? audienceParam : 'both';
     const page = Math.max(1, parseInt(params.get('page') || '1', 10));
     const pageSize = Math.min(200, Math.max(1, parseInt(params.get('pageSize') || '50', 10)));
 
+    // The audience and search clauses are ANDed rather than spread into one
+    // object: audienceWhere('organic') is itself an `OR`, and so is the search
+    // filter, so merging them would drop whichever landed first.
     const where = {
       shopify_shop_id: admin.shopify_shop_id,
       ...(status && status !== 'all' ? { status } : {}),
-      ...(search
-        ? {
-            OR: [
-              { instagram_handle: { contains: search, mode: 'insensitive' as const } },
-              { full_name: { contains: search, mode: 'insensitive' as const } },
-              { email: { contains: search, mode: 'insensitive' as const } },
-            ],
-          }
-        : {}),
+      AND: [
+        audienceWhere(audience),
+        ...(search
+          ? [
+              {
+                OR: [
+                  { instagram_handle: { contains: search, mode: 'insensitive' as const } },
+                  { full_name: { contains: search, mode: 'insensitive' as const } },
+                  { email: { contains: search, mode: 'insensitive' as const } },
+                ],
+              },
+            ]
+          : []),
+      ],
     };
 
     const warmup = effectiveDailyCap(undefined, await resolveWarmupStart(admin.shopify_shop_id));
@@ -60,7 +71,7 @@ export async function GET(request: NextRequest) {
         },
       }),
       prisma.creatorLead.count({ where }),
-      statusCounts(admin.shopify_shop_id),
+      statusCounts(admin.shopify_shop_id, audience),
       sentInLast24h(admin.shopify_shop_id),
       experimentResults(admin.shopify_shop_id),
     ]);

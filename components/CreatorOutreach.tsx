@@ -55,6 +55,30 @@ interface Payload {
   };
 }
 
+/**
+ * Which offer a lead is in line for, not merely where they came from.
+ *
+ * Organic creators were promised 40% and their own code; paid creators were
+ * promised free product and 15% once we run their video. The filter exists so
+ * an admin pressing Send knows exactly which of those two things is about to
+ * be said, to whom.
+ */
+const AUDIENCE_TABS: { key: 'both' | 'organic' | 'paid'; label: string }[] = [
+  { key: 'both', label: 'Both' },
+  { key: 'organic', label: 'Organic' },
+  { key: 'paid', label: 'Paid' },
+];
+
+const AUDIENCE_STYLE: Record<string, string> = {
+  organic: 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300',
+  paid: 'bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300',
+};
+
+/** Mirrors audienceOf() in lib/creator-outreach/audience.ts. */
+function audienceOfRow(sourceFilter: string | null): 'organic' | 'paid' {
+  return sourceFilter && /^meta(?:[-_.]|$)/i.test(sourceFilter.trim()) ? 'organic' : 'paid';
+}
+
 const STATUS_TABS: { key: string; label: string }[] = [
   { key: 'resolved', label: 'Ready to email' },
   { key: 'sourced', label: 'Awaiting lookup' },
@@ -87,6 +111,7 @@ function formatFollowers(count: number | null): string {
 export default function CreatorOutreach() {
   const [data, setData] = useState<Payload | null>(null);
   const [status, setStatus] = useState('resolved');
+  const [audience, setAudience] = useState<'both' | 'organic' | 'paid'>('both');
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -101,7 +126,7 @@ export default function CreatorOutreach() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ status, page: String(page), pageSize: '50' });
+      const params = new URLSearchParams({ status, audience, page: String(page), pageSize: '50' });
       if (query.trim()) params.set('q', query.trim());
       const response = await fetch(`/api/admin/creator-leads?${params}`);
       if (!response.ok) throw new Error('Failed to load leads');
@@ -111,7 +136,7 @@ export default function CreatorOutreach() {
     } finally {
       setLoading(false);
     }
-  }, [status, page, query]);
+  }, [status, audience, page, query]);
 
   useEffect(() => {
     load();
@@ -121,7 +146,7 @@ export default function CreatorOutreach() {
   // than the current one doesn't land on an empty view.
   useEffect(() => {
     setPage(1);
-  }, [status, query]);
+  }, [status, audience, query]);
 
   const runAction = async (action: 'resolve' | 'send', extra: Record<string, unknown> = {}) => {
     setBusy(action);
@@ -340,6 +365,29 @@ export default function CreatorOutreach() {
           </p>
         )}
 
+        {/* Audience first, and visually distinct from the status tabs: it
+            decides which offer any send will make, so it is not just another
+            way to narrow a list. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">
+            Audience
+          </span>
+          {AUDIENCE_TABS.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setAudience(tab.key)}
+              className={`px-3 py-1.5 rounded-full text-sm ${
+                audience === tab.key
+                  ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
         <div className="flex flex-wrap items-center gap-2">
           {STATUS_TABS.map((tab) => (
             <button
@@ -405,9 +453,20 @@ export default function CreatorOutreach() {
                       {lead.full_name && (
                         <div className="text-xs text-gray-500 dark:text-gray-400">{lead.full_name}</div>
                       )}
-                      {lead.source_filter && (
-                        <div className="text-xs text-gray-400 dark:text-gray-500">{lead.source_filter}</div>
-                      )}
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span
+                          className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide ${
+                            AUDIENCE_STYLE[audienceOfRow(lead.source_filter)]
+                          }`}
+                        >
+                          {audienceOfRow(lead.source_filter)}
+                        </span>
+                        {lead.source_filter && (
+                          <span className="text-xs text-gray-400 dark:text-gray-500">
+                            {lead.source_filter}
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">

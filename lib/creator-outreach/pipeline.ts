@@ -17,9 +17,17 @@ import {
   defaultCopy,
   sendOutreach,
   copyForVariant,
+  joinUrlFor,
+  variantKeysFor,
   VARIANT_KEYS,
   type OutreachCopy,
 } from './outreach-email';
+import {
+  audienceOf,
+  audienceWhere,
+  type Audience,
+  type AudienceFilter,
+} from './audience';
 import { assignVariants, compareVariants, type VariantStats, type Comparison } from './experiment';
 import { effectiveDailyCap, capForDay, warmupStartedAt, effectiveWarmupStart, type WarmupState } from './warmup';
 import { planSendTimes, sendWindowFromEnv, describeWindow, startOfSendingDay } from './schedule';
@@ -367,13 +375,22 @@ export async function sendBatch(
     delayMs?: number;
     dryRun?: boolean;
     copy?: OutreachCopy;
+    /**
+     * Which audience to draw from. Defaults to 'paid' rather than "everyone"
+     * deliberately: this function is called by a CLI script and an admin
+     * button, and an unspecified audience picking up organic leads would mail
+     * them the Trybe offer. A default that sends the wrong email is worse than
+     * one that sends fewer.
+     */
+    audience?: Audience;
     onSend?: (email: string, ok: boolean, reason?: string) => void;
   } = {}
 ): Promise<SendSummary> {
+  const audience = options.audience ?? 'paid';
   const dailyCap = options.dailyCap ?? effectiveDailyCap(undefined, await resolveWarmupStart(shopId)).cap;
   const delayMs = options.delayMs ?? parseInt(process.env.CREATOR_OUTREACH_SEND_DELAY_MS || '15000', 10);
-  const joinUrl = process.env.TRYBE_JOIN_URL || '';
-  const copy = options.copy ?? defaultCopy(joinUrl);
+  const joinUrl = joinUrlFor(audience);
+  const copy = options.copy ?? copyForVariant(null, joinUrl, audience);
 
   const alreadySent = await sentInLast24h(shopId);
   const capRemaining = Math.max(0, dailyCap - alreadySent);
@@ -383,7 +400,8 @@ export async function sendBatch(
   if (limit <= 0) return summary;
 
   if (!joinUrl && !options.copy) {
-    throw new Error('TRYBE_JOIN_URL is not set — the email would go out without a join link.');
+    const varName = audience === 'organic' ? 'META_JOIN_URL' : 'TRYBE_JOIN_URL';
+    throw new Error(`${varName} is not set, so the email would go out without a join link.`);
   }
 
   const candidates = await prisma.creatorLead.findMany({
@@ -393,6 +411,7 @@ export async function sendBatch(
       email: { not: null },
       emailed_at: null,
       unsubscribed_at: null,
+      ...audienceWhere(audience),
     },
     select: {
       id: true,
@@ -499,11 +518,20 @@ export async function suppress(
   }
 }
 
-/** Counts by status, for the admin view and the CLI summary. */
-export async function statusCounts(shopId: string): Promise<Record<string, number>> {
+/**
+ * Counts by status, for the admin view and the CLI summary.
+ *
+ * Takes the audience so the admin's tab counts describe the list actually on
+ * screen. A "Ready to email (5)" tab that turns out to mean five *Trybe* leads
+ * while the organic filter is selected is worse than no count at all.
+ */
+export async function statusCounts(
+  shopId: string,
+  audience?: AudienceFilter
+): Promise<Record<string, number>> {
   const rows = await prisma.creatorLead.groupBy({
     by: ['status'],
-    where: { shopify_shop_id: shopId },
+    where: { shopify_shop_id: shopId, ...audienceWhere(audience) },
     _count: { _all: true },
   });
   return Object.fromEntries(rows.map((row) => [row.status, row._count._all]));
@@ -542,8 +570,22 @@ export type ScheduleSummary = {
  */
 export async function scheduleBatch(
   shopId: string,
-  options: { count?: number; startInSeconds?: number; dailyCap?: number; now?: Date } = {}
+  options: {
+    count?: number;
+    startInSeconds?: number;
+    dailyCap?: number;
+    now?: Date;
+    /**
+     * Which audience this batch draws from. Defaults to 'paid' for the same
+     * reason sendBatch does: this is what autoTopUp calls from a cron that
+     * ticks every minute, and a batch that silently mixed audiences would
+     * stamp organic leads with a Trybe variant, after which the send path has
+     * no way left to tell they were ever different.
+     */
+    audience?: Audience;
+  } = {}
 ): Promise<ScheduleSummary> {
+  const audience = options.audience ?? 'paid';
   const now = options.now ?? new Date();
   const warmupStart = await resolveWarmupStart(shopId, now);
   const dailyCap = options.dailyCap ?? effectiveDailyCap(now, warmupStart).cap;
@@ -602,6 +644,7 @@ export async function scheduleBatch(
         email: { not: null },
         emailed_at: null,
         unsubscribed_at: null,
+        ...audienceWhere(audience),
       },
       select: { id: true, email: true, instagram_handle: true },
       orderBy: { sourced_at: 'asc' },
@@ -618,10 +661,16 @@ export async function scheduleBatch(
     // Continue the rotation from wherever the last batch left off, so a run of
     // small batches still ends up evenly split rather than every batch starting
     // on variant A.
+    // Counted within the audience: the rotation offset is meaningless across
+    // audiences, since they don't share a variant set.
     const alreadyAssigned = await db.creatorLead.count({
-      where: { shopify_shop_id: shopId, copy_variant: { not: null } },
+      where: {
+        shopify_shop_id: shopId,
+        copy_variant: { not: null },
+        ...audienceWhere(audience),
+      },
     });
-    const variants = assignVariants(sendable.length, VARIANT_KEYS, alreadyAssigned);
+    const variants = assignVariants(sendable.length, variantKeysFor(audience), alreadyAssigned);
 
     // Scattered across the sending window rather than fired off back to back —
     // see lib/creator-outreach/schedule.ts. A batch bigger than one day's cap
@@ -679,7 +728,6 @@ export async function sendDue(
 ): Promise<{ sent: number; failed: number; remaining: number }> {
   const now = options.now ?? new Date();
   const limit = options.limit ?? 10;
-  const joinUrl = process.env.TRYBE_JOIN_URL || '';
   const cap = effectiveDailyCap(now, await resolveWarmupStart(shopId, now)).cap;
 
   // Claimed under the shop lock and counted against today's cap before any mail
@@ -730,6 +778,7 @@ export async function sendDue(
         full_name: true,
         unsubscribe_token: true,
         copy_variant: true,
+        source_filter: true,
       },
     });
     if (!lead?.email) {
@@ -740,9 +789,16 @@ export async function sendDue(
       continue;
     }
 
+    // Resolved per lead rather than once per run: a queue can hold both
+    // audiences at the same time, and each has its own destination. Reading it
+    // from the lead means a mixed queue still sends every creator the offer
+    // they were actually made.
+    const audience = audienceOf(lead.source_filter);
+    const joinUrl = joinUrlFor(audience);
+
     // Whatever variant this lead was assigned at planning time. An override
     // passed by the caller wins, which is how the CLI's one-off sends work.
-    const copy = options.copy ?? copyForVariant(lead.copy_variant, joinUrl);
+    const copy = options.copy ?? copyForVariant(lead.copy_variant, joinUrl, audience);
 
     const result = await sendOutreach(
       {
@@ -927,8 +983,12 @@ export async function experimentResults(shopId: string): Promise<{
  */
 export async function autoTopUp(
   shopId: string,
-  options: { days?: number; now?: Date } = {}
+  options: { days?: number; now?: Date; audience?: Audience } = {}
 ): Promise<{ queued: number; alreadyBooked: number; readyPool: number; target: number }> {
+  // The cron calls this with no audience every minute. Defaulting to 'paid'
+  // is what keeps a newly resolved organic lead out of the automatic queue
+  // until someone deliberately schedules an organic batch.
+  const audience = options.audience ?? 'paid';
   const days = options.days ?? parseInt(process.env.CREATOR_OUTREACH_QUEUE_DAYS || '3', 10);
   const now = options.now ?? new Date();
   const warmupStart = await resolveWarmupStart(shopId, now);
@@ -949,6 +1009,7 @@ export async function autoTopUp(
         email: { not: null },
         emailed_at: null,
         unsubscribed_at: null,
+        ...audienceWhere(audience),
       },
     }),
   ]);
@@ -967,6 +1028,6 @@ export async function autoTopUp(
     return { queued: 0, alreadyBooked, readyPool, target };
   }
 
-  const summary = await scheduleBatch(shopId, { count: shortfall, now });
+  const summary = await scheduleBatch(shopId, { count: shortfall, now, audience });
   return { queued: summary.scheduled, alreadyBooked, readyPool, target };
 }
