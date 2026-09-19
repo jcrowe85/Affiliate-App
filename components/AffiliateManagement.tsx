@@ -1147,9 +1147,11 @@ export default function AffiliateManagement() {
                 <button
                   type="button"
                   onClick={copySignupLink}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium shrink-0"
+                  className={`px-4 py-2 text-white rounded-lg text-sm font-medium shrink-0 ${
+                    copiedSignupLink ? 'bg-green-600 hover:bg-green-700' : 'bg-indigo-600 hover:bg-indigo-700'
+                  }`}
                 >
-                  {copiedSignupLink ? '✓ Copied' : 'Copy'}
+                  Copy
                 </button>
               </div>
 
@@ -2653,10 +2655,14 @@ export default function AffiliateManagement() {
                             <button
                               type="button"
                               onClick={() => copyReferralUrl(a.affiliate_number, a.id, 'query')}
-                              className="text-blue-600 hover:text-blue-800 font-medium text-xs px-2 py-1 border border-blue-300 rounded hover:bg-blue-50"
+                              className={`font-medium text-xs px-2 py-1 border rounded ${
+                                copiedAffiliateId === a.id
+                                  ? 'text-green-700 border-green-400 bg-green-50'
+                                  : 'text-blue-600 hover:text-blue-800 border-blue-300 hover:bg-blue-50'
+                              }`}
                               title="Copy referral URL"
                             >
-                              {copiedAffiliateId === a.id ? '✓ Copied' : 'Copy'}
+                              Copy
                             </button>
                           </div>
                         ) : (
@@ -2680,10 +2686,14 @@ export default function AffiliateManagement() {
                                   setError('Failed to copy coupon code');
                                 }
                               }}
-                              className="text-emerald-700 hover:text-emerald-900 font-medium text-xs px-2 py-1 border border-emerald-300 rounded hover:bg-emerald-50"
+                              className={`font-medium text-xs px-2 py-1 border rounded ${
+                                copiedAffiliateId === `${a.id}:coupon`
+                                  ? 'text-green-700 border-green-400 bg-green-50'
+                                  : 'text-emerald-700 hover:text-emerald-900 border-emerald-300 hover:bg-emerald-50'
+                              }`}
                               title="Copy coupon code"
                             >
-                              {copiedAffiliateId === `${a.id}:coupon` ? '✓ Copied' : 'Copy'}
+                              Copy
                             </button>
                           </div>
                         ) : (
@@ -2867,9 +2877,13 @@ export default function AffiliateManagement() {
                             <button
                               type="button"
                               onClick={() => copyReferralUrl(a.affiliate_number, a.id, 'query')}
-                              className="text-blue-600 hover:text-blue-800 font-medium text-xs px-2 py-1 border border-blue-300 rounded hover:bg-blue-50 dark:hover:bg-blue-900/30"
+                              className={`font-medium text-xs px-2 py-1 border rounded ${
+                                copiedAffiliateId === a.id
+                                  ? 'text-green-700 border-green-400 bg-green-50 dark:bg-green-900/30 dark:text-green-300'
+                                  : 'text-blue-600 hover:text-blue-800 border-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/30'
+                              }`}
                             >
-                              {copiedAffiliateId === a.id ? '✓ Copied' : 'Copy'}
+                              Copy
                             </button>
                           </div>
                         ) : (
