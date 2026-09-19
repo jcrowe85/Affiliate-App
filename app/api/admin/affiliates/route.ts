@@ -29,6 +29,15 @@ export async function GET(request: NextRequest) {
             offer: true,
           },
         },
+        // The creator's own code, minted at approval. Only the count came back
+        // before, so the table had no way to show the one thing a creator
+        // actually reads out in a video.
+        links: {
+          where: { coupon_code: { not: null } },
+          select: { coupon_code: true },
+          orderBy: { created_at: 'asc' },
+          take: 1,
+        },
         _count: {
           select: {
             links: true,
@@ -171,6 +180,7 @@ export async function GET(request: NextRequest) {
           webhook_url: a.webhook_url,
           webhook_parameter_mapping: a.webhook_parameter_mapping,
           redirect_base_url: a.redirect_base_url,
+          coupon_code: a.links[0]?.coupon_code ?? null,
           offer: a.offer ? { id: a.offer.id, name: a.offer.name } : null,
           offers: a.affiliate_offers.map(ao => ({
             id: ao.offer.id,

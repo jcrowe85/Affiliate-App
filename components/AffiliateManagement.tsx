@@ -59,6 +59,15 @@ interface AffiliateApplication {
   created_at: string;
 }
 
+/**
+ * The product page creators are pointed at.
+ *
+ * One place to change it, and deliberately the storefront rather than this
+ * app's /ref/<n> route: that route redirects relative to its own origin, so a
+ * product path would land on affiliates.tryfleur.com and 404.
+ */
+const CREATOR_PDP_URL = 'https://tryfleur.com/products/bloom-hair-scalp-serum-longform';
+
 interface Affiliate {
   id: string;
   affiliate_number: number | null;
@@ -84,6 +93,7 @@ interface Affiliate {
   webhook_url: string | null;
   webhook_parameter_mapping: Record<string, { type: 'fixed' | 'dynamic'; value: string } | string> | null;
   redirect_base_url: string | null;
+  coupon_code: string | null;
   offer: { id: string; name: string } | null;
   offers?: Array<{ id: string; name: string; offer_number: number | null }>;
   created_at: string;
@@ -869,6 +879,16 @@ export default function AffiliateManagement() {
     // Path-based is secondary option
     return `https://tryfleur.com/ref/${affiliateNumber}`;
   };
+
+  /**
+   * The product page a creator should actually link to, tagged with their ref.
+   *
+   * Query form on the storefront, not /ref/<n>: that route redirects relative to
+   * this app's own origin, so a product path would land on affiliates.tryfleur.com
+   * and 404. The ?ref= parameter is what attribution reads off the referrer.
+   */
+  const getPdpReferralUrl = (affiliateNumber: number | null): string =>
+    affiliateNumber ? `${CREATOR_PDP_URL}?ref=${affiliateNumber}` : '';
 
   const copyReferralUrl = async (affiliateNumber: number | null, affiliateId: string, format: 'query' | 'path' = 'query') => {
     if (!affiliateNumber) {
@@ -2585,6 +2605,7 @@ export default function AffiliateManagement() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Affiliate Name</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Affiliate ID</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Referral URL</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Coupon</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Creation Date</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Payout</th>
@@ -2636,6 +2657,33 @@ export default function AffiliateManagement() {
                               title="Copy referral URL"
                             >
                               {copiedAffiliateId === a.id ? '✓ Copied' : 'Copy'}
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-sm">
+                        {a.coupon_code ? (
+                          <div className="flex items-center gap-2">
+                            <code className="text-xs bg-emerald-50 px-2 py-1 rounded text-emerald-700 border border-emerald-200 font-semibold tracking-wide">
+                              {a.coupon_code}
+                            </code>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  await navigator.clipboard.writeText(a.coupon_code as string);
+                                  setCopiedAffiliateId(`${a.id}:coupon`);
+                                  setTimeout(() => setCopiedAffiliateId(null), 2000);
+                                } catch {
+                                  setError('Failed to copy coupon code');
+                                }
+                              }}
+                              className="text-emerald-700 hover:text-emerald-900 font-medium text-xs px-2 py-1 border border-emerald-300 rounded hover:bg-emerald-50"
+                              title="Copy coupon code"
+                            >
+                              {copiedAffiliateId === `${a.id}:coupon` ? '✓ Copied' : 'Copy'}
                             </button>
                           </div>
                         ) : (
@@ -2847,6 +2895,51 @@ export default function AffiliateManagement() {
                         </dd>
                       </div>
                     )}
+                  </dl>
+                </section>
+
+                <section className="border-t border-gray-200 dark:border-gray-800 pt-6">
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">How to promote</h4>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                    Either one credits {a.first_name || 'this affiliate'} for the sale. The link
+                    works when someone clicks through; the code works when they don&apos;t —
+                    which is most of the time on Instagram, where captions aren&apos;t clickable.
+                  </p>
+                  <dl className="space-y-3">
+                    <div>
+                      <dt className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
+                        Ref ID
+                      </dt>
+                      <dd className="text-sm font-mono text-gray-900 dark:text-gray-100">
+                        {a.affiliate_number != null ? `#${a.affiliate_number}` : '—'}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
+                        Product page link
+                      </dt>
+                      <dd className="text-sm font-mono text-gray-900 dark:text-gray-100 break-all">
+                        {getPdpReferralUrl(a.affiliate_number) || '—'}
+                      </dd>
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        Put this in their bio or a story link sticker. The{' '}
+                        <code className="font-mono">?ref=</code> tag is what credits them, so it
+                        has to stay on the end of the URL.
+                      </p>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
+                        Coupon code
+                      </dt>
+                      <dd className="text-sm font-mono font-semibold text-gray-900 dark:text-gray-100">
+                        {a.coupon_code || '— (not minted yet)'}
+                      </dd>
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        They say this out loud in a video, or write it in the caption. It credits
+                        them at checkout even when nobody clicks a link, and it outranks the link
+                        if both are used.
+                      </p>
+                    </div>
                   </dl>
                 </section>
 
