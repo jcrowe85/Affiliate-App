@@ -865,13 +865,18 @@ export type LiveLead = {
   scheduled_send_at: Date | null;
   emailed_at: Date | null;
   send_error: string | null;
+  /** So the live view can tag each row with the offer it is about to make. */
+  audience: Audience;
 };
 
 /**
  * The current batch, for the live view: everything queued or sending, plus what
  * has already gone out today so the list reads as one continuous run.
  */
-export async function liveBatch(shopId: string): Promise<{
+export async function liveBatch(
+  shopId: string,
+  audience: AudienceFilter = 'both'
+): Promise<{
   batchId: string | null;
   leads: LiveLead[];
   sentToday: number;
@@ -883,11 +888,18 @@ export async function liveBatch(shopId: string): Promise<{
   const warmup = effectiveDailyCap(undefined, await resolveWarmupStart(shopId));
 
   const leads = await prisma.creatorLead.findMany({
+    // ANDed rather than spread: the recency clause is an `OR` and so is
+    // audienceWhere('organic'), and merging the two objects would drop one.
     where: {
       shopify_shop_id: shopId,
-      OR: [
-        { status: { in: ['queued', 'sending'] } },
-        { status: 'emailed', emailed_at: { gte: since } },
+      AND: [
+        {
+          OR: [
+            { status: { in: ['queued', 'sending'] } },
+            { status: 'emailed', emailed_at: { gte: since } },
+          ],
+        },
+        audienceWhere(audience),
       ],
     },
     select: {
@@ -900,6 +912,7 @@ export async function liveBatch(shopId: string): Promise<{
       emailed_at: true,
       send_error: true,
       batch_id: true,
+      source_filter: true,
     },
     // Pending first in send order, then the completed ones newest-last so the
     // list reads top-to-bottom as the run progresses.
@@ -910,7 +923,10 @@ export async function liveBatch(shopId: string): Promise<{
 
   return {
     batchId: pending[0]?.batch_id ?? null,
-    leads: leads.map(({ batch_id, ...rest }) => rest),
+    leads: leads.map(({ batch_id, source_filter, ...rest }) => ({
+      ...rest,
+      audience: audienceOf(source_filter),
+    })),
     sentToday: await sentInLast24h(shopId),
     dailyCap: warmup.cap,
     warmup: warmup.state,

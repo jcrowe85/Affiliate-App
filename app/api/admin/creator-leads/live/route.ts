@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentAdmin } from '@/lib/auth';
 import { liveBatch } from '@/lib/creator-outreach/pipeline';
+import { isAudienceFilter } from '@/lib/creator-outreach/audience';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,12 +9,14 @@ export const dynamic = 'force-dynamic';
  * Feeds the live send view. Polled every few seconds while the page is open,
  * so it stays deliberately small: no bios, no counts that need a scan.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const admin = await getCurrentAdmin();
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const live = await liveBatch(admin.shopify_shop_id);
+    const param = request.nextUrl.searchParams.get('audience');
+    const audience = isAudienceFilter(param) ? param : 'both';
+    const live = await liveBatch(admin.shopify_shop_id, audience);
     return NextResponse.json({
       ...live,
       // The client counts down against its own clock, which can be minutes off

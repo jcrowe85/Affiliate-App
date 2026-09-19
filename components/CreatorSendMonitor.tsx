@@ -12,6 +12,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  * offset between the browser's clock and the server's.
  */
 
+type Audience = 'organic' | 'paid';
+type AudienceFilter = Audience | 'both';
+
 type LiveLead = {
   id: string;
   instagram_handle: string;
@@ -21,6 +24,18 @@ type LiveLead = {
   scheduled_send_at: string | null;
   emailed_at: string | null;
   send_error: string | null;
+  audience: Audience;
+};
+
+const AUDIENCE_TABS: { key: AudienceFilter; label: string }[] = [
+  { key: 'both', label: 'Both' },
+  { key: 'organic', label: 'Organic' },
+  { key: 'paid', label: 'Paid' },
+];
+
+const AUDIENCE_STYLE: Record<Audience, string> = {
+  organic: 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300',
+  paid: 'bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300',
 };
 
 type LivePayload = {
@@ -65,6 +80,10 @@ export default function CreatorSendMonitor({ onChanged }: { onChanged?: () => vo
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [count, setCount] = useState(25);
+  // Filters the list *and* aims the Queue button. Those two must be the same
+  // control: a button that queued a different audience than the one on screen
+  // would send the wrong offer at the moment you were watching most closely.
+  const [audience, setAudience] = useState<AudienceFilter>('both');
   // Local clock, ticked every second so countdowns move smoothly between polls.
   const [now, setNow] = useState(() => Date.now());
   // Browser clock minus server clock. Without it, a laptop a minute fast shows
@@ -73,7 +92,7 @@ export default function CreatorSendMonitor({ onChanged }: { onChanged?: () => vo
 
   const load = useCallback(async () => {
     try {
-      const response = await fetch('/api/admin/creator-leads/live');
+      const response = await fetch(`/api/admin/creator-leads/live?audience=${audience}`);
       if (!response.ok) return;
       const payload: LivePayload = await response.json();
       skew.current = Date.now() - new Date(payload.serverNow).getTime();
@@ -81,7 +100,7 @@ export default function CreatorSendMonitor({ onChanged }: { onChanged?: () => vo
     } catch {
       // A dropped poll is not worth surfacing; the next one is 4s away.
     }
-  }, []);
+  }, [audience]);
 
   useEffect(() => {
     load();
@@ -171,6 +190,29 @@ export default function CreatorSendMonitor({ onChanged }: { onChanged?: () => vo
           />
         </div>
 
+        {/* Audience sits with the Queue controls, not off with the display
+            options, because it decides which of two different offers the next
+            batch makes — not merely which rows are shown. */}
+        <div className="flex flex-wrap items-center gap-2 mt-4">
+          <span className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">
+            Audience
+          </span>
+          {AUDIENCE_TABS.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setAudience(tab.key)}
+              className={`px-3 py-1.5 rounded-full text-sm ${
+                audience === tab.key
+                  ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
         <div className="flex flex-wrap items-center gap-3 mt-4">
           <input
             type="number"
@@ -181,11 +223,19 @@ export default function CreatorSendMonitor({ onChanged }: { onChanged?: () => vo
           />
           <button
             type="button"
-            onClick={() => act('schedule', { count })}
-            disabled={busy !== null || capLeft === 0}
+            // Queuing needs one audience, and 'Both' names two. Rather than
+            // pick one silently — the old behaviour, which quietly meant paid
+            // — the button is disabled until the choice is unambiguous.
+            onClick={() => audience !== 'both' && act('schedule', { count, audience })}
+            disabled={busy !== null || capLeft === 0 || audience === 'both'}
+            title={audience === 'both' ? 'Choose Organic or Paid before queueing' : undefined}
             className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium disabled:opacity-40"
           >
-            {busy === 'schedule' ? 'Queueing…' : `Queue ${count}`}
+            {busy === 'schedule'
+              ? 'Queueing…'
+              : audience === 'both'
+                ? 'Pick an audience to queue'
+                : `Queue ${count} ${audience}`}
           </button>
 
           {pending.length > 0 && (
@@ -235,7 +285,9 @@ export default function CreatorSendMonitor({ onChanged }: { onChanged?: () => vo
       <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 divide-y divide-gray-100 dark:divide-gray-800">
         {leads.length === 0 ? (
           <div className="p-8 text-center text-gray-500 dark:text-gray-400 text-sm">
-            Nothing queued. Pick a number above and hit Queue to schedule a batch.
+            {audience === 'both'
+              ? 'Nothing queued. Pick an audience and a number above, then hit Queue.'
+              : `No ${audience} sends queued or completed in the last 24h.`}
           </div>
         ) : (
           leads.map((lead) => {
@@ -268,6 +320,13 @@ export default function CreatorSendMonitor({ onChanged }: { onChanged?: () => vo
                   <div className="flex items-baseline gap-2">
                     <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
                       @{lead.instagram_handle}
+                    </span>
+                    <span
+                      className={`inline-flex shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide ${
+                        AUDIENCE_STYLE[lead.audience]
+                      }`}
+                    >
+                      {lead.audience}
                     </span>
                     <span className="text-xs text-gray-500 dark:text-gray-400 truncate">{lead.email}</span>
                   </div>
