@@ -8,13 +8,17 @@
  * highest-priority signal in attribution-enhanced, so it beats a link whenever
  * both are present.
  *
- * Why the code defaults to 0% off: every automatic discount on this store is
- * ACTIVE and combines with everything (Buy 2 Get 1 Free, subscription gifts). A
- * code that took a further percentage would stack straight out of margin, and a
- * code set not to combine would force the customer to choose between the code
- * and a better bundle — which they won't, so the attribution is lost. A 0% code
- * that combines with everything costs nothing, competes with nothing, and still
- * attributes perfectly. Set AFFILIATE_COUPON_PERCENT when the offer changes.
+ * The code is 10% off at the order level, and that class matters. Verified
+ * against the live store: this shape returns discountClasses ["ORDER"], and
+ * every storewide automatic discount here declares orderDiscounts: true, so the
+ * code stacks alongside Buy 2 Get 1 Free and the subscription gifts instead of
+ * competing with them. A code set not to combine would force the customer to
+ * choose between it and a better bundle — they'd drop the code, and the
+ * attribution with it.
+ *
+ * The 10% is a deliberate margin cost, not an accident: a code that visibly
+ * does nothing gives the creator nothing to say and the customer no reason to
+ * type it. AFFILIATE_COUPON_PERCENT changes it when the offer does.
  */
 
 import { prisma } from './db';
@@ -40,9 +44,9 @@ export type CreatedCoupon = {
   linkId: string;
 };
 
-/** Percentage off the generated code gives, 0–100. Defaults to 0 — see above. */
+/** Percentage off the generated code gives, 0–100. Defaults to 10 — see above. */
 export function couponPercent(): number {
-  const raw = parseFloat(process.env.AFFILIATE_COUPON_PERCENT || '0');
+  const raw = parseFloat(process.env.AFFILIATE_COUPON_PERCENT || '10');
   if (!Number.isFinite(raw) || raw < 0) return 0;
   return Math.min(raw, 100);
 }

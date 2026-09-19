@@ -28,7 +28,7 @@ eq('suffix is appended', buildCouponCode({ firstName: 'Sarah', affiliateNumber: 
 console.log('\n-- percent parsing --');
 const orig = process.env.AFFILIATE_COUPON_PERCENT;
 process.env.AFFILIATE_COUPON_PERCENT = '';
-eq('unset defaults to zero — a misconfigured code must never cost margin', couponPercent(), 0);
+eq('unset defaults to the 10% creator offer', couponPercent(), 10);
 process.env.AFFILIATE_COUPON_PERCENT = '15';
 eq('reads a percentage', couponPercent(), 15);
 process.env.AFFILIATE_COUPON_PERCENT = 'abc';
