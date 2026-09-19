@@ -189,7 +189,19 @@ export async function ensureAffiliateCoupon(
         // Shopify takes a fraction here, not a percentage.
         value: { percentage: percent / 100 },
         items: { all: true },
+        // Both purchase types. Left unset, Shopify makes the code one-time
+        // only — verified, the summary read "off one-time purchase products" —
+        // so a customer who subscribed would get nothing off and the creator
+        // who sent them would earn nothing. Subscriptions are a large share of
+        // orders here, so that silently wrote off much of the programme.
+        appliesOnOneTimePurchase: true,
+        appliesOnSubscription: true,
       },
+      // First billing cycle only, matching a first-purchase-only commission.
+      // Shopify defaults this to 1; setting it explicitly keeps the intent in
+      // the code, because 0 means every recurring order forever while the
+      // creator is still paid just once.
+      recurringCycleLimit: 1,
       // Combines with everything on purpose: the storewide bundles are active
       // and better than any code we would issue. A code that competed with them
       // would simply go unused, taking the attribution with it.
