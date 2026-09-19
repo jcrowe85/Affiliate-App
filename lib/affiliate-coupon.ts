@@ -179,48 +179,74 @@ export async function ensureAffiliateCoupon(
     };
   };
 
-  const data = await shopifyAdminGraphQL<Resp>(creds, CREATE_MUTATION, {
-    input: {
-      title: `Affiliate ${code}`,
-      code,
-      startsAt: new Date().toISOString(),
-      context: { all: 'ALL' },
-      customerGets: {
-        // Shopify takes a fraction here, not a percentage.
-        value: { percentage: percent / 100 },
-        items: { all: true },
-        // Both purchase types. Left unset, Shopify makes the code one-time
-        // only — verified, the summary read "off one-time purchase products" —
-        // so a customer who subscribed would get nothing off and the creator
-        // who sent them would earn nothing. Subscriptions are a large share of
-        // orders here, so that silently wrote off much of the programme.
-        appliesOnOneTimePurchase: true,
-        appliesOnSubscription: true,
-      },
-      // First billing cycle only, matching a first-purchase-only commission.
-      // Shopify defaults this to 1; setting it explicitly keeps the intent in
-      // the code, because 0 means every recurring order forever while the
-      // creator is still paid just once.
-      recurringCycleLimit: 1,
-      // Combines with everything on purpose: the storewide bundles are active
-      // and better than any code we would issue. A code that competed with them
-      // would simply go unused, taking the attribution with it.
-      combinesWith: { orderDiscounts: true, productDiscounts: true, shippingDiscounts: true },
-      appliesOncePerCustomer: false,
+  const buildInput = (couponCode: string) => ({
+    title: `Affiliate ${couponCode}`,
+    code: couponCode,
+    startsAt: new Date().toISOString(),
+    context: { all: 'ALL' },
+    customerGets: {
+      // Shopify takes a fraction here, not a percentage.
+      value: { percentage: percent / 100 },
+      items: { all: true },
+      // Both purchase types. Left unset, Shopify makes the code one-time
+      // only — verified, the summary read "off one-time purchase products" —
+      // so a customer who subscribed would get nothing off and the creator
+      // who sent them would earn nothing. Subscriptions are a large share of
+      // orders here, so that silently wrote off much of the programme.
+      appliesOnOneTimePurchase: true,
+      appliesOnSubscription: true,
     },
+    // First billing cycle only, matching a first-purchase-only commission.
+    // Shopify defaults this to 1; setting it explicitly keeps the intent in
+    // the code, because 0 means every recurring order forever while the
+    // creator is still paid just once.
+    recurringCycleLimit: 1,
+    // Combines with everything on purpose: the storewide bundles are active
+    // and better than any code we would issue. A code that competed with them
+    // would simply go unused, taking the attribution with it.
+    combinesWith: { orderDiscounts: true, productDiscounts: true, shippingDiscounts: true },
+    appliesOncePerCustomer: false,
   });
 
-  const result = data.discountCodeBasicCreate;
-  if (result.userErrors?.length) {
-    const first = result.userErrors[0];
-    throw new ShopifyAdminError(
-      `Shopify rejected the discount code ${code}: ${first.message}${first.field ? ` (${first.field.join('.')})` : ''}`,
-      422
-    );
+  // Shopify's code namespace covers every discount this shop has ever created,
+  // including ones nothing here tracks any more: deleting an affiliate cascades
+  // the local link away but leaves the Shopify code standing. So a name that
+  // looks free locally can still be taken, and asking is the only way to know.
+  // This threw instead of retrying, and an approval silently produced no code.
+  let shopifyId: string | null = null;
+  for (let attempt = 0; attempt < 5 && !shopifyId; attempt++) {
+    if (attempt > 0) {
+      code = buildCouponCode({
+        firstName: affiliate.first_name,
+        affiliateNumber: affiliate.affiliate_number,
+        suffix: randomSuffix(),
+      });
+    }
+
+    const data = await shopifyAdminGraphQL<Resp>(creds, CREATE_MUTATION, {
+      input: buildInput(code),
+    });
+    const result = data.discountCodeBasicCreate;
+    const errors = result.userErrors ?? [];
+
+    // Taken. Try a suffixed name rather than giving up on the creator.
+    if (errors.some((e) => /must be unique/i.test(e.message))) continue;
+
+    if (errors.length) {
+      const first = errors[0];
+      throw new ShopifyAdminError(
+        `Shopify rejected the discount code ${code}: ${first.message}${first.field ? ` (${first.field.join('.')})` : ''}`,
+        422
+      );
+    }
+    shopifyId = result.codeDiscountNode?.id ?? null;
   }
-  const shopifyId = result.codeDiscountNode?.id;
+
   if (!shopifyId) {
-    throw new ShopifyAdminError(`Shopify created no discount for ${code}`, 502);
+    throw new ShopifyAdminError(
+      `Could not find a free discount code for affiliate ${affiliate.affiliate_number ?? affiliate.id} after 5 attempts`,
+      409
+    );
   }
 
   const link = await prisma.affiliateLink.create({
