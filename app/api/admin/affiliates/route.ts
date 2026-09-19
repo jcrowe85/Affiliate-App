@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { ensureAffiliateCoupon } from '@/lib/affiliate-coupon';
 import { prisma } from '@/lib/db';
 import { getCurrentAdmin, hashPassword } from '@/lib/auth';
 import { sendApplicationApprovedEmail } from '@/lib/email';
@@ -399,6 +400,15 @@ export async function POST(request: NextRequest) {
       await sendApplicationApprovedEmail(affiliate);
     }
 
+    // Their personal code, created in Shopify and stored as the attribution key.
+    // After the commit and deliberately non-fatal: an approval that already
+    // succeeded must not fail because Shopify was unreachable, and the code can
+    // be minted later without redoing any of this.
+    const coupon = await ensureAffiliateCoupon(shopId, affiliate).catch((err: any) => {
+      console.error('[affiliates] Coupon creation failed:', err?.message || err);
+      return null;
+    });
+
     return NextResponse.json({
       success: true,
       affiliate: {
@@ -419,6 +429,7 @@ export async function POST(request: NextRequest) {
         merchant_id: affiliate.merchant_id,
         offer_id: affiliate.offer_id,
         affiliate_number: affiliate.affiliate_number,
+        coupon_code: coupon?.code ?? null,
       },
     }, { status: 201 });
   } catch (error: any) {

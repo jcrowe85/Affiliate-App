@@ -66,9 +66,12 @@ export async function attributeOrder(data: OrderAttributionData): Promise<string
 
   // Check if coupon code matches any affiliate
   if (data.couponCode) {
+    // Case-insensitive, for the same reason as attribution-enhanced: a stored
+    // "sarah20" against a Shopify code of "SARAH20" would silently attribute
+    // nothing, and nobody finds out until a creator asks where their money is.
     const couponLink = await prisma.affiliateLink.findFirst({
       where: {
-        coupon_code: data.couponCode,
+        coupon_code: { equals: data.couponCode, mode: 'insensitive' },
         shopify_shop_id: data.shopifyShopId,
       },
       include: {

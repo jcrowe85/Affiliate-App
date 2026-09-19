@@ -165,9 +165,12 @@ export async function attributeOrderEnhanced(
 
   // Method 1: Coupon code (highest priority, always reliable)
   if (data.couponCode) {
+    // Case-insensitive: Shopify echoes the code as the customer typed it, and
+    // an admin who stored "sarah20" against a code created as "SARAH20" would
+    // otherwise earn that creator nothing on every sale, with no error anywhere.
     const couponLink = await prisma.affiliateLink.findFirst({
       where: {
-        coupon_code: data.couponCode,
+        coupon_code: { equals: data.couponCode, mode: 'insensitive' },
         shopify_shop_id: data.shopifyShopId,
       },
       include: {

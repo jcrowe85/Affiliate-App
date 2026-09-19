@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     
     const apiKey = process.env.SHOPIFY_API_KEY;
     const apiSecret = process.env.SHOPIFY_API_SECRET;
-    const scopes = process.env.SHOPIFY_SCOPES || 'read_products,write_orders,read_orders';
+    const scopes = process.env.SHOPIFY_SCOPES || 'read_products,write_orders,read_orders,read_discounts,write_discounts';
 
     if (!apiKey || !apiSecret) {
       throw new Error('SHOPIFY_API_KEY and SHOPIFY_API_SECRET must be set in environment variables');
