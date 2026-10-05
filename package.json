@@ -17,6 +17,7 @@
     "db:status": "prisma migrate status",
     "db:studio": "prisma studio",
     "db:backfill-offer-numbers": "tsx scripts/backfill-offer-numbers.ts",
+    "seeds:backfill": "tsx scripts/backfill-seed-orders.ts",
     "type-check": "tsc --noEmit",
     "test:shopify-config": "node scripts/test-shopify-config.js",
     "test:webhook": "bash scripts/test-webhook-curl.sh",

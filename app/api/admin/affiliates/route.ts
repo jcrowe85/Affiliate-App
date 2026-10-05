@@ -43,6 +43,18 @@ export async function GET(request: NextRequest) {
           orderBy: { created_at: 'asc' },
           take: 1,
         },
+        // Fallback for the Meta/Trybe label on affiliates whose own source was
+        // overwritten or never copied across at approval.
+        application: { select: { source: true } },
+        seed_orders: {
+          select: {
+            shopify_order_id: true,
+            order_name: true,
+            items: true,
+            created_at: true,
+          },
+          orderBy: { created_at: 'desc' },
+        },
         _count: {
           select: {
             links: true,
@@ -176,6 +188,9 @@ export async function GET(request: NextRequest) {
           zip: a.zip,
           phone: a.phone,
           source: a.source,
+          creator_channel:
+            channelOfSource(a.source) ?? channelOfSource(a.application?.source),
+          seed_orders: a.seed_orders,
           status: a.status,
           payout_method: a.payout_method,
           payout_identifier: a.payout_identifier,

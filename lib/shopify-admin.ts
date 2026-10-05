@@ -261,6 +261,13 @@ export interface SeedOrderInput {
   sendReceipt: boolean;
 }
 
+export interface SeededItem {
+  title: string;
+  /** Null for single-variant products, where Shopify's "Default Title" says nothing. */
+  variant_title: string | null;
+  quantity: number;
+}
+
 export interface CreatedShopifyOrder {
   id: string;
   legacyResourceId: string;
@@ -268,6 +275,17 @@ export interface CreatedShopifyOrder {
   totalPrice: string;
   currency: string;
   adminUrl: string;
+  items: SeededItem[];
+}
+
+type LineItemNode = { title: string; variantTitle: string | null; quantity: number };
+
+function toSeededItems(nodes: LineItemNode[]): SeededItem[] {
+  return nodes.map((n) => ({
+    title: n.title,
+    variant_title: n.variantTitle && n.variantTitle !== 'Default Title' ? n.variantTitle : null,
+    quantity: n.quantity,
+  }));
 }
 
 export async function createSeedOrder(
@@ -283,6 +301,7 @@ export async function createSeedOrder(
           name
           currencyCode
           totalPriceSet { shopMoney { amount currencyCode } }
+          lineItems(first: 50) { nodes { title variantTitle quantity } }
         }
         userErrors { field message }
       }
@@ -297,6 +316,7 @@ export async function createSeedOrder(
         name: string;
         currencyCode: string;
         totalPriceSet: { shopMoney: { amount: string; currencyCode: string } };
+        lineItems: { nodes: LineItemNode[] };
       } | null;
       userErrors: Array<{ field: string[] | null; message: string }>;
     };
@@ -359,5 +379,71 @@ export async function createSeedOrder(
     totalPrice: order.totalPriceSet.shopMoney.amount,
     currency: order.totalPriceSet.shopMoney.currencyCode,
     adminUrl: `https://${creds.domain}/admin/orders/${order.legacyResourceId}`,
+    items: toSeededItems(order.lineItems.nodes),
   };
+}
+
+export interface PastSeedOrder {
+  legacyResourceId: string;
+  name: string;
+  createdAt: string;
+  tags: string[];
+  items: SeededItem[];
+}
+
+/**
+ * Every seeding order already in Shopify, found by the tag createSeedOrder
+ * puts on them. Used to backfill orders sent before they were recorded
+ * locally. Needs read_orders, which creating them did not.
+ */
+export async function listSeedOrders(creds: ShopifyAdminCredentials): Promise<PastSeedOrder[]> {
+  const query = `
+    query PastSeedOrders($cursor: String) {
+      orders(first: 50, after: $cursor, query: "tag:affiliate-seeding", sortKey: CREATED_AT) {
+        pageInfo { hasNextPage endCursor }
+        nodes {
+          legacyResourceId
+          name
+          createdAt
+          cancelledAt
+          tags
+          lineItems(first: 50) { nodes { title variantTitle quantity } }
+        }
+      }
+    }
+  `;
+
+  type Resp = {
+    orders: {
+      pageInfo: { hasNextPage: boolean; endCursor: string | null };
+      nodes: Array<{
+        legacyResourceId: string;
+        name: string;
+        createdAt: string;
+        cancelledAt: string | null;
+        tags: string[];
+        lineItems: { nodes: LineItemNode[] };
+      }>;
+    };
+  };
+
+  const orders: PastSeedOrder[] = [];
+  let cursor: string | null = null;
+  do {
+    const data: Resp = await shopifyAdminGraphQL<Resp>(creds, query, { cursor });
+    for (const n of data.orders.nodes) {
+      // A cancelled seed order never shipped, so nothing was sent.
+      if (n.cancelledAt) continue;
+      orders.push({
+        legacyResourceId: n.legacyResourceId,
+        name: n.name,
+        createdAt: n.createdAt,
+        tags: n.tags,
+        items: toSeededItems(n.lineItems.nodes),
+      });
+    }
+    cursor = data.orders.pageInfo.hasNextPage ? data.orders.pageInfo.endCursor : null;
+  } while (cursor);
+
+  return orders;
 }

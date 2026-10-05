@@ -56,12 +56,33 @@ model Affiliate {
   subscription_attributions   SubscriptionAttribution[]
   VisitorSession              VisitorSession[]
   payout_verifications        PayoutMethodVerification[]
+  seed_orders                 AffiliateSeedOrder[]
 
   @@unique([shopify_shop_id, affiliate_number])
   @@unique([shopify_shop_id, merchant_id])
   @@index([shopify_shop_id, status])
   @@index([email])
   @@index([offer_id])
+}
+
+/// Free product sent to an affiliate to film with. The order itself lives in
+/// Shopify; this keeps what was sent, so the affiliates table can show it
+/// without a Shopify round-trip per row.
+model AffiliateSeedOrder {
+  id               String    @id @default(cuid())
+  affiliate_id     String
+  shopify_shop_id  String
+  /// Shopify's numeric order id — unique, so a backfill can be re-run safely.
+  shopify_order_id String    @unique
+  /// e.g. "#1042"
+  order_name       String
+  /// [{ title, variant_title, quantity }] as Shopify named them at send time.
+  items            Json
+  created_at       DateTime  @default(now())
+  affiliate        Affiliate @relation(fields: [affiliate_id], references: [id], onDelete: Cascade)
+
+  @@index([affiliate_id, created_at])
+  @@index([shopify_shop_id])
 }
 
 model AffiliateApplication {

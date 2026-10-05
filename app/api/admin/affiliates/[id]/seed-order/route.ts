@@ -107,6 +107,22 @@ export async function POST(
       sendReceipt: send_receipt,
     });
 
+    // The order already exists in Shopify at this point, so a failure to note
+    // it locally must not report the send as failed and invite a second one.
+    try {
+      await prisma.affiliateSeedOrder.create({
+        data: {
+          affiliate_id: affiliate.id,
+          shopify_shop_id: admin.shopify_shop_id,
+          shopify_order_id: order.legacyResourceId,
+          order_name: order.name,
+          items: order.items as any,
+        },
+      });
+    } catch (recordError) {
+      console.error(`Seed order ${order.name} was created but not recorded:`, recordError);
+    }
+
     return NextResponse.json({ order });
   } catch (error: any) {
     if (error instanceof ShopifyAdminError) {

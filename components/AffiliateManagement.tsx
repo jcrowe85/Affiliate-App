@@ -84,6 +84,9 @@ interface Affiliate {
   zip: string | null;
   phone: string | null;
   source: string | null;
+  /** Which creator signup link they applied through; null for everyone else. */
+  creator_channel: 'meta' | 'trybe' | null;
+  seed_orders: SeedOrderRecord[];
   status: string;
   payout_method: string | null;
   payout_identifier: string | null;
@@ -171,6 +174,35 @@ interface ShopifyProduct {
 interface SeedLine {
   variant_id: string;
   quantity: number;
+}
+
+interface SeededItem {
+  title: string;
+  variant_title: string | null;
+  quantity: number;
+}
+
+// A past seeding order, as recorded when it was sent.
+interface SeedOrderRecord {
+  shopify_order_id: string;
+  order_name: string;
+  items: SeededItem[];
+  created_at: string;
+}
+
+const CREATOR_CHANNEL_LABEL = { meta: 'Meta creator', trybe: 'Trybe creator' } as const;
+
+function seededItemLabel(item: SeededItem, withVariant = false): string {
+  const name = withVariant && item.variant_title ? `${item.title} — ${item.variant_title}` : item.title;
+  return item.quantity > 1 ? `${item.quantity} × ${name}` : name;
+}
+
+// Everything ever sent to an affiliate, as one line for the table.
+function seededSummary(orders: SeedOrderRecord[] | undefined): string {
+  return (orders ?? [])
+    .flatMap((o) => o.items)
+    .map((i) => seededItemLabel(i))
+    .join(', ');
 }
 
 interface SeededOrder {
@@ -2612,6 +2644,7 @@ export default function AffiliateManagement() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Payout</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Offer Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Seeded</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Revenue</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Orders</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">AOV</th>
@@ -2627,6 +2660,7 @@ export default function AffiliateManagement() {
                     return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
                   };
                   const primaryOffer = a.offer?.name || '—';
+                  const seeded = seededSummary(a.seed_orders);
 
                   return (
                     <tr key={a.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
@@ -2639,6 +2673,11 @@ export default function AffiliateManagement() {
                         >
                           {a.first_name && a.last_name ? `${a.first_name} ${a.last_name}` : a.name}
                         </button>
+                        {a.creator_channel && (
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            {CREATOR_CHANNEL_LABEL[a.creator_channel]}
+                          </div>
+                        )}
                         {a.company && <div className="text-xs text-gray-500 dark:text-gray-400">{a.company}</div>}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -2719,7 +2758,20 @@ export default function AffiliateManagement() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <PayoutMethodBadge method={a.payout_method} identifier={a.payout_identifier} />
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">{primaryOffer}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                        <div className="max-w-[9rem] truncate" title={primaryOffer}>{primaryOffer}</div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                        {seeded ? (
+                          <div className="max-w-[11rem] truncate" title={seeded}>
+                            <span className="font-medium text-gray-900 dark:text-gray-100">Seeded</span>
+                            {' · '}
+                            {seeded}
+                          </div>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
                         {formatCurrency(a.stats.revenue, a.stats.currency)}
                       </td>
@@ -2739,7 +2791,9 @@ export default function AffiliateManagement() {
 
       {/* Read-only affiliate details */}
       {viewingAffiliate && (() => {
-        const a = viewingAffiliate;
+        // Prefer the refreshed row, so an order sent from this popup shows up
+        // in its Seeded list straight away.
+        const a = affiliates.find((x) => x.id === viewingAffiliate.id) ?? viewingAffiliate;
         const fullName =
           a.first_name && a.last_name ? `${a.first_name} ${a.last_name}` : a.name;
         const formatCurrency = (amount: number, currency: string = 'USD') =>
@@ -2990,6 +3044,33 @@ export default function AffiliateManagement() {
                       >
                         Seed affiliate
                       </button>
+                    )}
+                  </div>
+
+                  <div className="mt-4">
+                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Seeded
+                    </div>
+                    {a.seed_orders?.length ? (
+                      <ul className="mt-1 space-y-1">
+                        {a.seed_orders.map((o) => (
+                          <li key={o.shopify_order_id} className="text-sm text-gray-900 dark:text-gray-100">
+                            {o.items.map((i) => seededItemLabel(i, true)).join(', ')}
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              {' · '}
+                              {o.order_name}
+                              {' · '}
+                              {new Date(o.created_at).toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                              })}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Nothing sent yet.</p>
                     )}
                   </div>
 
