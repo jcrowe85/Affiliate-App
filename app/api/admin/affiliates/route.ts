@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ensureAffiliateCoupon } from '@/lib/affiliate-coupon';
-import { isCreatorSource, CREATOR_OFFER_NAME_HINT } from '@/lib/creator-offer';
+import {
+  isCreatorSource,
+  CREATOR_OFFER_NAME_HINT,
+  channelOfSource,
+  CHANNEL_OFFER,
+} from '@/lib/creator-offer';
 import { prisma } from '@/lib/db';
 import { getCurrentAdmin, hashPassword } from '@/lib/auth';
 import { sendApplicationApprovedEmail } from '@/lib/email';
@@ -280,14 +285,22 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    // A creator from the Meta campaign was promised 40% in writing, but the
-    // offer is otherwise chosen by hand on every approval. Fill it in when
-    // nothing was supplied — never override a deliberate choice, since an admin
-    // who picked a different offer meant it.
+    // Each campaign promised a specific commission in writing — 40% to the
+    // creators from Meta's hub, 15% to the ones from Trybe — while the offer is
+    // otherwise chosen by hand on every approval. Fill it in when nothing was
+    // supplied, and never override a deliberate choice: an admin who picked a
+    // different offer meant it.
+    //
+    // Routing by channel rather than by one campaign's flag is the point. Two
+    // links now feed this form, both arriving as applications that look alike,
+    // and the gap between 40% and 15% of a first order is paid out of margin on
+    // every sale that creator ever drives.
     let effectiveOfferId = offer_id?.trim() || '';
-    if (!effectiveOfferId && isCreatorSource(application?.source ?? source)) {
-      const configured = process.env.CREATOR_OFFER_ID?.trim();
-      const creatorOffer = configured
+    const channel = channelOfSource(application?.source ?? source);
+    if (!effectiveOfferId && channel) {
+      const { envVar, nameHint } = CHANNEL_OFFER[channel];
+      const configured = process.env[envVar]?.trim();
+      const channelOffer = configured
         ? await prisma.offer.findFirst({
             where: { id: configured, shopify_shop_id: admin.shopify_shop_id },
             select: { id: true },
@@ -295,11 +308,11 @@ export async function POST(request: NextRequest) {
         : await prisma.offer.findFirst({
             where: {
               shopify_shop_id: admin.shopify_shop_id,
-              name: { contains: CREATOR_OFFER_NAME_HINT, mode: 'insensitive' },
+              name: { contains: nameHint, mode: 'insensitive' },
             },
             select: { id: true },
           });
-      if (creatorOffer) effectiveOfferId = creatorOffer.id;
+      if (channelOffer) effectiveOfferId = channelOffer.id;
     }
 
     // Validate that an offer is provided
