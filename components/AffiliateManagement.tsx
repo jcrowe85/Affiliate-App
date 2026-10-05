@@ -329,7 +329,7 @@ export default function AffiliateManagement() {
   // "Add Affiliate" first asks how: fill the form in, or hand out the signup link.
   const [showAddChoice, setShowAddChoice] = useState(false);
   const [showSignupLinkModal, setShowSignupLinkModal] = useState(false);
-  const [copiedSignupLink, setCopiedSignupLink] = useState(false);
+  const [copiedSignupLink, setCopiedSignupLink] = useState<string | null>(null);
   // Resolved on the client so the link carries whatever host the admin is on
   // (production, preview or localhost) rather than a hardcoded domain.
   const [origin, setOrigin] = useState('');
@@ -892,11 +892,35 @@ export default function AffiliateManagement() {
   // known, so the value is never rendered as an empty string.
   const signupUrl = origin ? `${origin}/apply` : '/apply';
 
-  const copySignupLink = async () => {
+  // The ?source= tag is what labels the applicant as a Meta or Trybe creator
+  // and pre-selects the offer that channel was promised; the plain link sets
+  // neither.
+  const signupLinks = [
+    {
+      key: 'meta',
+      label: 'Meta creators',
+      hint: 'Applicants are tagged as Meta creators and put on their offer.',
+      url: `${signupUrl}?source=meta`,
+    },
+    {
+      key: 'trybe',
+      label: 'Trybe creators',
+      hint: 'Applicants are tagged as Trybe creators and put on their offer.',
+      url: `${signupUrl}?source=trybe`,
+    },
+    {
+      key: 'general',
+      label: 'Everyone else',
+      hint: 'The plain form, with no creator tag.',
+      url: signupUrl,
+    },
+  ];
+
+  const copySignupLink = async (key: string, url: string) => {
     try {
-      await navigator.clipboard.writeText(signupUrl);
-      setCopiedSignupLink(true);
-      setTimeout(() => setCopiedSignupLink(false), 2000);
+      await navigator.clipboard.writeText(url);
+      setCopiedSignupLink(key);
+      setTimeout(() => setCopiedSignupLink(null), 2000);
     } catch (err) {
       setError('Failed to copy link to clipboard');
     }
@@ -1151,7 +1175,7 @@ export default function AffiliateManagement() {
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Affiliate signup link</h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                  Share this with anyone you want to apply.
+                  Share the one that matches who you&apos;re inviting.
                 </p>
               </div>
               <button
@@ -1167,28 +1191,41 @@ export default function AffiliateManagement() {
             </div>
 
             <div className="p-6 space-y-4">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  readOnly
-                  value={signupUrl}
-                  onFocus={(e) => e.currentTarget.select()}
-                  aria-label="Affiliate signup form link"
-                  className="flex-1 min-w-0 px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg bg-gray-50 font-mono text-sm"
-                />
-                <button
-                  type="button"
-                  onClick={copySignupLink}
-                  className={`px-4 py-2 text-white rounded-lg text-sm font-medium shrink-0 ${
-                    copiedSignupLink ? 'bg-green-600 hover:bg-green-700' : 'bg-indigo-600 hover:bg-indigo-700'
-                  }`}
-                >
-                  Copy
-                </button>
-              </div>
+              {signupLinks.map((link) => (
+                <div key={link.key}>
+                  <label
+                    htmlFor={`signup-link-${link.key}`}
+                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                  >
+                    {link.label}
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      id={`signup-link-${link.key}`}
+                      type="text"
+                      readOnly
+                      value={link.url}
+                      onFocus={(e) => e.currentTarget.select()}
+                      className="flex-1 min-w-0 px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg bg-gray-50 font-mono text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => copySignupLink(link.key, link.url)}
+                      className={`px-4 py-2 text-white rounded-lg text-sm font-medium shrink-0 ${
+                        copiedSignupLink === link.key
+                          ? 'bg-green-600 hover:bg-green-700'
+                          : 'bg-indigo-600 hover:bg-indigo-700'
+                      }`}
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{link.hint}</p>
+                </div>
+              ))}
 
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                Applications submitted through this form appear under{' '}
+                Applications submitted through any of these appear under{' '}
                 <strong>Pending applications</strong> at the top of this page, where you can
                 complete their setup or reject them.
               </p>
